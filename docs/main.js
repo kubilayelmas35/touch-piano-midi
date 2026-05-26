@@ -29,6 +29,9 @@ const AppSettings = (() => {
     keyColorMid: "#a855f7",
     keyColorBottom: "#6b21a8",
     hitLineColor: "#d8b4fe",
+    pianoDock: "bottom",
+    pianoAlign: "stretch",
+    instrumentId: "piano",
   };
 
   function load() {
@@ -93,15 +96,25 @@ window.AppTheme = AppTheme;
 
 
 /* === audio.js === */
-/** Piyano benzeri ses — basılı tutunca doğal sönüm (decay) */
+/** Sentez enstrüman sesleri — Web Audio */
 const AudioEngine = (() => {
   let ctx = null;
   const voices = new Map();
 
   let dynamicPressure = true;
   let sustainEnabled = true;
+  let instrumentId = "piano";
   const RELEASE_FAST = 0.05;
   const RELEASE_SLOW = 0.55;
+
+  const INSTRUMENTS = {
+    piano: { label: "Piyano", sustainScale: 1 },
+    violin: { label: "Keman", sustainScale: 1.15 },
+    guitar: { label: "Gitar", sustainScale: 0.35 },
+    flute: { label: "Flüt", sustainScale: 0.85 },
+    brass: { label: "Bakır üflemeli", sustainScale: 0.9 },
+    synth: { label: "Synth", sustainScale: 0.75 },
+  };
 
   function ensure() {
     if (!ctx) ctx = new AudioContext();
@@ -121,6 +134,17 @@ const AudioEngine = (() => {
     sustainEnabled = !!on;
   }
 
+  function setInstrument(id) {
+    if (INSTRUMENTS[id]) instrumentId = id;
+  }
+
+  function getInstruments() {
+    return Object.entries(INSTRUMENTS).map(([id, meta]) => ({
+      id,
+      label: meta.label,
+    }));
+  }
+
   function velocityFromPointer(e, fallback = 0.75) {
     if (!dynamicPressure) return fallback;
     let v = fallback;
@@ -133,66 +157,167 @@ const AudioEngine = (() => {
     return Math.max(0.15, Math.min(1, v));
   }
 
+  function voiceConfig(id) {
+    switch (id) {
+      case "violin":
+        return {
+          oscs: [{ type: "sawtooth", gain: 0.42 }, { type: "sine", ratio: 2, gain: 0.12 }],
+          peak: 0.42,
+          attack: 0.07,
+          sustain: 0.32,
+          decay1: 0.45,
+          decay2: 2.6,
+          tail: 0.06,
+          filterType: "lowpass",
+          filterStart: 2400,
+          filterEnd: 900,
+          filterVel: 1400,
+          filterQ: 1.8,
+          vibratoHz: 5.5,
+          vibratoDepth: 0.007,
+        };
+      case "guitar":
+        return {
+          oscs: [{ type: "triangle", gain: 0.55 }, { type: "sine", ratio: 2, gain: 0.08 }],
+          peak: 0.48,
+          attack: 0.004,
+          sustain: 0.12,
+          decay1: 0.08,
+          decay2: 0.55,
+          tail: 0.02,
+          filterType: "bandpass",
+          filterStart: 1800,
+          filterEnd: 600,
+          filterVel: 800,
+          filterQ: 1.2,
+        };
+      case "flute":
+        return {
+          oscs: [{ type: "sine", gain: 0.5 }, { type: "triangle", ratio: 2, gain: 0.08 }],
+          peak: 0.38,
+          attack: 0.05,
+          sustain: 0.28,
+          decay1: 0.35,
+          decay2: 1.8,
+          tail: 0.05,
+          filterType: "lowpass",
+          filterStart: 3600,
+          filterEnd: 1200,
+          filterVel: 900,
+          filterQ: 0.5,
+          vibratoHz: 4.2,
+          vibratoDepth: 0.004,
+        };
+      case "brass":
+        return {
+          oscs: [{ type: "square", gain: 0.22 }, { type: "sawtooth", gain: 0.28 }],
+          peak: 0.44,
+          attack: 0.03,
+          sustain: 0.3,
+          decay1: 0.4,
+          decay2: 1.6,
+          tail: 0.05,
+          filterType: "lowpass",
+          filterStart: 2200,
+          filterEnd: 700,
+          filterVel: 1100,
+          filterQ: 1.4,
+        };
+      case "synth":
+        return {
+          oscs: [{ type: "sawtooth", gain: 0.32 }, { type: "square", ratio: 0.5, gain: 0.12 }],
+          peak: 0.4,
+          attack: 0.01,
+          sustain: 0.22,
+          decay1: 0.25,
+          decay2: 1.2,
+          tail: 0.04,
+          filterType: "lowpass",
+          filterStart: 4200,
+          filterEnd: 800,
+          filterVel: 2000,
+          filterQ: 2.2,
+        };
+      default:
+        return {
+          oscs: [
+            { type: "triangle", gain: 0.5 },
+            { type: "sine", ratio: 2.01, gain: 0.22 },
+            { type: "sine", ratio: 0.5, gain: 0.1 },
+          ],
+          peak: 0.38,
+          attack: 0.012,
+          sustain: 0.45,
+          decay1: 0.35,
+          decay2: 2.8,
+          tail: 0.08,
+          filterType: "lowpass",
+          filterStart: 3200,
+          filterEnd: 900,
+          filterVel: 1800,
+          filterQ: 0.7,
+        };
+    }
+  }
+
+  function buildVoice(ac, freq, vol, velocity, cfg) {
+    const t = ac.currentTime;
+    const master = ac.createGain();
+    master.gain.setValueAtTime(0.0001, t);
+    master.gain.exponentialRampToValueAtTime(Math.max(0.0002, vol * cfg.peak), t + cfg.attack);
+    master.gain.exponentialRampToValueAtTime(
+      Math.max(0.0002, vol * cfg.sustain),
+      t + cfg.decay1
+    );
+    master.gain.exponentialRampToValueAtTime(Math.max(0.0001, vol * cfg.tail), t + cfg.decay2);
+
+    const filter = ac.createBiquadFilter();
+    filter.type = cfg.filterType || "lowpass";
+    filter.frequency.setValueAtTime(cfg.filterStart + velocity * cfg.filterVel, t);
+    filter.frequency.exponentialRampToValueAtTime(
+      Math.max(200, cfg.filterEnd + velocity * cfg.filterVel * 0.25),
+      t + cfg.decay2
+    );
+    filter.Q.value = cfg.filterQ ?? 0.7;
+    filter.connect(master);
+    master.connect(ac.destination);
+
+    const oscNodes = [];
+    for (const spec of cfg.oscs) {
+      const osc = ac.createOscillator();
+      osc.type = spec.type;
+      osc.frequency.value = freq * (spec.ratio || 1);
+      const g = ac.createGain();
+      g.gain.value = spec.gain;
+      osc.connect(g);
+      g.connect(filter);
+      osc.start(t);
+      oscNodes.push(osc);
+    }
+
+    if (cfg.vibratoHz && oscNodes[0]) {
+      const lfo = ac.createOscillator();
+      const lfoGain = ac.createGain();
+      lfo.frequency.value = cfg.vibratoHz;
+      lfoGain.gain.value = freq * (cfg.vibratoDepth || 0.006);
+      lfo.connect(lfoGain);
+      lfoGain.connect(oscNodes[0].frequency);
+      lfo.start(t);
+      oscNodes.push(lfo);
+    }
+
+    return { oscs: oscNodes, master, filter, started: t, peak: vol };
+  }
+
   function noteOn(midi, velocity = 0.75) {
     const ac = ensure();
     noteOff(midi, true);
 
-    const t = ac.currentTime;
     const freq = midiToFreq(midi);
     const vol = velocity * 0.38;
-
-    const master = ac.createGain();
-    master.gain.setValueAtTime(0.0001, t);
-    master.gain.exponentialRampToValueAtTime(Math.max(0.0002, vol), t + 0.012);
-
-    const decay1 = t + 0.35;
-    const decay2 = t + 2.8;
-    master.gain.exponentialRampToValueAtTime(Math.max(0.0002, vol * 0.45), decay1);
-    master.gain.exponentialRampToValueAtTime(Math.max(0.0001, vol * 0.08), decay2);
-
-    const osc1 = ac.createOscillator();
-    const osc2 = ac.createOscillator();
-    const osc3 = ac.createOscillator();
-    osc1.type = "triangle";
-    osc2.type = "sine";
-    osc3.type = "sine";
-    osc1.frequency.value = freq;
-    osc2.frequency.value = freq * 2.01;
-    osc3.frequency.value = freq * 0.5;
-
-    const g1 = ac.createGain();
-    const g2 = ac.createGain();
-    const g3 = ac.createGain();
-    g1.gain.value = 0.5;
-    g2.gain.value = 0.22;
-    g3.gain.value = 0.1;
-
-    const filter = ac.createBiquadFilter();
-    filter.type = "lowpass";
-    filter.frequency.setValueAtTime(3200 + velocity * 1800, t);
-    filter.frequency.exponentialRampToValueAtTime(900 + velocity * 400, decay2);
-    filter.Q.value = 0.7;
-
-    osc1.connect(g1);
-    osc2.connect(g2);
-    osc3.connect(g3);
-    g1.connect(filter);
-    g2.connect(filter);
-    g3.connect(filter);
-    filter.connect(master);
-    master.connect(ac.destination);
-
-    osc1.start(t);
-    osc2.start(t);
-    osc3.start(t);
-
-    voices.set(midi, {
-      oscs: [osc1, osc2, osc3],
-      master,
-      filter,
-      started: t,
-      peak: vol,
-    });
+    const cfg = voiceConfig(instrumentId);
+    const voice = buildVoice(ac, freq, vol, velocity, cfg);
+    voices.set(midi, voice);
   }
 
   function noteOff(midi, silent = false) {
@@ -202,7 +327,9 @@ const AudioEngine = (() => {
 
     const ac = ensure();
     const t = ac.currentTime;
-    const release = silent ? 0.001 : sustainEnabled ? RELEASE_SLOW : RELEASE_FAST;
+    const scale = INSTRUMENTS[instrumentId]?.sustainScale ?? 1;
+    const base = silent ? 0.001 : sustainEnabled ? RELEASE_SLOW : RELEASE_FAST;
+    const release = Math.min(1.2, base * scale);
 
     try {
       voice.master.gain.cancelScheduledValues(t);
@@ -211,7 +338,13 @@ const AudioEngine = (() => {
       voice.master.gain.exponentialRampToValueAtTime(0.0001, t + release);
 
       const stopAt = t + release + 0.06;
-      for (const osc of voice.oscs) osc.stop(stopAt);
+      for (const osc of voice.oscs) {
+        try {
+          osc.stop(stopAt);
+        } catch {
+          /* */
+        }
+      }
     } catch {
       for (const osc of voice.oscs) {
         try {
@@ -241,6 +374,8 @@ const AudioEngine = (() => {
     stopAll,
     setDynamicPressure,
     setSustain,
+    setInstrument,
+    getInstruments,
     velocityFromPointer,
     midiToFreq,
   };
@@ -2285,6 +2420,10 @@ window.mainJsOk = true;
   const keyHeightRange = $("#keyHeightRange");
   const keyWidthLabel = $("#keyWidthLabel");
   const keyHeightLabel = $("#keyHeightLabel");
+  const pianoDock = $("#pianoDock");
+  const pianoAlign = $("#pianoAlign");
+  const instrumentSelect = $("#instrumentSelect");
+  const pianoWrap = $("#pianoWrap");
   const dynamicPressure = $("#dynamicPressure");
   const sustainEnabled = $("#sustainEnabled");
   const speedRange = $("#speedRange");
@@ -2477,6 +2616,31 @@ window.mainJsOk = true;
     return "Alevli!";
   }
 
+  function applyPianoLayout(s) {
+    const dock = s.pianoDock || "bottom";
+    const align = s.pianoAlign || "stretch";
+    document.body.classList.remove("piano-dock-bottom", "piano-dock-top", "piano-dock-middle");
+    document.body.classList.add(`piano-dock-${dock}`);
+    if (pianoWrap) {
+      pianoWrap.classList.remove(
+        "piano-align-stretch",
+        "piano-align-left",
+        "piano-align-center",
+        "piano-align-right"
+      );
+      pianoWrap.classList.add(`piano-align-${align}`);
+    }
+    if (pianoDock) pianoDock.value = dock;
+    if (pianoAlign) pianoAlign.value = align;
+    setTimeout(() => {
+      try {
+        requireMods().Game.resize();
+      } catch {
+        /* */
+      }
+    }, 80);
+  }
+
   function applySettings(s) {
     const { Piano, Game, AudioEngine } = requireMods();
     keyWidthRange.value = String(s.keyWidth);
@@ -2498,6 +2662,8 @@ window.mainJsOk = true;
 
     AudioEngine.setDynamicPressure(s.dynamicPressure);
     AudioEngine.setSustain(s.sustainEnabled);
+    AudioEngine.setInstrument(s.instrumentId || "piano");
+    if (instrumentSelect) instrumentSelect.value = s.instrumentId || "piano";
     Game.setTimingWindow(s.timingWindow);
     Game.setSpeed(s.speed / 100);
     Game.setFlameIntensity(s.flameIntensity || 1);
@@ -2512,8 +2678,9 @@ window.mainJsOk = true;
     applyThemeFromSettings(s);
     applyLabelSettings(s);
     setSidebarVisible(s.sidebarVisible !== false, false);
+    applyPianoLayout(s);
     populateOctaveSelects(s.octaveStart, s.octaveCount);
-    Piano.setAutoFit(true);
+    Piano.setAutoFit((s.pianoAlign || "stretch") === "stretch");
     Piano.setKeySize(s.keyWidth, s.keyHeight);
     const clamped = PianoRange.clampRange(s.octaveStart, s.octaveCount);
     Piano.buildKeys(clamped.startOctave, clamped.octaveCount);
@@ -2591,7 +2758,7 @@ window.mainJsOk = true;
         Number(octaveCount.value)
       ) || getOctaveRange();
 
-    Piano.setAutoFit(true);
+    Piano.setAutoFit((AppSettings.load().pianoAlign || "stretch") === "stretch");
     Piano.buildKeys(clamped.startOctave, clamped.octaveCount);
     window.KeyboardInput?.rebuild?.();
     applyLabelSettings(AppSettings.load());
@@ -2618,7 +2785,7 @@ window.mainJsOk = true;
     const fit = PianoRange.fitRangeToNotes(notes);
     populateOctaveSelects(fit.startOctave, fit.octaveCount);
     const { Piano } = requireMods();
-    Piano.setAutoFit(true);
+    Piano.setAutoFit((s.pianoAlign || "stretch") === "stretch");
     Piano.buildKeys(fit.startOctave, fit.octaveCount);
     persistSettings({
       octaveStart: fit.startOctave,
@@ -2640,7 +2807,7 @@ window.mainJsOk = true;
         false
       );
     } else {
-      Piano.setAutoFit(true);
+      Piano.setAutoFit((s.pianoAlign || "stretch") === "stretch");
       if (typeof Piano.autoSizeKeys === "function") {
         /* buildKeys içinde autoSizeKeys çağrılır */
       }
@@ -2989,6 +3156,27 @@ window.mainJsOk = true;
     Piano.setKeySize(w, h);
     persistSettings({ keyHeight: h, octaveLockManual: true });
     reloadTrackNotes();
+  });
+
+  pianoDock?.addEventListener("change", () => {
+    persistSettings({ pianoDock: pianoDock.value });
+    applyPianoLayout(AppSettings.load());
+  });
+
+  pianoAlign?.addEventListener("change", () => {
+    const align = pianoAlign.value;
+    persistSettings({ pianoAlign: align });
+    const s = AppSettings.load();
+    requireMods().Piano.setAutoFit(align === "stretch");
+    applyPianoLayout(s);
+    rebuildKeyboardFromSettings();
+  });
+
+  instrumentSelect?.addEventListener("change", () => {
+    const id = instrumentSelect.value;
+    requireMods().AudioEngine.setInstrument(id);
+    persistSettings({ instrumentId: id });
+    toast(`Enstrüman: ${instrumentSelect.selectedOptions[0]?.textContent || id}`);
   });
 
   dynamicPressure.addEventListener("change", () => {

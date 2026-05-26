@@ -26,6 +26,9 @@ const AppSettings = (() => {
     keyColorMid: "#a855f7",
     keyColorBottom: "#6b21a8",
     hitLineColor: "#d8b4fe",
+    pianoDock: "bottom",
+    pianoAlign: "stretch",
+    instrumentId: "piano",
   };
 
   function load() {

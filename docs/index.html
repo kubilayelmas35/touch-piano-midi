@@ -24,6 +24,21 @@
         "sidebar main"
         "sidebar piano";
     }
+    body.has-auth-banner.piano-dock-top {
+      grid-template-areas:
+        "banner banner"
+        "header header"
+        "sidebar piano"
+        "sidebar main";
+    }
+    body.has-auth-banner.piano-dock-middle .game-area,
+    body.has-auth-banner.piano-dock-middle .piano-wrap {
+      grid-area: main;
+    }
+    body.has-auth-banner.piano-dock-middle .piano-wrap {
+      align-self: end;
+      z-index: 8;
+    }
     body.has-auth-banner .top-bar {
       grid-area: header;
     }
@@ -151,6 +166,35 @@
           <input type="range" id="keyHeightRange" min="90" max="420" value="160" />
         </label>
         <label class="field">
+          Klavye konumu (dikey)
+          <select id="pianoDock">
+            <option value="bottom" selected>Alt (varsayılan)</option>
+            <option value="middle">Orta (notaların altı)</option>
+            <option value="top">Üst</option>
+          </select>
+        </label>
+        <label class="field">
+          Klavye hizası (yatay)
+          <select id="pianoAlign">
+            <option value="stretch" selected>Tam genişlik</option>
+            <option value="left">Sola</option>
+            <option value="center">Ortaya</option>
+            <option value="right">Sağa</option>
+          </select>
+        </label>
+        <p class="hint small-hint">Az oktav kullanıyorsanız ortaya/sağa hizalayın veya orta konuma alın.</p>
+        <label class="field">
+          Enstrüman sesi
+          <select id="instrumentSelect">
+            <option value="piano">Piyano</option>
+            <option value="violin">Keman</option>
+            <option value="guitar">Gitar</option>
+            <option value="flute">Flüt</option>
+            <option value="brass">Bakır üflemeli</option>
+            <option value="synth">Synth</option>
+          </select>
+        </label>
+        <label class="field">
           Etiket modu
           <select id="labelMode">
             <option value="note">Nota adı</option>
@@ -170,7 +214,7 @@
           <input type="text" id="customLabels" placeholder="Z,X,C,V,…" />
           <button type="button" id="btnApplyLabels" class="btn small primary">Uygula</button>
         </label>
-        <p class="hint small-hint">Tuşa <strong>sağ tık</strong> veya <strong>0,6 sn basılı tut</strong> (dokunmatik) → harf ata.</p>
+        <p class="hint small-hint">Tuşa <strong>sağ tık</strong> (fare) → harf ata. Dokunmatikte Ayarlar’dan düzenleyin.</p>
       </div>
 
       <div class="stab-panel" data-panel="look">

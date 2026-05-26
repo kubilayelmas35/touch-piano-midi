@@ -49,6 +49,45 @@ body {
     "sidebar piano";
 }
 
+body.piano-dock-top {
+  grid-template-areas:
+    "header header"
+    "sidebar piano"
+    "sidebar main";
+}
+
+body.piano-dock-middle .game-area,
+body.piano-dock-middle .piano-wrap {
+  grid-area: main;
+}
+
+body.piano-dock-middle .piano-wrap {
+  align-self: end;
+  z-index: 8;
+  background: rgba(10, 12, 16, 0.94);
+  border-top: 1px solid #2a3040;
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.piano-wrap.piano-align-stretch .piano-keys {
+  width: 100%;
+}
+
+.piano-wrap.piano-align-left .piano-keys {
+  margin-left: 0;
+  margin-right: auto;
+}
+
+.piano-wrap.piano-align-center .piano-keys {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.piano-wrap.piano-align-right .piano-keys {
+  margin-left: auto;
+  margin-right: 0;
+}
+
 .top-bar {
   grid-area: header;
   display: flex;
