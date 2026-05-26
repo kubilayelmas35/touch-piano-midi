@@ -1,0 +1,3198 @@
+/* Otomatik birleştirilmiş — npm start öncesi üretilir */
+
+/* === settings.js === */
+const AppSettings = (() => {
+  const KEY = "touch-piano-settings";
+  const defaults = {
+    octaveStart: 3,
+    octaveCount: 2,
+    keyWidth: 48,
+    keyHeight: 160,
+    dynamicPressure: true,
+    sustainEnabled: true,
+    timingWindow: 200,
+    speed: 100,
+    labelMode: "note",
+    labelPreset: "game",
+    customLabels: "Z,X,C,V,B,N,M,A,S,D,F,G,H,J",
+    flameIntensity: 1,
+    flameStyle: "aurora",
+    trimStart: 0,
+    trimEnd: 0,
+    midiLabels: {},
+    keyboardEnabled: true,
+    sidebarVisible: true,
+    autoKeyboardFromSong: true,
+    octaveLockManual: false,
+    effectHue: 275,
+    keyColorTop: "#e8d4ff",
+    keyColorMid: "#a855f7",
+    keyColorBottom: "#6b21a8",
+    hitLineColor: "#d8b4fe",
+  };
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (!raw) return { ...defaults };
+      return { ...defaults, ...JSON.parse(raw) };
+    } catch {
+      return { ...defaults };
+    }
+  }
+
+  function save(partial) {
+    const next = { ...load(), ...partial };
+    localStorage.setItem(KEY, JSON.stringify(next));
+    return next;
+  }
+
+  return { load, save, defaults };
+})();
+
+window.AppSettings = AppSettings;
+
+
+/* === theme.js === */
+/** Tema renkleri — CSS değişkenleri */
+const AppTheme = (() => {
+  const defaults = {
+    effectHue: 275,
+    keyColorTop: "#e8d4ff",
+    keyColorMid: "#a855f7",
+    keyColorBottom: "#6b21a8",
+    hitLineColor: "#d8b4fe",
+  };
+
+  function apply(partial) {
+    const s = { ...defaults, ...partial };
+    const r = document.documentElement;
+    r.style.setProperty("--effect-hue", String(s.effectHue));
+    r.style.setProperty("--key-active-top", s.keyColorTop);
+    r.style.setProperty("--key-active-mid", s.keyColorMid);
+    r.style.setProperty("--key-active-bottom", s.keyColorBottom);
+    r.style.setProperty("--hit-line-color", s.hitLineColor);
+    window.__effectHue = s.effectHue;
+    return s;
+  }
+
+  function fromSettings(s) {
+    return apply({
+      effectHue: s.effectHue,
+      keyColorTop: s.keyColorTop,
+      keyColorMid: s.keyColorMid,
+      keyColorBottom: s.keyColorBottom,
+      hitLineColor: s.hitLineColor,
+    });
+  }
+
+  return { apply, fromSettings, defaults };
+})();
+
+window.AppTheme = AppTheme;
+
+
+/* === audio.js === */
+/** Piyano benzeri ses — basılı tutunca doğal sönüm (decay) */
+const AudioEngine = (() => {
+  let ctx = null;
+  const voices = new Map();
+
+  let dynamicPressure = true;
+  let sustainEnabled = true;
+  const RELEASE_FAST = 0.05;
+  const RELEASE_SLOW = 0.55;
+
+  function ensure() {
+    if (!ctx) ctx = new AudioContext();
+    if (ctx.state === "suspended") ctx.resume();
+    return ctx;
+  }
+
+  function midiToFreq(midi) {
+    return 440 * Math.pow(2, (midi - 69) / 12);
+  }
+
+  function setDynamicPressure(on) {
+    dynamicPressure = !!on;
+  }
+
+  function setSustain(on) {
+    sustainEnabled = !!on;
+  }
+
+  function velocityFromPointer(e, fallback = 0.75) {
+    if (!dynamicPressure) return fallback;
+    let v = fallback;
+    if (e.pressure > 0) {
+      v = 0.25 + Math.min(1, e.pressure) * 0.75;
+    } else if (e.width && e.height) {
+      const area = Math.min(1, (e.width * e.height) / 1200);
+      v = 0.3 + area * 0.7;
+    }
+    return Math.max(0.15, Math.min(1, v));
+  }
+
+  function noteOn(midi, velocity = 0.75) {
+    const ac = ensure();
+    noteOff(midi, true);
+
+    const t = ac.currentTime;
+    const freq = midiToFreq(midi);
+    const vol = velocity * 0.38;
+
+    const master = ac.createGain();
+    master.gain.setValueAtTime(0.0001, t);
+    master.gain.exponentialRampToValueAtTime(Math.max(0.0002, vol), t + 0.012);
+
+    const decay1 = t + 0.35;
+    const decay2 = t + 2.8;
+    master.gain.exponentialRampToValueAtTime(Math.max(0.0002, vol * 0.45), decay1);
+    master.gain.exponentialRampToValueAtTime(Math.max(0.0001, vol * 0.08), decay2);
+
+    const osc1 = ac.createOscillator();
+    const osc2 = ac.createOscillator();
+    const osc3 = ac.createOscillator();
+    osc1.type = "triangle";
+    osc2.type = "sine";
+    osc3.type = "sine";
+    osc1.frequency.value = freq;
+    osc2.frequency.value = freq * 2.01;
+    osc3.frequency.value = freq * 0.5;
+
+    const g1 = ac.createGain();
+    const g2 = ac.createGain();
+    const g3 = ac.createGain();
+    g1.gain.value = 0.5;
+    g2.gain.value = 0.22;
+    g3.gain.value = 0.1;
+
+    const filter = ac.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(3200 + velocity * 1800, t);
+    filter.frequency.exponentialRampToValueAtTime(900 + velocity * 400, decay2);
+    filter.Q.value = 0.7;
+
+    osc1.connect(g1);
+    osc2.connect(g2);
+    osc3.connect(g3);
+    g1.connect(filter);
+    g2.connect(filter);
+    g3.connect(filter);
+    filter.connect(master);
+    master.connect(ac.destination);
+
+    osc1.start(t);
+    osc2.start(t);
+    osc3.start(t);
+
+    voices.set(midi, {
+      oscs: [osc1, osc2, osc3],
+      master,
+      filter,
+      started: t,
+      peak: vol,
+    });
+  }
+
+  function noteOff(midi, silent = false) {
+    const voice = voices.get(midi);
+    if (!voice) return;
+    voices.delete(midi);
+
+    const ac = ensure();
+    const t = ac.currentTime;
+    const release = silent ? 0.001 : sustainEnabled ? RELEASE_SLOW : RELEASE_FAST;
+
+    try {
+      voice.master.gain.cancelScheduledValues(t);
+      const now = Math.max(0.0001, voice.master.gain.value);
+      voice.master.gain.setValueAtTime(now, t);
+      voice.master.gain.exponentialRampToValueAtTime(0.0001, t + release);
+
+      const stopAt = t + release + 0.06;
+      for (const osc of voice.oscs) osc.stop(stopAt);
+    } catch {
+      for (const osc of voice.oscs) {
+        try {
+          osc.stop();
+        } catch {
+          /* */
+        }
+      }
+    }
+  }
+
+  function play(midi, velocity = 0.75, duration = 0.35) {
+    noteOn(midi, velocity);
+    const ms = Math.max(80, duration * 1000);
+    setTimeout(() => noteOff(midi), ms);
+  }
+
+  function stopAll() {
+    for (const midi of [...voices.keys()]) noteOff(midi, true);
+  }
+
+  return {
+    ensure,
+    noteOn,
+    noteOff,
+    play,
+    stopAll,
+    setDynamicPressure,
+    setSustain,
+    velocityFromPointer,
+    midiToFreq,
+  };
+})();
+
+window.AudioEngine = AudioEngine;
+
+
+/* === key-labels.js === */
+/** Tuş etiketleri — nota, harf, özel veya tuş başına (sağ tık) */
+const KeyLabels = (() => {
+  const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+  const WHITE_PC = [0, 2, 4, 5, 7, 9, 11];
+
+  const PRESET_GAME = "ZXCVBNMASDFGHJ".split("");
+  const PRESET_PIANO = "AWSEDRTYUIOPGHJKL".split("");
+
+  let mode = "note";
+  let customString = "ZXCVBNMASDFGHJ";
+  let letterPreset = "game";
+  /** midi → tek harf (beyaz/siyah) */
+  const midiLabels = new Map();
+
+  function setMode(m) {
+    mode = m || "note";
+  }
+
+  function setCustomString(s) {
+    customString = String(s || "");
+  }
+
+  function setLetterPreset(p) {
+    letterPreset = p || "game";
+  }
+
+  function getPresetLetters() {
+    if (letterPreset === "piano") return PRESET_PIANO;
+    return PRESET_GAME;
+  }
+
+  function parseCustomList(str) {
+    return String(str)
+      .split(/[,;\s]+/)
+      .map((c) => c.trim())
+      .filter(Boolean);
+  }
+
+  function setMidiLabel(midi, letter) {
+    const m = Number(midi);
+    const ch = String(letter || "").trim();
+    if (!ch) {
+      midiLabels.delete(m);
+      return;
+    }
+    midiLabels.set(m, ch.length === 1 ? ch : ch[0]);
+  }
+
+  function getMidiLabel(midi) {
+    return midiLabels.get(Number(midi)) || "";
+  }
+
+  function getMidiLabelsObject() {
+    const o = {};
+    midiLabels.forEach((v, k) => {
+      o[k] = v;
+    });
+    return o;
+  }
+
+  function loadMidiLabelsObject(obj) {
+    midiLabels.clear();
+    if (!obj || typeof obj !== "object") return;
+    for (const [k, v] of Object.entries(obj)) {
+      if (v) midiLabels.set(Number(k), String(v).slice(0, 1));
+    }
+  }
+
+  function noteNameForMidi(midi) {
+    const oct = Math.floor(midi / 12) - 1;
+    return `${NOTE_NAMES[midi % 12]}${oct}`;
+  }
+
+  function labelForMidi(midi, startMidi, endMidi) {
+    if (midiLabels.has(midi)) {
+      return midiLabels.get(midi);
+    }
+
+    if (mode === "note") {
+      return NOTE_NAMES[midi % 12];
+    }
+
+    const pc = midi % 12;
+    const isWhite = WHITE_PC.includes(pc);
+
+    if (mode === "letters") {
+      if (!isWhite) return "·";
+      let whiteIndex = 0;
+      for (let m = startMidi; m <= endMidi; m++) {
+        if (!WHITE_PC.includes(m % 12)) continue;
+        if (m === midi) {
+          const letters = getPresetLetters();
+          return letters[whiteIndex % letters.length] || "?";
+        }
+        whiteIndex++;
+      }
+      return "";
+    }
+
+    if (mode === "custom") {
+      const chars = parseCustomList(customString);
+      if (!isWhite) return chars.length > 20 ? "·" : "";
+      let wi = 0;
+      for (let m = startMidi; m <= endMidi; m++) {
+        if (!WHITE_PC.includes(m % 12)) continue;
+        if (m === midi) return chars[wi]?.toUpperCase() || "?";
+        wi++;
+      }
+    }
+
+    return NOTE_NAMES[midi % 12];
+  }
+
+  function applyToKeys(keyMap, range) {
+    const { startMidi, endMidi } = range;
+    keyMap.forEach((el, midi) => {
+      const label = el.querySelector(".key-label");
+      if (!label) return;
+      const text = labelForMidi(midi, startMidi, endMidi);
+      label.textContent = text;
+      const mapped = midiLabels.has(midi);
+      label.classList.toggle("letter-mode", mode !== "note" || mapped);
+      el.title = mapped
+        ? `${noteNameForMidi(midi)} → "${text}" (sağ tık: değiştir)`
+        : `${noteNameForMidi(midi)} — sağ tık ile harf ata`;
+    });
+  }
+
+  return {
+    setMode,
+    setCustomString,
+    setLetterPreset,
+    setMidiLabel,
+    getMidiLabel,
+    getMidiLabelsObject,
+    loadMidiLabelsObject,
+    noteNameForMidi,
+    labelForMidi,
+    applyToKeys,
+    getMode: () => mode,
+    getCustomString: () => customString,
+    hasMidiLabels: () => midiLabels.size > 0,
+  };
+})();
+
+window.KeyLabels = KeyLabels;
+
+
+/* === flame-styles.js === */
+/** Alev / nota çizim stilleri */
+const FlameStyles = (() => {
+  const PITCH_HUES = [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330];
+
+  let current = "aurora";
+
+  function hueToRgb(h, a = 1) {
+    const s = h / 360;
+    const c = 0.9;
+    const x = c * (1 - Math.abs(((s * 6) % 2) - 1));
+    let r = 0, g = 0, b = 0;
+    if (s < 1 / 6) [r, g, b] = [c, x, 0];
+    else if (s < 2 / 6) [r, g, b] = [x, c, 0];
+    else if (s < 3 / 6) [r, g, b] = [0, c, x];
+    else if (s < 4 / 6) [r, g, b] = [0, x, c];
+    else if (s < 5 / 6) [r, g, b] = [x, 0, c];
+    else [r, g, b] = [c, 0, x];
+    return `${Math.round((r + 0.1) * 255)},${Math.round((g + 0.1) * 255)},${Math.round((b + 0.1) * 255)}`;
+  }
+
+  function pitchColor(midi, noteH, velocity, alpha = 1) {
+    const hue = PITCH_HUES[midi % 12];
+    const isSmall = noteH < 22;
+    const sat = isSmall ? 95 : 75;
+    const light = isSmall ? 72 : 52 + (velocity || 0.7) * 15;
+    return `hsla(${hue}, ${sat}%, ${light}%, ${alpha})`;
+  }
+
+  const styles = {
+    aurora: {
+      name: "Aurora (mor)",
+      drawNote(ctx, x, y, w, h, state, midi, vel, intensity) {
+        const hu = (275 + (midi % 12) * 4) % 360;
+        const r = Math.min(w * 0.48, 12);
+        ctx.save();
+        ctx.shadowColor = `hsla(${hu}, 100%, 65%, 0.85)`;
+        ctx.shadowBlur = 14 * intensity;
+        const g = ctx.createLinearGradient(x, y, x, y + h);
+        g.addColorStop(0, `hsla(${hu}, 75%, 75%, 0.95)`);
+        g.addColorStop(1, `hsla(${hu}, 100%, 48%, 1)`);
+        ctx.fillStyle = g;
+        if (typeof ctx.roundRect === "function") {
+          ctx.beginPath();
+          ctx.roundRect(x, y, w, h, r);
+          ctx.fill();
+        } else {
+          ctx.fillRect(x, y, w, h);
+        }
+        ctx.restore();
+      },
+      particle(p) {
+        p.rgb = "200,120,255";
+        p.star = true;
+      },
+    },
+
+    fire: {
+      name: "Alev",
+      drawNote(ctx, x, y, w, h, state, midi, vel, intensity) {
+        if (state === "hit") {
+          const g = ctx.createLinearGradient(x, y, x, y + h);
+          g.addColorStop(0, "rgba(180,255,200,0.4)");
+          g.addColorStop(1, "rgba(34,160,80,1)");
+          ctx.fillStyle = g;
+        } else if (state === "miss") {
+          ctx.fillStyle = "rgba(180,50,50,0.55)";
+        } else {
+          const g = ctx.createLinearGradient(x, y, x, y + h);
+          const top = pitchColor(midi, h, vel, 0.85);
+          g.addColorStop(0, top);
+          g.addColorStop(0.4, `hsla(${(PITCH_HUES[midi % 12] + 40) % 360}, 90%, 65%, 0.9)`);
+          g.addColorStop(0.75, "rgba(255,100,30,0.95)");
+          g.addColorStop(1, "rgba(255,40,0,1)");
+          ctx.fillStyle = g;
+          ctx.shadowColor = "rgba(255,100,40,0.8)";
+          ctx.shadowBlur = 14 * intensity;
+        }
+        roundFill(ctx, x, y, w, h);
+        ctx.shadowBlur = 0;
+      },
+      particle(p, hot) {
+        p.rgb = hot
+          ? ["255,245,160", "255,120,32", "255,34,0"][Math.floor(Math.random() * 3)]
+          : hueToRgb(PITCH_HUES[(p.midi || 0) % 12], 0.85);
+      },
+    },
+
+    ice: {
+      name: "Buz",
+      drawNote(ctx, x, y, w, h, state, midi, vel, intensity) {
+        if (state === "hit") {
+          ctx.fillStyle = "rgba(120,255,200,0.9)";
+        } else if (state === "miss") {
+          ctx.fillStyle = "rgba(100,80,120,0.5)";
+        } else {
+          const g = ctx.createLinearGradient(x, y, x, y + h);
+          g.addColorStop(0, pitchColor(midi, h, vel, 0.9));
+          g.addColorStop(0.5, "rgba(150,230,255,0.95)");
+          g.addColorStop(1, "rgba(40,120,255,1)");
+          ctx.fillStyle = g;
+          ctx.shadowColor = "rgba(100,200,255,0.7)";
+          ctx.shadowBlur = 12 * intensity;
+        }
+        roundFill(ctx, x, y, w, h);
+        ctx.shadowBlur = 0;
+      },
+      particle(p) {
+        p.rgb = p.hot ? "170,240,255" : hueToRgb(200);
+      },
+    },
+
+    neon: {
+      name: "Neon",
+      drawNote(ctx, x, y, w, h, state, midi, vel, intensity) {
+        const hue = PITCH_HUES[midi % 12];
+        if (state === "hit") {
+          ctx.fillStyle = `hsla(${hue},100%,60%,1)`;
+        } else if (state === "miss") {
+          ctx.fillStyle = "rgba(80,80,80,0.4)";
+        } else {
+          ctx.fillStyle = pitchColor(midi, h, vel, 1);
+          ctx.shadowColor = `hsl(${hue},100%,55%)`;
+          ctx.shadowBlur = 20 * intensity;
+          ctx.strokeStyle = `hsla(${hue},100%,80%,0.9)`;
+          ctx.lineWidth = 2;
+        }
+        roundFill(ctx, x, y, w, h);
+        if (state === "pending") roundStroke(ctx, x, y, w, h);
+        ctx.shadowBlur = 0;
+      },
+      particle(p) {
+        p.rgb = hueToRgb(PITCH_HUES[(p.midi || 0) % 12]);
+      },
+    },
+
+    rainbow: {
+      name: "Gökkuşağı",
+      drawNote(ctx, x, y, w, h, state, midi, vel, intensity) {
+        if (state === "hit") {
+          ctx.fillStyle = "#4ade80";
+        } else if (state === "miss") {
+          ctx.fillStyle = "rgba(120,80,80,0.45)";
+        } else {
+          const g = ctx.createLinearGradient(x, y, x, y + h);
+          const n = 5;
+          for (let i = 0; i <= n; i++) {
+            const t = i / n;
+            const hue = (PITCH_HUES[midi % 12] + t * 120) % 360;
+            g.addColorStop(t, `hsla(${hue}, 90%, ${h < 22 ? 70 : 55}%, 0.95)`);
+          }
+          ctx.fillStyle = g;
+          ctx.shadowColor = pitchColor(midi, h, vel, 0.6);
+          ctx.shadowBlur = 10 * intensity;
+        }
+        roundFill(ctx, x, y, w, h);
+        ctx.shadowBlur = 0;
+      },
+      particle(p) {
+        p.rgb = hueToRgb((PITCH_HUES[(p.midi || 0) % 12] + Math.random() * 80) % 360);
+      },
+    },
+
+    minimal: {
+      name: "Sade",
+      drawNote(ctx, x, y, w, h, state, midi, vel) {
+        if (state === "hit") ctx.fillStyle = "rgba(74,222,128,0.85)";
+        else if (state === "miss") ctx.fillStyle = "rgba(248,113,113,0.45)";
+        else ctx.fillStyle = pitchColor(midi, h, vel, 0.88);
+        roundFill(ctx, x, y, w, h);
+      },
+      particle(p) {
+        p.rgb = hueToRgb(PITCH_HUES[(p.midi || 0) % 12]);
+      },
+    },
+
+    plasma: {
+      name: "Plazma",
+      drawNote(ctx, x, y, w, h, state, midi, vel, intensity) {
+        if (state === "hit") {
+          ctx.fillStyle = "#a78bfa";
+        } else if (state === "miss") {
+          ctx.fillStyle = "rgba(80,40,80,0.5)";
+        } else {
+          const g = ctx.createLinearGradient(x, y, x, y + h);
+          g.addColorStop(0, pitchColor(midi, h, vel, 0.7));
+          g.addColorStop(0.5, "rgba(200,100,255,0.95)");
+          g.addColorStop(1, "rgba(120,0,200,1)");
+          ctx.fillStyle = g;
+          ctx.shadowColor = "rgba(180,80,255,0.9)";
+          ctx.shadowBlur = 16 * intensity;
+        }
+        roundFill(ctx, x, y, w, h);
+        ctx.shadowBlur = 0;
+      },
+      particle(p) {
+        p.rgb = p.hot ? "233,213,255" : hueToRgb(280 + ((p.midi || 0) % 12) * 5);
+      },
+    },
+  };
+
+  function roundFill(ctx, x, y, w, h) {
+    if (typeof ctx.roundRect === "function") {
+      ctx.beginPath();
+      ctx.roundRect(x, y, w, h, Math.min(6, w * 0.2));
+      ctx.fill();
+    } else {
+      ctx.fillRect(x, y, w, h);
+    }
+  }
+
+  function roundStroke(ctx, x, y, w, h) {
+    if (typeof ctx.roundRect === "function") {
+      ctx.beginPath();
+      ctx.roundRect(x, y, w, h, Math.min(6, w * 0.2));
+      ctx.stroke();
+    }
+  }
+
+  function setStyle(id) {
+    if (styles[id]) current = id;
+  }
+
+  function getStyle() {
+    return styles[current] || styles.fire;
+  }
+
+  function getStyleIds() {
+    return Object.keys(styles);
+  }
+
+  function getStyleName(id) {
+    return styles[id]?.name || id;
+  }
+
+  return {
+    setStyle,
+    getStyle,
+    getStyleIds,
+    getStyleName,
+    pitchColor,
+    styles,
+  };
+})();
+
+window.FlameStyles = FlameStyles;
+
+
+/* === note-utils.js === */
+/** Nota birleştirme, üst üste binenleri tekilleştirme */
+const NoteUtils = (() => {
+  function mergeAdjacentNotes(notes, maxGapSec = 0.15) {
+    if (!notes?.length) return [];
+    const sorted = [...notes].sort((a, b) => a.time - b.time || a.midi - b.midi);
+    const out = [];
+
+    for (const n of sorted) {
+      const last = out[out.length - 1];
+      const end = last ? last.time + last.duration : 0;
+      if (
+        last &&
+        last.midi === n.midi &&
+        n.time - end <= maxGapSec
+      ) {
+        const newEnd = Math.max(end, n.time + (n.duration || 0));
+        last.duration = Math.max(0.06, newEnd - last.time);
+        last.velocity = Math.max(last.velocity || 0, n.velocity || 0);
+        continue;
+      }
+      out.push({
+        midi: n.midi,
+        time: n.time,
+        duration: Math.max(0.06, n.duration || 0.1),
+        velocity: n.velocity ?? 0.75,
+        name: n.name,
+      });
+    }
+    return out;
+  }
+
+  /** Aynı perdede çakışan aralıkları birleştir */
+  function mergeOverlappingSamePitch(notes) {
+    const groups = new Map();
+    for (const n of notes) {
+      if (!groups.has(n.midi)) groups.set(n.midi, []);
+      groups.get(n.midi).push(n);
+    }
+    const out = [];
+    for (const arr of groups.values()) {
+      arr.sort((a, b) => a.time - b.time);
+      let cur = { ...arr[0] };
+      for (let i = 1; i < arr.length; i++) {
+        const n = arr[i];
+        const curEnd = cur.time + cur.duration;
+        if (n.time < curEnd + 0.04) {
+          const newEnd = Math.max(curEnd, n.time + n.duration);
+          cur.duration = newEnd - cur.time;
+          cur.velocity = Math.max(cur.velocity || 0, n.velocity || 0);
+        } else {
+          out.push(cur);
+          cur = { ...n };
+        }
+      }
+      out.push(cur);
+    }
+    return out.sort((a, b) => a.time - b.time || a.midi - b.midi);
+  }
+
+  function cleanupNotes(notes, minDuration = 0.08) {
+    let list = mergeAdjacentNotes(notes, 0.18);
+    list = mergeOverlappingSamePitch(list);
+    list = mergeAdjacentNotes(list, 0.12);
+    return list.filter((n) => (n.duration || 0) >= minDuration);
+  }
+
+  return { mergeAdjacentNotes, mergeOverlappingSamePitch, cleanupNotes };
+})();
+
+window.NoteUtils = NoteUtils;
+
+
+/* === note-renderer.js === */
+/** Mor/neon düşen notalar, vuruş parıltısı, aurora */
+const NoteRenderer = (() => {
+  function baseHue() {
+    const v = window.__effectHue;
+    if (typeof v === "number" && !Number.isNaN(v)) return v;
+    const css = getComputedStyle(document.documentElement).getPropertyValue("--effect-hue");
+    return Number(css) || 275;
+  }
+
+  function hue(midi) {
+    return (baseHue() + (midi % 12) * 4) % 360;
+  }
+
+  function roundRect(ctx, x, y, w, h, r) {
+    const rad = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    if (typeof ctx.roundRect === "function") {
+      ctx.roundRect(x, y, w, h, rad);
+    } else {
+      ctx.rect(x, y, w, h);
+    }
+  }
+
+  function drawLane(ctx, x, w, h, hitY, midi, t) {
+    const hu = hue(midi);
+    const pulse = 0.04 + Math.sin(t * 2.5 + midi * 0.08) * 0.02;
+    const g = ctx.createLinearGradient(x - w, 0, x + w, 0);
+    g.addColorStop(0, "rgba(0,0,0,0)");
+    g.addColorStop(0.45, `hsla(${hu}, 80%, 55%, ${pulse})`);
+    g.addColorStop(0.55, `hsla(${hu}, 90%, 65%, ${pulse * 1.2})`);
+    g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(x - w * 0.6, 0, w * 1.2, hitY + 8);
+  }
+
+  function drawNote(ctx, opts) {
+    const { x, y, w, h, midi, vel, state, styleId, intensity, time } = opts;
+    if (h < 2) return;
+
+    const style = window.FlameStyles?.styles?.[styleId];
+    if (style?.drawNote && styleId && styleId !== "aurora") {
+      style.drawNote(ctx, x, y, w, h, state, midi, vel, intensity);
+      return;
+    }
+
+    const hu = hue(midi);
+    const v = vel ?? 0.75;
+    const cx = x + w / 2;
+    const r = Math.min(w * 0.48, 12);
+
+    if (state === "hit") {
+      ctx.save();
+      ctx.shadowColor = `hsla(${hu}, 100%, 75%, 1)`;
+      ctx.shadowBlur = 22;
+      const g = ctx.createLinearGradient(x, y, x, y + h);
+      g.addColorStop(0, `hsla(${hu}, 90%, 85%, 1)`);
+      g.addColorStop(1, `hsla(${hu}, 100%, 55%, 1)`);
+      ctx.fillStyle = g;
+      roundRect(ctx, x, y, w, h, r);
+      ctx.fill();
+      ctx.restore();
+      return;
+    }
+    if (state === "miss") {
+      ctx.fillStyle = "rgba(248, 113, 113, 0.4)";
+      roundRect(ctx, x, y, w, h, 4);
+      ctx.fill();
+      return;
+    }
+
+    ctx.save();
+    ctx.shadowColor = `hsla(${hu}, 100%, 65%, 0.9)`;
+    ctx.shadowBlur = (14 + v * 8) * intensity;
+    const body = ctx.createLinearGradient(x, y, x, y + h);
+    body.addColorStop(0, `hsla(${hu}, 70%, 78%, 0.95)`);
+    body.addColorStop(0.35, `hsla(${hu}, 95%, 62%, 1)`);
+    body.addColorStop(0.75, `hsla(${hu}, 100%, 52%, 1)`);
+    body.addColorStop(1, `hsla(${hu}, 100%, 42%, 1)`);
+    ctx.fillStyle = body;
+    roundRect(ctx, x, y, w, h, r);
+    ctx.fill();
+
+    const shine = ctx.createLinearGradient(x, y, x + w * 0.4, y + h * 0.3);
+    shine.addColorStop(0, "rgba(255,255,255,0.4)");
+    shine.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = shine;
+    roundRect(ctx, x + w * 0.08, y + 1, w * 0.3, Math.min(h * 0.3, 20), r * 0.4);
+    ctx.fill();
+
+    const bottomY = y + h;
+    const cap = ctx.createRadialGradient(cx, bottomY, 0, cx, bottomY, w * 0.7);
+    cap.addColorStop(0, `rgba(255,255,255,${0.5 + v * 0.3})`);
+    cap.addColorStop(0.4, `hsla(${hu}, 100%, 75%, 0.85)`);
+    cap.addColorStop(1, `hsla(${hu}, 100%, 50%, 0)`);
+    ctx.fillStyle = cap;
+    ctx.beginPath();
+    ctx.ellipse(cx, bottomY, w * 0.5, Math.min(8, h * 0.12), 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function spawnImpactParticles(particles, x, y, w, midi, count = 16) {
+    const hu = hue(midi);
+    for (let i = 0; i < count; i++) {
+      const a = -Math.PI / 2 + (Math.random() - 0.5) * 1.4;
+      const sp = 2 + Math.random() * 5;
+      particles.push({
+        x: x + (Math.random() - 0.5) * w * 0.5,
+        y,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp - 3,
+        life: 0.35 + Math.random() * 0.35,
+        maxLife: 0.7,
+        size: 2 + Math.random() * 4,
+        hot: true,
+        midi,
+        rgb: `${180 + (hu % 60)},${100 + Math.random() * 80},255`,
+        star: Math.random() > 0.5,
+      });
+    }
+  }
+
+  function drawKeyAuroras(ctx, auras, hitY, w, t) {
+    for (const [midi, aura] of auras) {
+      const power = aura.power * Math.max(0, aura.life);
+      if (power < 0.02) continue;
+      const hu = hue(midi);
+      const x = aura.x;
+      const kw = aura.w || 40;
+
+      const pillar = ctx.createLinearGradient(x, hitY, x, hitY - 120);
+      pillar.addColorStop(0, `hsla(${hu}, 90%, 65%, ${0.45 * power})`);
+      pillar.addColorStop(0.5, `hsla(${hu}, 80%, 50%, ${0.2 * power})`);
+      pillar.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = pillar;
+      ctx.fillRect(x - kw * 0.55, hitY - 130, kw * 1.1, 130);
+
+      for (let i = 0; i < 8; i++) {
+        const sx = x + Math.sin(t * 3 + midi + i) * kw * 0.35;
+        const sy = hitY - 15 - i * 12 - Math.sin(t * 2 + i) * 6;
+        const a = 0.35 * power * (0.5 + Math.sin(t * 5 + i) * 0.5);
+        ctx.fillStyle = `rgba(255,255,255,${a})`;
+        ctx.beginPath();
+        ctx.arc(sx, sy, 1 + (i % 2), 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
+  return {
+    drawNote,
+    drawLane,
+    drawKeyAuroras,
+    spawnImpactParticles,
+    hue,
+  };
+})();
+
+window.NoteRenderer = NoteRenderer;
+
+
+/* === piano-range.js === */
+/** 88 tuşlu piyano aralığı (A0 – C8) */
+const PianoRange = (() => {
+  const MIN_MIDI = 21;
+  const MAX_MIDI = 108;
+  const MIN_START_OCTAVE = 0;
+  const MAX_START_OCTAVE = 8;
+  const MAX_OCTAVES = 7;
+
+  function startMidiFromOctave(octave) {
+    return (Number(octave) + 1) * 12;
+  }
+
+  function clampRange(startOctave, octaveCount) {
+    let startOct = Number(startOctave);
+    let startMidi = startMidiFromOctave(startOct);
+    let count = Math.max(1, Math.min(MAX_OCTAVES, Number(octaveCount)));
+    let endMidi = startMidi + count * 12 - 1;
+
+    if (startMidi < MIN_MIDI) {
+      startMidi = MIN_MIDI;
+      endMidi = startMidi + count * 12 - 1;
+      startOct = Math.max(MIN_START_OCTAVE, Math.floor(startMidi / 12) - 1);
+    }
+    if (endMidi > MAX_MIDI) {
+      endMidi = MAX_MIDI;
+      const maxCount = Math.floor((MAX_MIDI - startMidi + 1) / 12);
+      count = Math.max(1, maxCount);
+      endMidi = startMidi + count * 12 - 1;
+      if (endMidi > MAX_MIDI) endMidi = MAX_MIDI;
+    }
+
+    return {
+      startOctave: startOct,
+      octaveCount: count,
+      startMidi,
+      endMidi,
+    };
+  }
+
+  function getStartOctaveOptions() {
+    const opts = [];
+    for (let o = MIN_START_OCTAVE; o <= MAX_START_OCTAVE; o++) {
+      const midi = startMidiFromOctave(o);
+      if (midi > MAX_MIDI - 12) continue;
+      const name = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"][midi % 12];
+      const label = `Oktav ${o} (${name}${o})`;
+      opts.push({ value: o, label });
+    }
+    return opts;
+  }
+
+  /** Şarkı notalarına göre klavye aralığı (C tabanlı tam oktavlar) */
+  function fitRangeToNotes(notes, paddingSemitones = 2) {
+    if (!notes?.length) return null;
+    let minMidi = MAX_MIDI;
+    let maxMidi = MIN_MIDI;
+    for (const n of notes) {
+      minMidi = Math.min(minMidi, n.midi);
+      maxMidi = Math.max(maxMidi, n.midi);
+    }
+    minMidi = Math.max(MIN_MIDI, minMidi - paddingSemitones);
+    maxMidi = Math.min(MAX_MIDI, maxMidi + paddingSemitones);
+
+    let startMidi = minMidi;
+    while (startMidi > MIN_MIDI && startMidi % 12 !== 0) startMidi--;
+
+    let count = Math.ceil((maxMidi - startMidi + 1) / 12);
+    count = Math.max(1, Math.min(MAX_OCTAVES, count));
+    const startOctave = Math.floor(startMidi / 12) - 1;
+    return clampRange(startOctave, count);
+  }
+
+  function getOctaveCountOptions(startOctave) {
+    const opts = [];
+    const startMidi = Math.max(MIN_MIDI, startMidiFromOctave(startOctave));
+    for (let c = 1; c <= MAX_OCTAVES; c++) {
+      const end = startMidi + c * 12 - 1;
+      if (end > MAX_MIDI) break;
+      opts.push({ value: c, label: `${c} oktav` });
+    }
+    return opts.length ? opts : [{ value: 1, label: "1 oktav" }];
+  }
+
+  return {
+    MIN_MIDI,
+    MAX_MIDI,
+    MAX_OCTAVES,
+    clampRange,
+    startMidiFromOctave,
+    getStartOctaveOptions,
+    getOctaveCountOptions,
+    fitRangeToNotes,
+  };
+})();
+
+window.PianoRange = PianoRange;
+
+
+/* === piano.js === */
+/** Dokunmatik piyano — 88 tuş, otomatik boyut */
+const Piano = (() => {
+  const WHITE_PATTERN = [0, 2, 4, 5, 7, 9, 11];
+
+  let container = null;
+  let wrapEl = null;
+  let range = { startMidi: 48, endMidi: 83 };
+  let keyMap = new Map();
+  let activePointers = new Map();
+  let keyboardHeld = new Set();
+  const holdCount = new Map();
+  let onNoteDown = null;
+  let onNoteUp = null;
+  let keyWidth = 48;
+  let keyHeight = 160;
+  let autoFitWidth = true;
+
+  function applySize() {
+    if (!wrapEl) return;
+    wrapEl.style.setProperty("--white-key-width", `${keyWidth}px`);
+    wrapEl.style.setProperty("--piano-height", `${keyHeight}px`);
+    if (window.Game && typeof window.Game.resize === "function") {
+      window.Game.resize();
+    }
+  }
+
+  function autoSizeKeys() {
+    if (!wrapEl || !container) return;
+    const whites = [...keyMap.keys()].filter((m) => WHITE_PATTERN.includes(m % 12));
+    if (!whites.length) return;
+    const avail = wrapEl.clientWidth - 16;
+    const fit = Math.floor(avail / whites.length) - 1;
+    keyWidth = Math.max(20, Math.min(100, fit));
+    applySize();
+  }
+
+  function setKeySize(width, height) {
+    autoFitWidth = false;
+    keyWidth = Math.max(20, Math.min(100, width));
+    keyHeight = Math.max(90, Math.min(420, height));
+    applySize();
+  }
+
+  function setAutoFit(on) {
+    autoFitWidth = !!on;
+    if (autoFitWidth) autoSizeKeys();
+  }
+
+  function getKeySize() {
+    return { keyWidth, keyHeight };
+  }
+
+  function refreshLabels() {
+    if (window.KeyLabels && keyMap.size) {
+      window.KeyLabels.applyToKeys(keyMap, range);
+    }
+    window.KeyboardInput?.rebuild?.();
+  }
+
+  function buildKeys(startOctave, octaveCount) {
+    if (!container) return;
+
+    window.KeyboardInput?.releaseAll?.();
+
+    const clamped = window.PianoRange
+      ? window.PianoRange.clampRange(startOctave, octaveCount)
+      : {
+          startMidi: (startOctave + 1) * 12,
+          endMidi: (startOctave + 1) * 12 + octaveCount * 12 - 1,
+        };
+
+    range = {
+      startMidi: clamped.startMidi,
+      endMidi: clamped.endMidi,
+    };
+
+    keyMap.clear();
+    activePointers.clear();
+    keyboardHeld.clear();
+    container.innerHTML = "";
+
+    const whites = [];
+    for (let m = range.startMidi; m <= range.endMidi; m++) {
+      if (WHITE_PATTERN.includes(m % 12)) whites.push(m);
+    }
+
+    for (const midi of whites) {
+      const el = createKey(midi, "white");
+      container.appendChild(el);
+      keyMap.set(midi, el);
+    }
+
+    for (let m = range.startMidi; m <= range.endMidi; m++) {
+      if (WHITE_PATTERN.includes(m % 12)) continue;
+      const el = createKey(m, "black");
+      let prev = m - 1;
+      while (prev >= range.startMidi && !keyMap.has(prev)) prev--;
+      const anchor = keyMap.get(prev);
+      if (anchor?.nextSibling) container.insertBefore(el, anchor.nextSibling);
+      else container.appendChild(el);
+      keyMap.set(m, el);
+    }
+
+    if (autoFitWidth) autoSizeKeys();
+    else applySize();
+    refreshLabels();
+  }
+
+  function createKey(midi, kind) {
+    const el = document.createElement("button");
+    el.type = "button";
+    el.className = `key ${kind}`;
+    el.dataset.midi = String(midi);
+    const label = document.createElement("span");
+    label.className = "key-label";
+    label.textContent = "?";
+    el.appendChild(label);
+    bindPointer(el, midi);
+    bindContextMenu(el, midi);
+    return el;
+  }
+
+  function openLabelEditor(midi) {
+    window.dispatchEvent(
+      new CustomEvent("piano:edit-label", { detail: { midi: Number(midi) } })
+    );
+  }
+
+  function bindContextMenu(el, midi) {
+    let longPressTimer = null;
+    const cancelLong = () => {
+      if (longPressTimer) clearTimeout(longPressTimer);
+      longPressTimer = null;
+    };
+    const open = (e) => {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      openLabelEditor(midi);
+    };
+
+    el.addEventListener("contextmenu", open);
+    el.addEventListener("auxclick", (e) => {
+      if (e.button === 2) open(e);
+    });
+    el.addEventListener("pointerdown", (e) => {
+      if (e.button === 2) {
+        open(e);
+        return;
+      }
+      if (e.pointerType === "touch" && e.button === 0) {
+        cancelLong();
+        longPressTimer = setTimeout(() => open(e), 650);
+      }
+    });
+    el.addEventListener("pointerup", cancelLong);
+    el.addEventListener("pointercancel", cancelLong);
+    el.addEventListener("pointermove", cancelLong);
+  }
+
+  function releaseAll() {
+    for (const [, m] of activePointers) {
+      window.AudioEngine.noteOff(m);
+    }
+    activePointers.clear();
+    for (const m of keyboardHeld) {
+      window.AudioEngine.noteOff(m);
+    }
+    keyboardHeld.clear();
+    holdCount.clear();
+    keyMap.forEach((el) => {
+      el.classList.remove("active", "hit-target", "miss-flash", "key-burst");
+    });
+  }
+
+  function bindPointer(el, midi) {
+    const down = (e) => {
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      e.preventDefault();
+      el.setPointerCapture(e.pointerId);
+      const vel = window.AudioEngine.velocityFromPointer(e);
+      el.classList.add("active");
+      activePointers.set(e.pointerId, midi);
+      window.AudioEngine.noteOn(midi, vel);
+      onNoteDown?.(midi, vel, e);
+    };
+
+    const up = (e) => {
+      if (!activePointers.has(e.pointerId)) return;
+      e.preventDefault();
+      activePointers.delete(e.pointerId);
+      el.classList.remove("active");
+      try {
+        el.releasePointerCapture(e.pointerId);
+      } catch {
+        /* ignore */
+      }
+      window.AudioEngine.noteOff(midi);
+      onNoteUp?.(midi, e);
+    };
+
+    el.addEventListener("pointerdown", down);
+    el.addEventListener("pointerup", up);
+    el.addEventListener("pointercancel", up);
+    el.addEventListener("pointerleave", (e) => {
+      if (activePointers.get(e.pointerId) === midi) up(e);
+    });
+  }
+
+  function pressKey(midi, velocity = 0.85) {
+    if (!midiInRange(midi)) return;
+    const el = keyMap.get(midi);
+    if (!el) return;
+    const next = (holdCount.get(midi) || 0) + 1;
+    holdCount.set(midi, next);
+    if (next > 1) return;
+    keyboardHeld.add(midi);
+    el.classList.add("active");
+    window.AudioEngine.noteOn(midi, velocity);
+    onNoteDown?.(midi, velocity);
+  }
+
+  function releaseKey(midi) {
+    const cur = holdCount.get(midi) || 0;
+    if (cur <= 0) return;
+    const next = cur - 1;
+    if (next > 0) {
+      holdCount.set(midi, next);
+      return;
+    }
+    holdCount.delete(midi);
+    if (!keyboardHeld.has(midi)) return;
+    keyboardHeld.delete(midi);
+    const el = keyMap.get(midi);
+    if (el) el.classList.remove("active");
+    window.AudioEngine.noteOff(midi);
+    onNoteUp?.(midi);
+  }
+
+  function flash(midi, type) {
+    const el = keyMap.get(midi);
+    if (!el) return;
+    el.classList.remove("hit-target", "miss-flash");
+    el.classList.add(type === "good" ? "hit-target" : "miss-flash");
+    if (type === "good") el.classList.add("key-burst");
+    setTimeout(() => el.classList.remove("hit-target", "miss-flash", "key-burst"), 320);
+  }
+
+  function init(rootEl, wrap, noteDownCb, noteUpCb) {
+    container = rootEl;
+    wrapEl = wrap;
+    onNoteDown = noteDownCb;
+    onNoteUp = noteUpCb;
+    window.addEventListener("resize", () => {
+      if (autoFitWidth) autoSizeKeys();
+    });
+  }
+
+  function midiInRange(midi) {
+    return midi >= range.startMidi && midi <= range.endMidi;
+  }
+
+  return {
+    init,
+    buildKeys,
+    flash,
+    refreshLabels,
+    pressKey,
+    releaseKey,
+    setKeySize,
+    setAutoFit,
+    getKeySize,
+    applySize,
+    midiInRange,
+    getRange: () => ({ ...range }),
+    getKeyMap: () => keyMap,
+    getKeyElement: (midi) => keyMap.get(midi),
+    releaseAll,
+  };
+})();
+
+window.Piano = Piano;
+
+
+/* === keyboard-input.js === */
+/** Bilgisayar klavyesi → piyano (oktav değişince yeniden eşleme) */
+const KeyboardInput = (() => {
+  const WHITE_PC = [0, 2, 4, 5, 7, 9, 11];
+
+  const WHITE_CODES = [
+    "KeyZ", "KeyX", "KeyC", "KeyV", "KeyB", "KeyN", "KeyM",
+    "Comma", "KeyL", "Period", "Semicolon", "Slash",
+    "KeyQ", "KeyW", "KeyE", "KeyR", "KeyT", "KeyY", "KeyU", "KeyI", "KeyO", "KeyP",
+    "BracketLeft", "BracketRight", "Backslash",
+    "Digit1", "Digit4", "Digit5", "Digit6", "Digit7", "Digit8", "Digit9", "Digit0",
+    "Minus", "Equal",
+  ];
+
+  const BLACK_CODES = [
+    "KeyS", "KeyD", "KeyG", "KeyH", "KeyJ",
+    "KeyU", "KeyO", "KeyI", "KeyP",
+    "KeyY", "KeyT", "KeyR", "KeyE", "KeyW", "KeyQ",
+    "Digit2", "Digit3", "Digit5", "Digit6", "Digit7", "Digit9", "Digit0",
+    "Minus", "Equal", "Backquote", "BracketLeft", "BracketRight",
+  ];
+
+  let enabled = true;
+  let codeToMidi = new Map();
+  let charToMidi = new Map();
+  let held = new Set();
+  let bound = false;
+
+  function isTypingTarget(el) {
+    if (!el) return false;
+    const tag = el.tagName;
+    return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.isContentEditable;
+  }
+
+  function releaseAll() {
+    for (const midi of [...held]) {
+      held.delete(midi);
+      window.Piano?.releaseKey?.(midi);
+    }
+  }
+
+  function rebuild() {
+    releaseAll();
+    codeToMidi.clear();
+    charToMidi.clear();
+    if (!window.Piano) return;
+
+    const range = window.Piano.getRange();
+    const whites = [];
+    const blacks = [];
+
+    for (let m = range.startMidi; m <= range.endMidi; m++) {
+      if (WHITE_PC.includes(m % 12)) whites.push(m);
+      else blacks.push(m);
+    }
+
+    whites.forEach((midi, i) => {
+      if (WHITE_CODES[i]) codeToMidi.set(WHITE_CODES[i], midi);
+    });
+    blacks.forEach((midi, i) => {
+      if (BLACK_CODES[i]) codeToMidi.set(BLACK_CODES[i], midi);
+    });
+
+    for (let m = range.startMidi; m <= range.endMidi; m++) {
+      const label = window.KeyLabels?.labelForMidi?.(m, range.startMidi, range.endMidi);
+      if (!label || label === "·" || label === "?" || label.length !== 1) continue;
+      const ch = label.toUpperCase();
+      charToMidi.set(ch, m);
+      charToMidi.set(ch.toLowerCase(), m);
+    }
+  }
+
+  function resolveMidi(e) {
+    if (codeToMidi.has(e.code)) return codeToMidi.get(e.code);
+
+    const k = e.key;
+    if (k && k.length === 1) {
+      const upper = k.toUpperCase();
+      if (charToMidi.has(upper)) return charToMidi.get(upper);
+      if (charToMidi.has(k)) return charToMidi.get(k);
+    }
+    return null;
+  }
+
+  function noteOn(midi) {
+    if (midi == null || held.has(midi)) return;
+    if (!window.Piano?.midiInRange?.(midi)) return;
+    held.add(midi);
+    window.Piano.pressKey(midi, 0.85);
+  }
+
+  function noteOff(midi) {
+    if (!held.has(midi)) return;
+    held.delete(midi);
+    window.Piano.releaseKey(midi);
+  }
+
+  function onKeyDown(e) {
+    if (!enabled) return;
+    if (e.repeat) return;
+    if (isTypingTarget(e.target)) return;
+    if (e.code === "F11" || e.code === "Escape") return;
+
+    const midi = resolveMidi(e);
+    if (midi == null) return;
+
+    e.preventDefault();
+    noteOn(midi);
+  }
+
+  function onKeyUp(e) {
+    if (!enabled) return;
+    if (isTypingTarget(e.target)) return;
+
+    const midi = resolveMidi(e);
+    if (midi == null) return;
+
+    e.preventDefault();
+    noteOff(midi);
+  }
+
+  function onBlur() {
+    releaseAll();
+  }
+
+  function setEnabled(on) {
+    enabled = !!on;
+    if (!enabled) releaseAll();
+  }
+
+  function bind() {
+    if (bound) return;
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", onBlur);
+    bound = true;
+  }
+
+  function unbind() {
+    if (!bound) return;
+    window.removeEventListener("keydown", onKeyDown);
+    window.removeEventListener("keyup", onKeyUp);
+    window.removeEventListener("blur", onBlur);
+    releaseAll();
+    bound = false;
+  }
+
+  return {
+    bind,
+    unbind,
+    rebuild,
+    releaseAll,
+    setEnabled,
+    isEnabled: () => enabled,
+    getHeldCount: () => held.size,
+  };
+})();
+
+window.KeyboardInput = KeyboardInput;
+
+
+/* === game.js === */
+/** Düşen notalar — stiller, renkler, süre */
+const Game = (() => {
+  const NOTE_HEIGHT_PX = 14;
+  const LOOKAHEAD_SEC = 3;
+  const HIT_LINE_FALLBACK = 0.88;
+
+  let canvas, ctx;
+  let notes = [];
+  let pendingHits = [];
+  let particles = [];
+  let playing = false;
+  let startTime = 0;
+  let pausedAt = 0;
+  let speed = 1;
+  let animId = null;
+  let timingWindowMs = 200;
+  let score = 0;
+  let combo = 0;
+  let songDuration = 0;
+  let flameIntensity = 1;
+  let flameStyleId = "aurora";
+  let trimStartSec = 0;
+  let trimEndSec = 0;
+  const keyAuras = new Map();
+  const impactCooldown = new Map();
+  let onScoreChange = null;
+  let onFeedback = null;
+  let onTimeUpdate = null;
+  let keyPositions = new Map();
+  let lastFrameT = 0;
+  let autoPlayMode = false;
+
+  function init(canvasEl, callbacks) {
+    canvas = canvasEl;
+    ctx = canvas.getContext("2d");
+    ctx.imageSmoothingEnabled = true;
+    if ("imageSmoothingQuality" in ctx) ctx.imageSmoothingQuality = "high";
+    onScoreChange = callbacks.onScoreChange;
+    onFeedback = callbacks.onFeedback;
+    onTimeUpdate = callbacks.onTimeUpdate;
+    resize();
+    window.addEventListener("resize", resize);
+    const pianoWrap = document.getElementById("pianoWrap");
+    if (pianoWrap && typeof ResizeObserver !== "undefined") {
+      new ResizeObserver(() => {
+        resize();
+        updateKeyPositions();
+      }).observe(pianoWrap);
+    }
+  }
+
+  function setFlameIntensity(level) {
+    flameIntensity = Math.max(0.3, Math.min(2, level));
+  }
+
+  function setFlameStyle(styleId) {
+    flameStyleId = styleId || "aurora";
+    window.FlameStyles?.setStyle(flameStyleId);
+  }
+
+  function setTrim(startSec, endSec) {
+    trimStartSec = Math.max(0, Number(startSec) || 0);
+    trimEndSec = Math.max(0, Number(endSec) || 0);
+  }
+
+  function formatTime(sec) {
+    const s = Math.max(0, Math.floor(sec));
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return `${m}:${String(r).padStart(2, "0")}`;
+  }
+
+  function emitTime(t) {
+    const total = songDuration || 0;
+    const remaining = Math.max(0, total - t);
+    onTimeUpdate?.({
+      current: t,
+      total,
+      remaining,
+      currentText: formatTime(t),
+      totalText: formatTime(total),
+      remainingText: formatTime(remaining),
+      percent: total > 0 ? Math.min(100, (t / total) * 100) : 0,
+    });
+  }
+
+  function resize() {
+    const parent = canvas.parentElement;
+    canvas.width = parent.clientWidth * devicePixelRatio;
+    canvas.height = parent.clientHeight * devicePixelRatio;
+    canvas.style.width = `${parent.clientWidth}px`;
+    canvas.style.height = `${parent.clientHeight}px`;
+    ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+    positionHitLine();
+  }
+
+  function getHitY() {
+    const area = canvas?.parentElement;
+    const pianoWrap = document.getElementById("pianoWrap");
+    if (!area || !pianoWrap) return area?.clientHeight * HIT_LINE_FALLBACK || 400;
+    const ar = area.getBoundingClientRect();
+    const pr = pianoWrap.getBoundingClientRect();
+    return Math.max(48, Math.round(pr.top - ar.top));
+  }
+
+  function positionHitLine() {
+    const line = document.getElementById("hitLine");
+    if (!line) return;
+    const y = getHitY();
+    line.style.top = `${y - 2}px`;
+  }
+
+  function updateKeyPositions() {
+    keyPositions.clear();
+    if (!window.Piano) return;
+    const range = window.Piano.getRange();
+    const keys = document.querySelectorAll(".piano-keys .key");
+    const area = canvas.parentElement;
+    const areaRect = area.getBoundingClientRect();
+
+    keys.forEach((key) => {
+      const midi = Number(key.dataset.midi);
+      if (midi < range.startMidi || midi > range.endMidi) return;
+      const r = key.getBoundingClientRect();
+      const centerX = r.left + r.width / 2 - areaRect.left;
+      keyPositions.set(midi, { x: centerX, w: r.width });
+    });
+  }
+
+  function clearAutoFlags() {
+    for (const n of notes) {
+      n._autoStarted = false;
+      n._autoEnded = false;
+    }
+  }
+
+  function setAutoPlayMode(on) {
+    autoPlayMode = !!on;
+    clearAutoFlags();
+  }
+
+  function isAutoPlayMode() {
+    return autoPlayMode;
+  }
+
+  function releaseAllSound() {
+    window.AudioEngine?.stopAll?.();
+    window.Piano?.releaseAll?.();
+    window.KeyboardInput?.releaseAll?.();
+  }
+
+  function loadNotes(trackNotes, range) {
+    stop();
+    particles = [];
+    keyAuras.clear();
+    let list = trackNotes;
+    if (window.NoteUtils?.cleanupNotes) {
+      list = window.NoteUtils.cleanupNotes(trackNotes);
+    }
+    if (list.length && (trimStartSec > 0 || trimEndSec > 0)) {
+      const rawEnd =
+        list.length > 0 ? Math.max(...list.map((n) => n.time + n.duration)) : 0;
+      const endLimit = Math.max(0, rawEnd - trimEndSec);
+      list = list
+        .filter((n) => n.time >= trimStartSec && n.time + n.duration <= endLimit + 0.001)
+        .map((n) => ({
+          ...n,
+          time: Math.max(0, n.time - trimStartSec),
+        }));
+    }
+    notes = list
+      .filter((n) => n.midi >= range.startMidi && n.midi <= range.endMidi)
+      .map((n) => ({
+        midi: n.midi,
+        time: n.time,
+        duration: Math.max(0.08, n.duration),
+        velocity: n.velocity,
+        hit: false,
+        missed: false,
+        _autoStarted: false,
+        _autoEnded: false,
+      }))
+      .sort((a, b) => a.time - b.time);
+
+    pendingHits = notes.map((n) => ({ ...n, id: `${n.midi}-${n.time}` }));
+    songDuration =
+      notes.length > 0
+        ? Math.max(...notes.map((n) => n.time + n.duration)) + 1.5
+        : 0;
+    score = 0;
+    combo = 0;
+    emitScore();
+    emitTime(0);
+  }
+
+  function spawnFlame(x, y, w, count, hot, midi) {
+    const style = window.FlameStyles?.getStyle();
+    const n = Math.floor(count * flameIntensity);
+    for (let i = 0; i < n; i++) {
+      const p = {
+        x: x + (Math.random() - 0.5) * w,
+        y,
+        vx: (Math.random() - 0.5) * 1.2,
+        vy: -1.5 - Math.random() * 2.5,
+        life: 0.4 + Math.random() * 0.5,
+        maxLife: 0.9,
+        size: 2 + Math.random() * 4,
+        hot: hot !== false,
+        midi: midi || 0,
+      };
+      style?.particle?.(p, p.hot);
+      particles.push(p);
+    }
+  }
+
+  function spawnHitBurst(x, y, midi) {
+    const style = window.FlameStyles?.getStyle();
+    for (let i = 0; i < 18 * flameIntensity; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = 2 + Math.random() * 4;
+      const p = {
+        x,
+        y,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp - 2,
+        life: 0.5 + Math.random() * 0.4,
+        maxLife: 0.9,
+        size: 3 + Math.random() * 5,
+        hot: true,
+        midi: midi || 0,
+      };
+      style?.particle?.(p, true);
+      particles.push(p);
+    }
+  }
+
+  function updateParticles(dt) {
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.life -= dt;
+      if (p.life <= 0) {
+        particles.splice(i, 1);
+        continue;
+      }
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy -= 0.08;
+    }
+  }
+
+  function drawParticles() {
+    for (const p of particles) {
+      const alpha = (p.life / p.maxLife) * 0.9;
+      const rgb = p.rgb || "200,120,255";
+      if (p.star) {
+        ctx.fillStyle = `rgba(${rgb}, ${alpha})`;
+        ctx.fillRect(p.x - 1, p.y - 1, 2, 2);
+        ctx.fillRect(p.x, p.y - 2, 1, 4);
+        ctx.fillRect(p.x - 2, p.y, 4, 1);
+      } else {
+        const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size * 2);
+        g.addColorStop(0, `rgba(${rgb}, ${alpha})`);
+        g.addColorStop(1, `rgba(${rgb}, 0)`);
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size * 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
+  function drawBackground(w, h, t) {
+    const bg = ctx.createLinearGradient(0, 0, 0, h);
+    bg.addColorStop(0, "#05060c");
+    bg.addColorStop(0.45, "#0c1020");
+    bg.addColorStop(1, "#12182a");
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, w, h);
+
+    const hitY = getHitY();
+    const vig = ctx.createRadialGradient(w * 0.5, hitY, w * 0.2, w * 0.5, hitY, w * 0.85);
+    vig.addColorStop(0, "rgba(80, 120, 255, 0.06)");
+    vig.addColorStop(1, "rgba(0, 0, 0, 0.45)");
+    ctx.fillStyle = vig;
+    ctx.fillRect(0, 0, w, h);
+
+    const glow = ctx.createLinearGradient(0, hitY - 50, 0, hitY + 30);
+    glow.addColorStop(0, "rgba(168, 85, 247, 0)");
+    glow.addColorStop(0.45, `rgba(192, 132, 252, ${0.14 + Math.sin(t * 3) * 0.05})`);
+    glow.addColorStop(1, "rgba(124, 58, 237, 0.25)");
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, hitY - 55, w, 90);
+
+    ctx.strokeStyle = "rgba(216, 180, 254, 0.9)";
+    ctx.lineWidth = 2;
+    ctx.shadowColor = "rgba(168, 85, 247, 0.85)";
+    ctx.shadowBlur = 12;
+    ctx.beginPath();
+    ctx.moveTo(0, hitY);
+    ctx.lineTo(w, hitY);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
+  function play() {
+    if (!notes.length) return;
+    window.AudioEngine.ensure();
+    clearAutoFlags();
+    keyAuras.clear();
+    updateKeyPositions();
+    playing = true;
+    startTime = performance.now() / 1000 - pausedAt;
+    lastFrameT = currentTime();
+    tick();
+  }
+
+  function stop() {
+    playing = false;
+    pausedAt = 0;
+    autoPlayMode = false;
+    if (animId) cancelAnimationFrame(animId);
+    animId = null;
+    releaseAllSound();
+    clearAutoFlags();
+    keyAuras.clear();
+    draw(0);
+    emitTime(0);
+  }
+
+  function pause() {
+    if (!playing) return;
+    playing = false;
+    pausedAt = currentTime();
+    if (animId) cancelAnimationFrame(animId);
+    releaseAllSound();
+    emitTime(pausedAt);
+  }
+
+  function currentTime() {
+    if (!playing && pausedAt) return pausedAt;
+    return (performance.now() / 1000 - startTime) * speed;
+  }
+
+  function setSpeed(s) {
+    const t = currentTime();
+    speed = s;
+    if (playing) {
+      startTime = performance.now() / 1000 - t / speed;
+    } else {
+      pausedAt = t;
+    }
+  }
+
+  function setTimingWindow(ms) {
+    timingWindowMs = ms;
+  }
+
+  function processAutoPlay(t) {
+    if (!autoPlayMode || !playing) return;
+    for (const n of notes) {
+      if (!n._autoStarted && t >= n.time) {
+        n._autoStarted = true;
+        const vel = Math.max(0.2, Math.min(1, n.velocity ?? 0.75));
+        window.Piano?.pressKey?.(n.midi, vel);
+        boostKeyAura(n.midi, 1);
+        n.hit = true;
+      }
+      if (n._autoStarted && !n._autoEnded && t >= n.time + n.duration) {
+        n._autoEnded = true;
+        window.Piano?.releaseKey?.(n.midi);
+      }
+    }
+  }
+
+  /** Çubuk vuruş çizgisindeyken sürekli aurora */
+  function syncHeldLineEffects(t) {
+    for (const n of notes) {
+      if (t < n.time || t >= n.time + n.duration) continue;
+      boostKeyAura(n.midi, 0.2);
+      const pos = keyPositions.get(n.midi);
+      if (!pos) continue;
+      const aura = keyAuras.get(n.midi);
+      if (aura) {
+        aura.life = 1;
+        aura.power = Math.min(1, aura.power + 0.05);
+      }
+    }
+  }
+
+  function boostKeyAura(midi, amount = 0.8) {
+    const pos = keyPositions.get(midi);
+    if (!pos) return;
+    const prev = keyAuras.get(midi);
+    keyAuras.set(midi, {
+      x: pos.x,
+      w: pos.w,
+      power: Math.min(1, (prev?.power || 0) + amount),
+      life: 1,
+    });
+  }
+
+  function updateKeyAuras(dt) {
+    for (const [midi, a] of keyAuras) {
+      a.life -= dt * 1.8;
+      a.power *= 0.92;
+      if (a.life <= 0 || a.power < 0.03) keyAuras.delete(midi);
+    }
+    document.querySelectorAll(".piano-keys .key.active").forEach((el) => {
+      const midi = Number(el.dataset.midi);
+      const pos = keyPositions.get(midi);
+      if (!pos) return;
+      keyAuras.set(midi, {
+        x: pos.x,
+        w: pos.w,
+        power: 1,
+        life: 1,
+      });
+    });
+  }
+
+  function checkNoteImpacts(t, hitY, pxPerSec) {
+    const NR = window.NoteRenderer;
+    if (!NR?.spawnImpactParticles) return;
+    for (const n of notes) {
+      if (n.hit || n.missed || n._impactDone) continue;
+      const dist = (n.time - t) * pxPerSec;
+      if (dist > 0 && dist < 6) {
+        n._impactDone = true;
+        const pos = keyPositions.get(n.midi);
+        if (!pos) continue;
+        const key = `${n.midi}-${Math.floor(n.time * 20)}`;
+        if (impactCooldown.has(key)) continue;
+        impactCooldown.set(key, t);
+        NR.spawnImpactParticles(particles, pos.x, hitY, pos.w, n.midi, 14);
+        boostKeyAura(n.midi, 0.7);
+        window.Piano?.flash?.(n.midi, "good");
+      }
+    }
+    for (const [k, when] of impactCooldown) {
+      if (t - when > 0.5) impactCooldown.delete(k);
+    }
+  }
+
+  function tick() {
+    if (!playing) return;
+    const t = currentTime();
+    const dt = Math.min(0.05, t - lastFrameT || 0.016);
+    lastFrameT = t;
+    processAutoPlay(t);
+    syncHeldLineEffects(t);
+    if (!autoPlayMode) checkMisses(t);
+    draw(t, dt);
+    emitTime(t);
+    if (songDuration > 0 && t >= songDuration) {
+      playing = false;
+      window.AudioEngine?.stopAll?.();
+      onFeedback?.("complete");
+      emitTime(songDuration);
+      return;
+    }
+    animId = requestAnimationFrame(tick);
+  }
+
+  function checkMisses(t) {
+    const windowSec = timingWindowMs / 1000;
+    for (const n of pendingHits) {
+      if (n.hit || n.missed) continue;
+      if (t > n.time + windowSec) {
+        n.missed = true;
+        combo = 0;
+        onFeedback?.("miss");
+        window.Piano?.flash(n.midi, "miss");
+        emitScore();
+      }
+    }
+  }
+
+  function handleKeyPress(midi) {
+    if (autoPlayMode) return false;
+    if (!playing && !pausedAt) return false;
+    const t = currentTime();
+    const windowSec = timingWindowMs / 1000;
+
+    let best = null;
+    let bestDelta = Infinity;
+    for (const n of pendingHits) {
+      if (n.hit || n.missed || n.midi !== midi) continue;
+      const delta = Math.abs(t - n.time);
+      if (delta <= windowSec && delta < bestDelta) {
+        best = n;
+        bestDelta = delta;
+      }
+    }
+
+    if (!best) return false;
+
+    best.hit = true;
+    const points = Math.round(100 + Math.max(0, 50 - bestDelta * 200));
+    combo += 1;
+    score += points + combo * 5;
+    onFeedback?.("good", points);
+
+    const pos = keyPositions.get(midi);
+    const hitY = getHitY();
+    if (pos) {
+      window.NoteRenderer?.spawnImpactParticles?.(particles, pos.x, hitY, pos.w, midi, 18);
+      spawnHitBurst(pos.x, hitY - 4, midi);
+      boostKeyAura(midi, 1);
+    }
+
+    window.Piano?.flash(midi, "good");
+    emitScore();
+    return true;
+  }
+
+  function emitScore() {
+    onScoreChange?.({ score, combo });
+  }
+
+  function draw(t, dt = 0.016) {
+    const w = canvas.width / devicePixelRatio;
+    const h = canvas.height / devicePixelRatio;
+    updateParticles(dt);
+    drawBackground(w, h, t);
+
+    const hitY = getHitY();
+    const pxPerSec = hitY / LOOKAHEAD_SEC;
+    positionHitLine();
+    const NR = window.NoteRenderer;
+
+    updateKeyAuras(dt);
+    checkNoteImpacts(t, hitY, pxPerSec);
+    NR?.drawKeyAuroras?.(ctx, keyAuras, hitY, w, t);
+
+    const seenLanes = new Set();
+    for (const n of notes) {
+      if (n.time > t + LOOKAHEAD_SEC || n.time + n.duration < t - 0.2) continue;
+      const pos = keyPositions.get(n.midi);
+      if (!pos || seenLanes.has(n.midi)) continue;
+      seenLanes.add(n.midi);
+      NR?.drawLane(ctx, pos.x, pos.w, h, hitY, n.midi, t);
+    }
+
+    for (const n of notes) {
+      if (n.time > t + LOOKAHEAD_SEC || n.time + n.duration < t - 0.2) continue;
+      const pos = keyPositions.get(n.midi);
+      if (!pos) continue;
+
+      const noteBottom = hitY - (n.time - t) * pxPerSec;
+      const noteH = Math.max(NOTE_HEIGHT_PX, n.duration * pxPerSec);
+      const width = pos.w * 0.92;
+      const x = pos.x - width / 2;
+      const y = noteBottom - noteH;
+      const state = n.hit ? "hit" : n.missed ? "miss" : "pending";
+
+      if (NR) {
+        NR.drawNote(ctx, {
+          x,
+          y,
+          w: width,
+          h: noteH,
+          midi: n.midi,
+          vel: n.velocity,
+          state,
+          styleId: flameStyleId,
+          intensity: flameIntensity,
+          time: t,
+        });
+      }
+
+    }
+
+    drawParticles();
+  }
+
+  function resetScore() {
+    score = 0;
+    combo = 0;
+    emitScore();
+  }
+
+  function resetRound() {
+    autoPlayMode = false;
+    stop();
+    particles = [];
+    impactCooldown.clear();
+    for (const n of notes) {
+      n.hit = false;
+      n.missed = false;
+      n._autoStarted = false;
+      n._autoEnded = false;
+      n._impactDone = false;
+    }
+    pendingHits = notes.map((n) => ({ ...n, id: `${n.midi}-${n.time}` }));
+    resetScore();
+    draw(0);
+  }
+
+  return {
+    init,
+    loadNotes,
+    play,
+    stop,
+    pause,
+    setSpeed,
+    setTimingWindow,
+    setFlameIntensity,
+    setFlameStyle,
+    setTrim,
+    setAutoPlayMode,
+    isAutoPlayMode,
+    handleKeyPress,
+    resetScore,
+    resetRound,
+    getSongDuration: () => songDuration,
+    isPlaying: () => playing,
+    hasNotes: () => notes.length > 0,
+    resize: () => {
+      resize();
+      updateKeyPositions();
+    },
+  };
+})();
+
+window.Game = Game;
+
+
+/* === library.js === */
+/** Kütüphane ve şarkı verisi */
+const LibraryStore = (() => {
+  let data = { libraries: [] };
+  let activeLibraryId = null;
+  let activeSongId = null;
+  let parsedMidi = null;
+  let selectedTrackIndex = 0;
+
+  async function load() {
+    data = await window.pianoApi.getLibraries();
+    if (!data.libraries) data = { libraries: [] };
+    return data;
+  }
+
+  async function save() {
+    await window.pianoApi.saveLibraries(data);
+  }
+
+  function createLibrary(name) {
+    const lib = {
+      id: `lib-${Date.now()}`,
+      name: name.trim(),
+      songs: [],
+      createdAt: new Date().toISOString(),
+    };
+    data.libraries.push(lib);
+    return lib;
+  }
+
+  function getLibraries() {
+    return data.libraries;
+  }
+
+  function getLibrary(id) {
+    return data.libraries.find((l) => l.id === id);
+  }
+
+  function setActiveLibrary(id) {
+    activeLibraryId = id;
+    activeSongId = null;
+    parsedMidi = null;
+  }
+
+  function setActiveSong(songId) {
+    activeSongId = songId;
+    parsedMidi = null;
+  }
+
+  function songStorageRef(song) {
+    return song.midiUrl || song.relativePath;
+  }
+
+  async function importSongs(libraryId, imported) {
+    const lib = getLibrary(libraryId);
+    if (!lib) return;
+    for (const item of imported) {
+      const entry = {
+        id: item.id,
+        name: item.name,
+        fileName: item.fileName,
+      };
+      if (item.midiUrl) entry.midiUrl = item.midiUrl;
+      if (item.relativePath) entry.relativePath = item.relativePath;
+      lib.songs.push(entry);
+    }
+    await save();
+  }
+
+  async function loadSongMidi(song) {
+    const ref = songStorageRef(song);
+    if (!ref) throw new Error("Şarkı dosya adresi yok");
+    const bytes = await window.pianoApi.readMidi(ref);
+    parsedMidi = window.pianoApi.parseMidi(bytes);
+    return parsedMidi;
+  }
+
+  function getParsedMidi() {
+    return parsedMidi;
+  }
+
+  function getActiveSong() {
+    const lib = getLibrary(activeLibraryId);
+    return lib?.songs.find((s) => s.id === activeSongId);
+  }
+
+  function setTrackIndex(index) {
+    selectedTrackIndex = index;
+  }
+
+  function getTrackNotes() {
+    if (!parsedMidi?.tracks?.length) return [];
+    const track = parsedMidi.tracks[selectedTrackIndex];
+    const raw = track?.notes ?? [];
+    if (window.NoteUtils?.cleanupNotes) {
+      return window.NoteUtils.cleanupNotes(raw);
+    }
+    return raw;
+  }
+
+  async function deleteSong(libraryId, songId) {
+    const lib = getLibrary(libraryId);
+    if (!lib) return;
+    const idx = lib.songs.findIndex((s) => s.id === songId);
+    if (idx < 0) return;
+    const song = lib.songs[idx];
+    const ref = songStorageRef(song);
+    if (window.pianoApi.isWeb) {
+      await window.pianoApi.deleteMidi(ref, {
+        songId: song.id,
+        libraryId,
+      });
+    } else {
+      await window.pianoApi.deleteMidi(ref);
+    }
+    lib.songs.splice(idx, 1);
+    if (activeSongId === songId) {
+      activeSongId = null;
+      parsedMidi = null;
+    }
+    await save();
+  }
+
+  return {
+    load,
+    save,
+    createLibrary,
+    getLibraries,
+    getLibrary,
+    setActiveLibrary,
+    setActiveSong,
+    importSongs,
+    loadSongMidi,
+    getParsedMidi,
+    getActiveSong,
+    setTrackIndex,
+    getTrackNotes,
+    deleteSong,
+    getActiveLibraryId: () => activeLibraryId,
+    getActiveSongId: () => activeSongId,
+    getSelectedTrackIndex: () => selectedTrackIndex,
+  };
+})();
+
+window.LibraryStore = LibraryStore;
+
+
+window.mainJsOk = true;
+
+/* === app.js === */
+/** Ana uygulama */
+(function () {
+  const $ = (sel) => document.querySelector(sel);
+
+  function mods() {
+    return {
+      Piano: window.Piano,
+      Game: window.Game,
+      LibraryStore: window.LibraryStore,
+      AppSettings: window.AppSettings,
+      AudioEngine: window.AudioEngine,
+    };
+  }
+
+  function requireStore() {
+    if (!window.LibraryStore) {
+      throw new Error("Kütüphane modülü yüklenemedi. Uygulamayı kapatıp npm start ile açın.");
+    }
+    return window.LibraryStore;
+  }
+
+  function requireMods() {
+    const m = mods();
+    if (!m.Piano || !m.Game) {
+      throw new Error("Piyano modülü yüklenemedi. Uygulamayı kapatıp npm start ile açın.");
+    }
+    if (!m.LibraryStore) throw new Error("Kütüphane modülü yüklenemedi.");
+    return m;
+  }
+
+  if (!window.mainJsOk || !window.LibraryStore) {
+    $("#apiError")?.classList.remove("hidden");
+    $("#apiError").innerHTML =
+      "Ana program yüklenemedi. Terminalde klasöre gidip: <code>npm start</code>";
+    return;
+  }
+
+  if (!window.Piano || !window.PianoRange) {
+    $("#apiError")?.classList.remove("hidden");
+    $("#apiError").innerHTML =
+      "Piyano modülü yüklenemedi; kütüphane yine de kullanılabilir. <code>npm start</code> ile yeniden açın.";
+  }
+
+  if (!window.pianoApi) {
+    $("#apiError")?.classList.remove("hidden");
+    return;
+  }
+
+  const libraryList = $("#libraryList");
+  const songList = $("#songList");
+  const trackSelect = $("#trackSelect");
+  const scoreValue = $("#scoreValue");
+  const comboValue = $("#comboValue");
+  const btnPlay = $("#btnPlay");
+  const btnAutoPlay = $("#btnAutoPlay");
+  const btnStop = $("#btnStop");
+  const btnImport = $("#btnImportMidi");
+  const btnImportAudio = $("#btnImportAudio");
+  const audioImportOverlay = $("#audioImportOverlay");
+  const audioImportBarFill = $("#audioImportBarFill");
+  const audioImportStatus = $("#audioImportStatus");
+  const audioImportFile = $("#audioImportFile");
+  const btnNewLib = $("#btnNewLibrary");
+  const octaveStart = $("#octaveStart");
+  const octaveCount = $("#octaveCount");
+  const keyWidthRange = $("#keyWidthRange");
+  const keyHeightRange = $("#keyHeightRange");
+  const keyWidthLabel = $("#keyWidthLabel");
+  const keyHeightLabel = $("#keyHeightLabel");
+  const dynamicPressure = $("#dynamicPressure");
+  const sustainEnabled = $("#sustainEnabled");
+  const speedRange = $("#speedRange");
+  const speedLabel = $("#speedLabel");
+  const timingWindow = $("#timingWindow");
+  const timingLabel = $("#timingLabel");
+  const libraryModal = $("#libraryModal");
+  const libraryForm = $("#libraryForm");
+  const libraryNameInput = $("#libraryNameInput");
+  const libraryCancel = $("#libraryCancel");
+  const libraryBackdrop = $("#libraryBackdrop");
+  const inlineLibraryForm = $("#inlineLibraryForm");
+  const inlineLibraryName = $("#inlineLibraryName");
+  const libraryHint = $("#libraryHint");
+  const songHint = $("#songHint");
+  const toastEl = $("#toast");
+  const timeCurrent = $("#timeCurrent");
+  const timeTotal = $("#timeTotal");
+  const timeRemaining = $("#timeRemaining");
+  const progressFill = $("#progressFill");
+  const labelMode = $("#labelMode");
+  const labelPreset = $("#labelPreset");
+  const labelPresetWrap = $("#labelPresetWrap");
+  const customLabelsWrap = $("#customLabelsWrap");
+  const customLabels = $("#customLabels");
+  const btnApplyLabels = $("#btnApplyLabels");
+  const flameRange = $("#flameRange");
+  const flameLabel = $("#flameLabel");
+  const flameStyle = $("#flameStyle");
+  const trimStartInput = $("#trimStart");
+  const trimEndInput = $("#trimEnd");
+  const effectHueInput = $("#effectHue");
+  const keyColorTopInput = $("#keyColorTop");
+  const keyColorMidInput = $("#keyColorMid");
+  const keyColorBottomInput = $("#keyColorBottom");
+  const hitLineColorInput = $("#hitLineColor");
+  const labelAssignModal = $("#labelAssignModal");
+  const labelAssignTitle = $("#labelAssignTitle");
+  const labelAssignHint = $("#labelAssignHint");
+  const labelAssignInput = $("#labelAssignInput");
+  const labelAssignSave = $("#labelAssignSave");
+  const labelAssignCancel = $("#labelAssignCancel");
+  const labelAssignClear = $("#labelAssignClear");
+  const labelAssignBackdrop = $("#labelAssignBackdrop");
+  const keyboardEnabled = $("#keyboardEnabled");
+  const btnToggleSidebar = $("#btnToggleSidebar");
+  const btnFullscreen = $("#btnFullscreen");
+  const comboFlare = $("#comboFlare");
+
+  let editingLibraryId = null;
+  let labelEditMidi = null;
+  let lastComboShown = 0;
+  let toastTimer = null;
+
+  function setupSettingsTabs() {
+    const tabs = document.querySelectorAll(".settings-tabs .stab");
+    const panels = document.querySelectorAll(".stab-panel");
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", () => {
+        const id = tab.dataset.tab;
+        tabs.forEach((t) => t.classList.toggle("active", t === tab));
+        panels.forEach((p) => p.classList.toggle("active", p.dataset.panel === id));
+      });
+    });
+  }
+
+  function applyThemeFromSettings(s) {
+    window.AppTheme?.fromSettings?.(s || AppSettings.load());
+  }
+
+  function persistThemeFromInputs() {
+    persistSettings({
+      effectHue: Number(effectHueInput?.value) || 275,
+      keyColorTop: keyColorTopInput?.value,
+      keyColorMid: keyColorMidInput?.value,
+      keyColorBottom: keyColorBottomInput?.value,
+      hitLineColor: hitLineColorInput?.value,
+    });
+    applyThemeFromSettings(AppSettings.load());
+  }
+
+  function openLabelAssignModal(midi) {
+    labelEditMidi = midi;
+    const name = KeyLabels?.noteNameForMidi?.(midi) || `MIDI ${midi}`;
+    labelAssignTitle.textContent = "Tuş harfi ata";
+    labelAssignHint.textContent = `${name} — tek harf veya boş`;
+    labelAssignInput.value = KeyLabels?.getMidiLabel?.(midi) || "";
+    labelAssignModal.classList.remove("hidden");
+    labelAssignModal.setAttribute("aria-hidden", "false");
+    setTimeout(() => labelAssignInput.focus(), 50);
+  }
+
+  function closeLabelAssignModal() {
+    labelAssignModal.classList.add("hidden");
+    labelAssignModal.setAttribute("aria-hidden", "true");
+    labelEditMidi = null;
+  }
+
+  function saveLabelAssign() {
+    if (labelEditMidi == null) return;
+    const ch = labelAssignInput.value.trim();
+    KeyLabels.setMidiLabel(labelEditMidi, ch);
+    persistSettings({
+      labelMode: "custom",
+      midiLabels: KeyLabels.getMidiLabelsObject(),
+    });
+    applyLabelSettings(AppSettings.load());
+    window.KeyboardInput?.rebuild?.();
+    toast(ch ? `Tuş → "${ch}"` : "Harf kaldırıldı");
+    closeLabelAssignModal();
+  }
+
+  function toast(msg, isError = false) {
+    toastEl.textContent = msg;
+    toastEl.classList.toggle("error", isError);
+    toastEl.classList.remove("hidden");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.add("hidden"), 3200);
+  }
+
+  function openModal(editId = null) {
+    editingLibraryId = editId;
+    $("#libraryDialogTitle").textContent = editId ? "Kütüphaneyi yeniden adlandır" : "Yeni kütüphane";
+    libraryNameInput.value = editId ? requireStore().getLibrary(editId)?.name ?? "" : "";
+    libraryModal.classList.remove("hidden");
+    libraryModal.setAttribute("aria-hidden", "false");
+    setTimeout(() => libraryNameInput.focus(), 50);
+  }
+
+  function closeModal() {
+    libraryModal.classList.add("hidden");
+    libraryModal.setAttribute("aria-hidden", "true");
+    editingLibraryId = null;
+  }
+
+  async function saveLibraryName(name) {
+    const LibraryStore = requireStore();
+    const trimmed = name.trim();
+    if (!trimmed) {
+      toast("Kütüphane adı boş olamaz.", true);
+      return false;
+    }
+    try {
+      if (editingLibraryId) {
+        const lib = LibraryStore.getLibrary(editingLibraryId);
+        if (lib) {
+          lib.name = trimmed;
+          toast(`Kütüphane adı güncellendi.`);
+        }
+      } else {
+        const lib = LibraryStore.createLibrary(trimmed);
+        LibraryStore.setActiveLibrary(lib.id);
+        toast(`"${trimmed}" kütüphanesi eklendi.`);
+      }
+      await LibraryStore.save();
+      if (!libraryModal.classList.contains("hidden")) closeModal();
+      renderLibraries();
+      renderSongs();
+      updateHints();
+      return true;
+    } catch (err) {
+      toast(`Kayıt hatası: ${err.message}`, true);
+      return false;
+    }
+  }
+
+  function applyLabelSettings(s) {
+    if (!window.KeyLabels) return;
+    KeyLabels.loadMidiLabelsObject(s.midiLabels);
+    KeyLabels.setMode(s.labelMode);
+    KeyLabels.setLetterPreset(s.labelPreset);
+    KeyLabels.setCustomString(s.customLabels);
+    labelMode.value = s.labelMode;
+    labelPreset.value = s.labelPreset;
+    customLabels.value = s.customLabels;
+    labelPresetWrap.classList.toggle("hidden", s.labelMode !== "letters");
+    customLabelsWrap.classList.toggle("hidden", s.labelMode !== "custom");
+    try {
+      requireMods().Piano.refreshLabels();
+      window.KeyboardInput?.rebuild?.();
+    } catch {
+      /* henüz hazır değil */
+    }
+  }
+
+  function flameLabelText(v) {
+    if (v < 60) return "Hafif";
+    if (v < 120) return "Normal";
+    if (v < 160) return "Güçlü";
+    return "Alevli!";
+  }
+
+  function applySettings(s) {
+    const { Piano, Game, AudioEngine } = requireMods();
+    keyWidthRange.value = String(s.keyWidth);
+    keyHeightRange.value = String(s.keyHeight);
+    keyWidthLabel.textContent = `${s.keyWidth} px`;
+    keyHeightLabel.textContent = `${s.keyHeight} px`;
+    dynamicPressure.checked = s.dynamicPressure;
+    sustainEnabled.checked = s.sustainEnabled;
+    timingWindow.value = String(s.timingWindow);
+    timingLabel.textContent = `${s.timingWindow} ms`;
+    speedRange.value = String(s.speed);
+    speedLabel.textContent = `${s.speed}%`;
+    flameRange.value = String(Math.round((s.flameIntensity || 1) * 100));
+    flameLabel.textContent = flameLabelText(Number(flameRange.value));
+    flameStyle.value = s.flameStyle || "aurora";
+    if (trimStartInput) trimStartInput.value = String(s.trimStart ?? 0);
+    if (trimEndInput) trimEndInput.value = String(s.trimEnd ?? 0);
+    keyboardEnabled.checked = s.keyboardEnabled !== false;
+
+    AudioEngine.setDynamicPressure(s.dynamicPressure);
+    AudioEngine.setSustain(s.sustainEnabled);
+    Game.setTimingWindow(s.timingWindow);
+    Game.setSpeed(s.speed / 100);
+    Game.setFlameIntensity(s.flameIntensity || 1);
+    Game.setTrim(s.trimStart ?? 0, s.trimEnd ?? 0);
+    Game.setFlameStyle(s.flameStyle || "aurora");
+    window.KeyboardInput?.setEnabled(s.keyboardEnabled !== false);
+    if (effectHueInput) effectHueInput.value = String(s.effectHue ?? 275);
+    if (keyColorTopInput) keyColorTopInput.value = s.keyColorTop || "#e8d4ff";
+    if (keyColorMidInput) keyColorMidInput.value = s.keyColorMid || "#a855f7";
+    if (keyColorBottomInput) keyColorBottomInput.value = s.keyColorBottom || "#6b21a8";
+    if (hitLineColorInput) hitLineColorInput.value = s.hitLineColor || "#d8b4fe";
+    applyThemeFromSettings(s);
+    applyLabelSettings(s);
+    setSidebarVisible(s.sidebarVisible !== false, false);
+    populateOctaveSelects(s.octaveStart, s.octaveCount);
+    Piano.setAutoFit(true);
+    Piano.setKeySize(s.keyWidth, s.keyHeight);
+    const clamped = PianoRange.clampRange(s.octaveStart, s.octaveCount);
+    Piano.buildKeys(clamped.startOctave, clamped.octaveCount);
+  }
+
+  function setSidebarVisible(visible, save = true) {
+    document.body.classList.toggle("sidebar-hidden", !visible);
+    btnToggleSidebar.textContent = visible ? "☰ Menü" : "☰ Menüyü aç";
+    if (save) persistSettings({ sidebarVisible: visible });
+    setTimeout(() => requireMods().Game.resize(), 120);
+  }
+
+  async function toggleFullscreen() {
+    if (!window.pianoApi?.toggleFullscreen) return;
+    const on = await window.pianoApi.toggleFullscreen();
+    btnFullscreen.textContent = on ? "⛶ Pencere" : "⛶ Tam ekran";
+    toast(on ? "Tam ekran açık (F11 / Esc)" : "Pencere modu");
+    setTimeout(() => {
+      try {
+        requireMods().Game.resize();
+      } catch {
+        /* */
+      }
+    }, 200);
+  }
+
+  function persistSettings(partial) {
+    window.AppSettings.save(partial);
+  }
+
+  function populateOctaveSelects(startVal, countVal) {
+    if (!window.PianoRange) return;
+    const start = startVal ?? (Number(octaveStart.value) || 3);
+    const count = countVal ?? (Number(octaveCount.value) || 2);
+
+    octaveStart.innerHTML = "";
+    for (const o of PianoRange.getStartOctaveOptions()) {
+      const opt = document.createElement("option");
+      opt.value = String(o.value);
+      opt.textContent = o.label;
+      octaveStart.appendChild(opt);
+    }
+
+    octaveCount.innerHTML = "";
+    const countOpts = PianoRange.getOctaveCountOptions(start);
+    for (const o of countOpts) {
+      const opt = document.createElement("option");
+      opt.value = String(o.value);
+      opt.textContent = o.label;
+      octaveCount.appendChild(opt);
+    }
+
+    const clamped = PianoRange.clampRange(start, count);
+    octaveStart.value = String(clamped.startOctave);
+    octaveCount.value = String(clamped.octaveCount);
+    return clamped;
+  }
+
+  function getOctaveRange() {
+    return PianoRange
+      ? PianoRange.clampRange(Number(octaveStart.value), Number(octaveCount.value))
+      : {
+          startOctave: Number(octaveStart.value),
+          octaveCount: Number(octaveCount.value),
+        };
+  }
+
+  function rebuildPiano() {
+    const { Piano, Game } = requireMods();
+    window.KeyboardInput?.releaseAll?.();
+
+    const clamped =
+      populateOctaveSelects(
+        Number(octaveStart.value),
+        Number(octaveCount.value)
+      ) || getOctaveRange();
+
+    Piano.setAutoFit(true);
+    Piano.buildKeys(clamped.startOctave, clamped.octaveCount);
+    window.KeyboardInput?.rebuild?.();
+    applyLabelSettings(AppSettings.load());
+    persistSettings({
+      octaveStart: clamped.startOctave,
+      octaveCount: clamped.octaveCount,
+      octaveLockManual: true,
+      autoKeyboardFromSong: false,
+    });
+
+    setTimeout(() => {
+      Game.resize();
+      reloadTrackNotes();
+    }, 80);
+
+    toast(`Klavye: oktav ${clamped.startOctave}, ${clamped.octaveCount} oktav`);
+  }
+
+  function fitKeyboardToSong(notes) {
+    const s = AppSettings.load();
+    if (s.octaveLockManual || !s.autoKeyboardFromSong || !notes?.length) return null;
+    if (!window.PianoRange?.fitRangeToNotes) return null;
+
+    const fit = PianoRange.fitRangeToNotes(notes);
+    populateOctaveSelects(fit.startOctave, fit.octaveCount);
+    const { Piano } = requireMods();
+    Piano.setAutoFit(true);
+    Piano.buildKeys(fit.startOctave, fit.octaveCount);
+    persistSettings({
+      octaveStart: fit.startOctave,
+      octaveCount: fit.octaveCount,
+      autoKeyboardFromSong: true,
+    });
+    return fit;
+  }
+
+  async function reloadTrackNotes() {
+    const { Piano, Game, LibraryStore } = requireMods();
+    const notes = LibraryStore.getTrackNotes();
+    const s = AppSettings.load();
+    Game.setTrim(s.trimStart ?? 0, s.trimEnd ?? 0);
+    const fit = fitKeyboardToSong(notes);
+    if (fit) {
+      toast(
+        `Klavye şarkıya göre: ${fit.octaveCount} oktav (tam genişlik)`,
+        false
+      );
+    } else {
+      Piano.setAutoFit(true);
+      if (typeof Piano.autoSizeKeys === "function") {
+        /* buildKeys içinde autoSizeKeys çağrılır */
+      }
+    }
+    const range = Piano.getRange();
+    Game.loadNotes(notes, range);
+    btnPlay.disabled = !Game.hasNotes();
+    if (btnAutoPlay) btnAutoPlay.disabled = !Game.hasNotes();
+    setTimeout(() => Game.resize(), 100);
+  }
+
+  function updateHints() {
+    const LibraryStore = requireStore();
+    const libId = LibraryStore.getActiveLibraryId();
+    const lib = libId ? LibraryStore.getLibrary(libId) : null;
+    libraryHint.textContent = lib
+      ? `Seçili: ${lib.name} — MIDI eklemek için + MIDI`
+      : "Kütüphane seçin veya yukarıdan ekleyin.";
+    songHint.textContent = lib
+      ? lib.songs.length
+        ? "Çalmak için şarkı seçin."
+        : "Bu kütüphaneye + MIDI ile dosya ekleyin."
+      : "Önce bir kütüphane seçin.";
+  }
+
+  function renderLibraries() {
+    const LibraryStore = requireStore();
+    const libs = LibraryStore.getLibraries();
+    libraryList.innerHTML = "";
+    const activeId = LibraryStore.getActiveLibraryId();
+    if (!libs.length) {
+      const empty = document.createElement("li");
+      empty.className = "hint";
+      empty.textContent = "Henüz kütüphane yok.";
+      libraryList.appendChild(empty);
+    }
+    for (const lib of libs) {
+      const li = document.createElement("li");
+      li.textContent = lib.name;
+      li.title = "Çift tık: yeniden adlandır";
+      li.className = lib.id === activeId ? "active" : "";
+      li.addEventListener("click", () => selectLibrary(lib.id));
+      li.addEventListener("dblclick", (e) => {
+        e.preventDefault();
+        openModal(lib.id);
+      });
+      libraryList.appendChild(li);
+    }
+    btnImport.disabled = !activeId;
+    if (btnImportAudio) btnImportAudio.disabled = !activeId;
+    updateHints();
+  }
+
+  function showAudioImportProgress(show) {
+    audioImportOverlay.classList.toggle("hidden", !show);
+    if (!show) {
+      audioImportBarFill.style.width = "0%";
+      audioImportStatus.textContent = "";
+      audioImportFile.textContent = "";
+    }
+  }
+
+  function updateAudioImportProgress({ pct, message, file }) {
+    const p = Math.round((pct || 0) * 100);
+    audioImportBarFill.style.width = `${p}%`;
+    audioImportStatus.textContent = message || "";
+    if (file) audioImportFile.textContent = file;
+  }
+
+  function renderSongs() {
+    const LibraryStore = requireStore();
+    const lib = LibraryStore.getLibrary(LibraryStore.getActiveLibraryId());
+    songList.innerHTML = "";
+    if (!lib) {
+      updateHints();
+      return;
+    }
+    const activeSongId = LibraryStore.getActiveSongId();
+    if (!lib.songs.length) {
+      const empty = document.createElement("li");
+      empty.className = "hint";
+      empty.textContent = "Henüz şarkı yok.";
+      songList.appendChild(empty);
+    }
+    for (const song of lib.songs) {
+      const li = document.createElement("li");
+      const name = document.createElement("span");
+      name.textContent = song.name;
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "btn small";
+      del.textContent = "×";
+      del.title = "Sil";
+      del.addEventListener("click", (e) => {
+        e.stopPropagation();
+        deleteSong(song.id);
+      });
+      li.appendChild(name);
+      li.appendChild(del);
+      li.className = song.id === activeSongId ? "active" : "";
+      li.addEventListener("click", () => selectSong(song.id));
+      songList.appendChild(li);
+    }
+    updateHints();
+  }
+
+  async function selectLibrary(id) {
+    const LibraryStore = requireStore();
+    LibraryStore.setActiveLibrary(id);
+    renderLibraries();
+    renderSongs();
+    trackSelect.innerHTML = '<option value="">Şarkı seçin</option>';
+    trackSelect.disabled = true;
+    btnPlay.disabled = true;
+    try {
+      requireMods().Game.stop();
+    } catch {
+      /* oyun modülü yok */
+    }
+  }
+
+  async function selectSong(songId) {
+    const LibraryStore = requireStore();
+    try {
+      LibraryStore.setActiveSong(songId);
+      renderSongs();
+      const song = LibraryStore.getActiveSong();
+      if (!song) return;
+
+      const parsed = await LibraryStore.loadSongMidi(song);
+      if (parsed.error) {
+        toast(parsed.error, true);
+        return;
+      }
+      if (!parsed.tracks.length) {
+        toast("Bu MIDI dosyasında nota bulunamadı.", true);
+        return;
+      }
+
+      trackSelect.innerHTML = "";
+      parsed.tracks.forEach((t, i) => {
+        const opt = document.createElement("option");
+        opt.value = String(i);
+        const inst = t.instrument ? ` — ${t.instrument}` : "";
+        opt.textContent = `${t.name} (${t.noteCount} nota)${inst}`;
+        trackSelect.appendChild(opt);
+      });
+      trackSelect.disabled = false;
+      LibraryStore.setTrackIndex(0);
+      trackSelect.value = "0";
+      await reloadTrackNotes();
+      try {
+        btnPlay.disabled = !requireMods().Game.hasNotes();
+      } catch {
+        btnPlay.disabled = false;
+      }
+      toast(`"${song.name}" yüklendi.`);
+    } catch (err) {
+      toast(`Şarkı yüklenemedi: ${err.message}`, true);
+    }
+  }
+
+  async function deleteSong(songId) {
+    const LibraryStore = requireStore();
+    try {
+      await LibraryStore.deleteSong(LibraryStore.getActiveLibraryId(), songId);
+      renderSongs();
+      trackSelect.innerHTML = '<option value="">Şarkı seçin</option>';
+      trackSelect.disabled = true;
+      try {
+        requireMods().Game.stop();
+      } catch {
+        /* */
+      }
+      btnPlay.disabled = true;
+      toast("Şarkı silindi.");
+    } catch (err) {
+      toast(`Silinemedi: ${err.message}`, true);
+    }
+  }
+
+  function showFeedback(type, points) {
+    if (type === "complete") {
+      toast("Parça bitti! ■ ile yeniden başlayın.");
+      try {
+        requireMods().Game.setAutoPlayMode(false);
+      } catch {
+        /* */
+      }
+      btnPlay.textContent = "▶ Oynat (sen çal)";
+      if (btnAutoPlay) btnAutoPlay.textContent = "🎹 Sen çal";
+      return;
+    }
+    const el = document.createElement("div");
+    el.className = `feedback-pop ${type}`;
+    el.textContent = type === "good" ? `+${points}` : "Kaçırdın!";
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 650);
+  }
+
+  function onTimeUpdate(t) {
+    timeCurrent.textContent = t.currentText;
+    timeTotal.textContent = t.totalText;
+    timeRemaining.textContent = t.remainingText;
+    progressFill.style.width = `${t.percent}%`;
+  }
+
+  function onScoreChange({ score, combo }) {
+    scoreValue.textContent = String(score);
+    comboValue.textContent = combo > 1 ? `×${combo}` : "";
+    if (combo >= 5 && combo % 5 === 0 && combo !== lastComboShown) {
+      lastComboShown = combo;
+      comboFlare.textContent = `COMBO ×${combo}!`;
+      comboFlare.classList.remove("hidden");
+      setTimeout(() => comboFlare.classList.add("hidden"), 500);
+    }
+  }
+
+  btnNewLib.addEventListener("click", () => openModal());
+  libraryCancel.addEventListener("click", closeModal);
+  libraryBackdrop.addEventListener("click", closeModal);
+
+  libraryForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    await saveLibraryName(libraryNameInput.value);
+  });
+
+  inlineLibraryForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    editingLibraryId = null;
+    const ok = await saveLibraryName(inlineLibraryName.value);
+    if (ok) inlineLibraryName.value = "";
+  });
+
+  btnImport.addEventListener("click", async () => {
+    const LibraryStore = requireStore();
+    const libId = LibraryStore.getActiveLibraryId();
+    if (!libId) {
+      toast("Önce bir kütüphane seçin veya oluşturun.", true);
+      return;
+    }
+    try {
+      try {
+        requireMods().AudioEngine.ensure();
+      } catch {
+        /* ses yoksa da MIDI eklenebilir */
+      }
+      const imported = await window.pianoApi.importMidi(libId);
+      if (!imported.length) return;
+      await LibraryStore.importSongs(libId, imported);
+      renderSongs();
+      toast(`${imported.length} MIDI dosyası eklendi.`);
+    } catch (err) {
+      toast(`MIDI eklenemedi: ${err.message}`, true);
+    }
+  });
+
+  let unbindAudioProgress = null;
+  btnImportAudio?.addEventListener("click", async () => {
+    const LibraryStore = requireStore();
+    const libId = LibraryStore.getActiveLibraryId();
+    if (!libId) {
+      toast("Önce bir kütüphane seçin veya oluşturun.", true);
+      return;
+    }
+    if (!window.pianoApi?.importAudio) {
+      toast("Ses içe aktarma bu sürümde yok.", true);
+      return;
+    }
+    if (btnImportAudio) btnImportAudio.disabled = true;
+    btnImport.disabled = true;
+    showAudioImportProgress(true);
+    unbindAudioProgress?.();
+    unbindAudioProgress = window.pianoApi.onAudioProgress(updateAudioImportProgress);
+
+    try {
+      const imported = await window.pianoApi.importAudio(libId);
+      if (!imported.length) {
+        toast("İşlem iptal edildi veya dosya seçilmedi.");
+        return;
+      }
+      await LibraryStore.importSongs(libId, imported);
+      renderSongs();
+      const totalNotes = imported.reduce((s, x) => s + (x.noteCount || 0), 0);
+      toast(
+        `${imported.length} parça MIDI'ye çevrildi (${totalNotes} nota). Şarkıyı seçip oynatın.`
+      );
+      if (imported.length === 1) {
+        LibraryStore.setActiveSong(imported[0].id);
+        await selectSong(imported[0].id);
+      }
+    } catch (err) {
+      toast(`Ses dönüştürülemedi: ${err.message}`, true);
+    } finally {
+      unbindAudioProgress?.();
+      unbindAudioProgress = null;
+      showAudioImportProgress(false);
+      const activeId = LibraryStore.getActiveLibraryId();
+      btnImport.disabled = !activeId;
+      if (btnImportAudio) btnImportAudio.disabled = !activeId;
+    }
+  });
+
+  trackSelect.addEventListener("change", () => reloadTrackNotes());
+  octaveStart.addEventListener("change", () => {
+    persistSettings({ octaveLockManual: true, autoKeyboardFromSong: false });
+    populateOctaveSelects(Number(octaveStart.value), Number(octaveCount.value));
+    rebuildPiano();
+  });
+  octaveCount.addEventListener("change", () => {
+    persistSettings({ octaveLockManual: true, autoKeyboardFromSong: false });
+    rebuildPiano();
+  });
+
+  keyWidthRange.addEventListener("input", () => {
+    const { Piano } = requireMods();
+    const w = Number(keyWidthRange.value);
+    keyWidthLabel.textContent = `${w} px`;
+    const h = Number(keyHeightRange.value);
+    Piano.setKeySize(w, h);
+    persistSettings({ keyWidth: w, octaveLockManual: true });
+    reloadTrackNotes();
+  });
+
+  keyHeightRange.addEventListener("input", () => {
+    const { Piano } = requireMods();
+    const h = Number(keyHeightRange.value);
+    keyHeightLabel.textContent = `${h} px`;
+    const w = Number(keyWidthRange.value);
+    Piano.setKeySize(w, h);
+    persistSettings({ keyHeight: h, octaveLockManual: true });
+    reloadTrackNotes();
+  });
+
+  dynamicPressure.addEventListener("change", () => {
+    requireMods().AudioEngine.setDynamicPressure(dynamicPressure.checked);
+    persistSettings({ dynamicPressure: dynamicPressure.checked });
+    toast(dynamicPressure.checked ? "Dinamik basınç açık." : "Sabit ses şiddeti.");
+  });
+
+  sustainEnabled.addEventListener("change", () => {
+    requireMods().AudioEngine.setSustain(sustainEnabled.checked);
+    persistSettings({ sustainEnabled: sustainEnabled.checked });
+    toast(
+      sustainEnabled.checked
+        ? "Sustain açık — bırakınca ses yumuşak söner."
+        : "Sustain kapalı — bırakınca ses hemen kesilir."
+    );
+  });
+
+  speedRange.addEventListener("input", () => {
+    const pct = Number(speedRange.value);
+    speedLabel.textContent = `${pct}%`;
+    requireMods().Game.setSpeed(pct / 100);
+    persistSettings({ speed: pct });
+  });
+
+  timingWindow.addEventListener("input", () => {
+    const ms = Number(timingWindow.value);
+    timingLabel.textContent = `${ms} ms`;
+    requireMods().Game.setTimingWindow(ms);
+    persistSettings({ timingWindow: ms });
+  });
+
+  labelMode.addEventListener("change", () => {
+    const mode = labelMode.value;
+    persistSettings({ labelMode: mode });
+    applyLabelSettings(AppSettings.load());
+  });
+
+  labelPreset.addEventListener("change", () => {
+    persistSettings({ labelPreset: labelPreset.value });
+    applyLabelSettings(AppSettings.load());
+  });
+
+  btnApplyLabels.addEventListener("click", () => {
+    persistSettings({ customLabels: customLabels.value });
+    applyLabelSettings(AppSettings.load());
+    toast("Tuş harfleri güncellendi.");
+  });
+
+  customLabels.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") btnApplyLabels.click();
+  });
+
+  flameRange.addEventListener("input", () => {
+    const v = Number(flameRange.value);
+    const intensity = v / 100;
+    flameLabel.textContent = flameLabelText(v);
+    requireMods().Game.setFlameIntensity(intensity);
+    persistSettings({ flameIntensity: intensity });
+  });
+
+  flameStyle.addEventListener("change", () => {
+    const id = flameStyle.value;
+    requireMods().Game.setFlameStyle(id);
+    persistSettings({ flameStyle: id });
+    toast(`Alev stili: ${window.FlameStyles?.getStyleName(id) || id}`);
+  });
+
+  function applyTrim() {
+    const start = Number(trimStartInput?.value) || 0;
+    const end = Number(trimEndInput?.value) || 0;
+    persistSettings({ trimStart: start, trimEnd: end });
+    try {
+      requireMods().Game.setTrim(start, end);
+      reloadTrackNotes();
+      toast(`Kırpma: baş ${start} sn, son ${end} sn`);
+    } catch {
+      /* */
+    }
+  }
+
+  trimStartInput?.addEventListener("change", applyTrim);
+  trimEndInput?.addEventListener("change", applyTrim);
+
+  setupSettingsTabs();
+  effectHueInput?.addEventListener("input", persistThemeFromInputs);
+  keyColorTopInput?.addEventListener("input", persistThemeFromInputs);
+  keyColorMidInput?.addEventListener("input", persistThemeFromInputs);
+  keyColorBottomInput?.addEventListener("input", persistThemeFromInputs);
+  hitLineColorInput?.addEventListener("input", persistThemeFromInputs);
+
+  labelAssignSave?.addEventListener("click", saveLabelAssign);
+  labelAssignCancel?.addEventListener("click", closeLabelAssignModal);
+  labelAssignBackdrop?.addEventListener("click", closeLabelAssignModal);
+  labelAssignClear?.addEventListener("click", () => {
+    labelAssignInput.value = "";
+    saveLabelAssign();
+  });
+  labelAssignInput?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") saveLabelAssign();
+    if (e.key === "Escape") closeLabelAssignModal();
+  });
+
+  window.addEventListener("piano:edit-label", (e) => {
+    openLabelAssignModal(e.detail?.midi);
+  });
+
+  keyboardEnabled.addEventListener("change", () => {
+    const on = keyboardEnabled.checked;
+    window.KeyboardInput?.setEnabled(on);
+    if (on) window.KeyboardInput?.rebuild?.();
+    persistSettings({ keyboardEnabled: on });
+    toast(on ? "Klavye ile çalma açık." : "Klavye ile çalma kapalı.");
+  });
+
+  btnToggleSidebar.addEventListener("click", () => {
+    const hidden = document.body.classList.contains("sidebar-hidden");
+    setSidebarVisible(hidden);
+  });
+
+  btnFullscreen.addEventListener("click", () => toggleFullscreen());
+
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "F11") {
+      e.preventDefault();
+      toggleFullscreen();
+    }
+    if (e.code === "Escape" && document.body.classList.contains("sidebar-hidden") === false) {
+      /* Esc tam ekrandan çıkar — Electron halleder */
+    }
+  });
+
+  btnPlay.addEventListener("click", () => {
+    const { AudioEngine, Game } = requireMods();
+    Game.setAutoPlayMode(false);
+    AudioEngine.ensure();
+    if (Game.isPlaying()) {
+      Game.pause();
+      btnPlay.textContent = "▶ Oynat (sen çal)";
+    } else {
+      Game.play();
+      btnPlay.textContent = "⏸ Duraklat";
+      btnStop.disabled = false;
+    }
+  });
+
+  btnAutoPlay?.addEventListener("click", () => {
+    const { AudioEngine, Game } = requireMods();
+    AudioEngine.ensure();
+    Game.setAutoPlayMode(true);
+    if (Game.isPlaying()) {
+      Game.pause();
+      btnAutoPlay.textContent = "🎹 Sen çal";
+      btnPlay.textContent = "▶ Oynat (sen çal)";
+    } else {
+      Game.play();
+      btnAutoPlay.textContent = "⏸ Bilgisayar duraklat";
+      btnPlay.textContent = "▶ Oynat (sen çal)";
+      btnStop.disabled = false;
+      toast("Bilgisayar çalıyor — notalar otomatik vuruluyor.");
+    }
+  });
+
+  btnStop.addEventListener("click", () => {
+    const { Game, Piano } = requireMods();
+    Game.setAutoPlayMode(false);
+    Piano.releaseAll?.();
+    window.KeyboardInput?.releaseAll?.();
+    Game.resetRound();
+    btnPlay.textContent = "▶ Oynat (sen çal)";
+    btnAutoPlay.textContent = "🎹 Sen çal";
+    btnPlay.disabled = !Game.hasNotes();
+    btnAutoPlay.disabled = !Game.hasNotes();
+    btnStop.disabled = true;
+  });
+
+  applyThemeFromSettings(AppSettings.load());
+
+  (async function boot() {
+    window.__bootStatus = "başlıyor";
+    try {
+      await requireStore().load();
+      window.__bootStatus = "kütüphane yüklendi";
+      renderLibraries();
+      renderSongs();
+    } catch (err) {
+      window.__bootStatus = "hata: " + err.message;
+      toast(`Kütüphane hatası: ${err.message}`, true);
+      console.error(err);
+      return;
+    }
+
+    try {
+      const { Piano, Game, AppSettings } = requireMods();
+      Piano.init(
+        $("#pianoKeys"),
+        $("#pianoWrap"),
+        (midi) => Game.handleKeyPress(midi),
+        () => {}
+      );
+      Game.init($("#notesCanvas"), {
+        onScoreChange,
+        onFeedback: showFeedback,
+        onTimeUpdate,
+      });
+      applySettings(AppSettings.load());
+      window.KeyboardInput?.bind?.();
+      window.KeyboardInput?.rebuild?.();
+      window.__bootStatus = "piyano hazır";
+    } catch (err) {
+      window.__bootStatus = "piyano hata: " + err.message;
+      toast(`Piyano uyarısı: ${err.message}`, true);
+      console.error(err);
+    }
+
+    try {
+      const demo = requireStore().getLibrary("lib-demo");
+      if (demo) {
+        requireStore().setActiveLibrary(demo.id);
+        renderLibraries();
+        renderSongs();
+        if (demo.songs.length) {
+          await selectSong(demo.songs[0].id);
+        }
+        window.__bootStatus = "hazır";
+      }
+    } catch (err) {
+      window.__bootStatus = "demo hata: " + err.message;
+      toast(`Demo şarkı: ${err.message}`, true);
+      console.error(err);
+    }
+  })();
+})();
+

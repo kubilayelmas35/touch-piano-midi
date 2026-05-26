@@ -1,0 +1,990 @@
+/** Ana uygulama */
+(function () {
+  const $ = (sel) => document.querySelector(sel);
+
+  function mods() {
+    return {
+      Piano: window.Piano,
+      Game: window.Game,
+      LibraryStore: window.LibraryStore,
+      AppSettings: window.AppSettings,
+      AudioEngine: window.AudioEngine,
+    };
+  }
+
+  function requireStore() {
+    if (!window.LibraryStore) {
+      throw new Error("Kütüphane modülü yüklenemedi. Uygulamayı kapatıp npm start ile açın.");
+    }
+    return window.LibraryStore;
+  }
+
+  function requireMods() {
+    const m = mods();
+    if (!m.Piano || !m.Game) {
+      throw new Error("Piyano modülü yüklenemedi. Uygulamayı kapatıp npm start ile açın.");
+    }
+    if (!m.LibraryStore) throw new Error("Kütüphane modülü yüklenemedi.");
+    return m;
+  }
+
+  if (!window.mainJsOk || !window.LibraryStore) {
+    $("#apiError")?.classList.remove("hidden");
+    $("#apiError").innerHTML =
+      "Ana program yüklenemedi. Terminalde klasöre gidip: <code>npm start</code>";
+    return;
+  }
+
+  if (!window.Piano || !window.PianoRange) {
+    $("#apiError")?.classList.remove("hidden");
+    $("#apiError").innerHTML =
+      "Piyano modülü yüklenemedi; kütüphane yine de kullanılabilir. <code>npm start</code> ile yeniden açın.";
+  }
+
+  if (!window.pianoApi) {
+    $("#apiError")?.classList.remove("hidden");
+    return;
+  }
+
+  const libraryList = $("#libraryList");
+  const songList = $("#songList");
+  const trackSelect = $("#trackSelect");
+  const scoreValue = $("#scoreValue");
+  const comboValue = $("#comboValue");
+  const btnPlay = $("#btnPlay");
+  const btnAutoPlay = $("#btnAutoPlay");
+  const btnStop = $("#btnStop");
+  const btnImport = $("#btnImportMidi");
+  const btnImportAudio = $("#btnImportAudio");
+  const audioImportOverlay = $("#audioImportOverlay");
+  const audioImportBarFill = $("#audioImportBarFill");
+  const audioImportStatus = $("#audioImportStatus");
+  const audioImportFile = $("#audioImportFile");
+  const btnNewLib = $("#btnNewLibrary");
+  const octaveStart = $("#octaveStart");
+  const octaveCount = $("#octaveCount");
+  const keyWidthRange = $("#keyWidthRange");
+  const keyHeightRange = $("#keyHeightRange");
+  const keyWidthLabel = $("#keyWidthLabel");
+  const keyHeightLabel = $("#keyHeightLabel");
+  const dynamicPressure = $("#dynamicPressure");
+  const sustainEnabled = $("#sustainEnabled");
+  const speedRange = $("#speedRange");
+  const speedLabel = $("#speedLabel");
+  const timingWindow = $("#timingWindow");
+  const timingLabel = $("#timingLabel");
+  const libraryModal = $("#libraryModal");
+  const libraryForm = $("#libraryForm");
+  const libraryNameInput = $("#libraryNameInput");
+  const libraryCancel = $("#libraryCancel");
+  const libraryBackdrop = $("#libraryBackdrop");
+  const inlineLibraryForm = $("#inlineLibraryForm");
+  const inlineLibraryName = $("#inlineLibraryName");
+  const libraryHint = $("#libraryHint");
+  const songHint = $("#songHint");
+  const toastEl = $("#toast");
+  const timeCurrent = $("#timeCurrent");
+  const timeTotal = $("#timeTotal");
+  const timeRemaining = $("#timeRemaining");
+  const progressFill = $("#progressFill");
+  const labelMode = $("#labelMode");
+  const labelPreset = $("#labelPreset");
+  const labelPresetWrap = $("#labelPresetWrap");
+  const customLabelsWrap = $("#customLabelsWrap");
+  const customLabels = $("#customLabels");
+  const btnApplyLabels = $("#btnApplyLabels");
+  const flameRange = $("#flameRange");
+  const flameLabel = $("#flameLabel");
+  const flameStyle = $("#flameStyle");
+  const trimStartInput = $("#trimStart");
+  const trimEndInput = $("#trimEnd");
+  const effectHueInput = $("#effectHue");
+  const keyColorTopInput = $("#keyColorTop");
+  const keyColorMidInput = $("#keyColorMid");
+  const keyColorBottomInput = $("#keyColorBottom");
+  const hitLineColorInput = $("#hitLineColor");
+  const labelAssignModal = $("#labelAssignModal");
+  const labelAssignTitle = $("#labelAssignTitle");
+  const labelAssignHint = $("#labelAssignHint");
+  const labelAssignInput = $("#labelAssignInput");
+  const labelAssignSave = $("#labelAssignSave");
+  const labelAssignCancel = $("#labelAssignCancel");
+  const labelAssignClear = $("#labelAssignClear");
+  const labelAssignBackdrop = $("#labelAssignBackdrop");
+  const keyboardEnabled = $("#keyboardEnabled");
+  const btnToggleSidebar = $("#btnToggleSidebar");
+  const btnFullscreen = $("#btnFullscreen");
+  const comboFlare = $("#comboFlare");
+
+  let editingLibraryId = null;
+  let labelEditMidi = null;
+  let lastComboShown = 0;
+  let toastTimer = null;
+
+  function setupSettingsTabs() {
+    const tabs = document.querySelectorAll(".settings-tabs .stab");
+    const panels = document.querySelectorAll(".stab-panel");
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", () => {
+        const id = tab.dataset.tab;
+        tabs.forEach((t) => t.classList.toggle("active", t === tab));
+        panels.forEach((p) => p.classList.toggle("active", p.dataset.panel === id));
+      });
+    });
+  }
+
+  function applyThemeFromSettings(s) {
+    window.AppTheme?.fromSettings?.(s || AppSettings.load());
+  }
+
+  function persistThemeFromInputs() {
+    persistSettings({
+      effectHue: Number(effectHueInput?.value) || 275,
+      keyColorTop: keyColorTopInput?.value,
+      keyColorMid: keyColorMidInput?.value,
+      keyColorBottom: keyColorBottomInput?.value,
+      hitLineColor: hitLineColorInput?.value,
+    });
+    applyThemeFromSettings(AppSettings.load());
+  }
+
+  function openLabelAssignModal(midi) {
+    labelEditMidi = midi;
+    const name = KeyLabels?.noteNameForMidi?.(midi) || `MIDI ${midi}`;
+    labelAssignTitle.textContent = "Tuş harfi ata";
+    labelAssignHint.textContent = `${name} — tek harf veya boş`;
+    labelAssignInput.value = KeyLabels?.getMidiLabel?.(midi) || "";
+    labelAssignModal.classList.remove("hidden");
+    labelAssignModal.setAttribute("aria-hidden", "false");
+    setTimeout(() => labelAssignInput.focus(), 50);
+  }
+
+  function closeLabelAssignModal() {
+    labelAssignModal.classList.add("hidden");
+    labelAssignModal.setAttribute("aria-hidden", "true");
+    labelEditMidi = null;
+  }
+
+  function saveLabelAssign() {
+    if (labelEditMidi == null) return;
+    const ch = labelAssignInput.value.trim();
+    KeyLabels.setMidiLabel(labelEditMidi, ch);
+    persistSettings({
+      labelMode: "custom",
+      midiLabels: KeyLabels.getMidiLabelsObject(),
+    });
+    applyLabelSettings(AppSettings.load());
+    window.KeyboardInput?.rebuild?.();
+    toast(ch ? `Tuş → "${ch}"` : "Harf kaldırıldı");
+    closeLabelAssignModal();
+  }
+
+  function toast(msg, isError = false) {
+    toastEl.textContent = msg;
+    toastEl.classList.toggle("error", isError);
+    toastEl.classList.remove("hidden");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.add("hidden"), 3200);
+  }
+
+  function openModal(editId = null) {
+    editingLibraryId = editId;
+    $("#libraryDialogTitle").textContent = editId ? "Kütüphaneyi yeniden adlandır" : "Yeni kütüphane";
+    libraryNameInput.value = editId ? requireStore().getLibrary(editId)?.name ?? "" : "";
+    libraryModal.classList.remove("hidden");
+    libraryModal.setAttribute("aria-hidden", "false");
+    setTimeout(() => libraryNameInput.focus(), 50);
+  }
+
+  function closeModal() {
+    libraryModal.classList.add("hidden");
+    libraryModal.setAttribute("aria-hidden", "true");
+    editingLibraryId = null;
+  }
+
+  async function saveLibraryName(name) {
+    const LibraryStore = requireStore();
+    const trimmed = name.trim();
+    if (!trimmed) {
+      toast("Kütüphane adı boş olamaz.", true);
+      return false;
+    }
+    try {
+      if (editingLibraryId) {
+        const lib = LibraryStore.getLibrary(editingLibraryId);
+        if (lib) {
+          lib.name = trimmed;
+          toast(`Kütüphane adı güncellendi.`);
+        }
+      } else {
+        const lib = LibraryStore.createLibrary(trimmed);
+        LibraryStore.setActiveLibrary(lib.id);
+        toast(`"${trimmed}" kütüphanesi eklendi.`);
+      }
+      await LibraryStore.save();
+      if (!libraryModal.classList.contains("hidden")) closeModal();
+      renderLibraries();
+      renderSongs();
+      updateHints();
+      return true;
+    } catch (err) {
+      toast(`Kayıt hatası: ${err.message}`, true);
+      return false;
+    }
+  }
+
+  function applyLabelSettings(s) {
+    if (!window.KeyLabels) return;
+    KeyLabels.loadMidiLabelsObject(s.midiLabels);
+    KeyLabels.setMode(s.labelMode);
+    KeyLabels.setLetterPreset(s.labelPreset);
+    KeyLabels.setCustomString(s.customLabels);
+    labelMode.value = s.labelMode;
+    labelPreset.value = s.labelPreset;
+    customLabels.value = s.customLabels;
+    labelPresetWrap.classList.toggle("hidden", s.labelMode !== "letters");
+    customLabelsWrap.classList.toggle("hidden", s.labelMode !== "custom");
+    try {
+      requireMods().Piano.refreshLabels();
+      window.KeyboardInput?.rebuild?.();
+    } catch {
+      /* henüz hazır değil */
+    }
+  }
+
+  function flameLabelText(v) {
+    if (v < 60) return "Hafif";
+    if (v < 120) return "Normal";
+    if (v < 160) return "Güçlü";
+    return "Alevli!";
+  }
+
+  function applySettings(s) {
+    const { Piano, Game, AudioEngine } = requireMods();
+    keyWidthRange.value = String(s.keyWidth);
+    keyHeightRange.value = String(s.keyHeight);
+    keyWidthLabel.textContent = `${s.keyWidth} px`;
+    keyHeightLabel.textContent = `${s.keyHeight} px`;
+    dynamicPressure.checked = s.dynamicPressure;
+    sustainEnabled.checked = s.sustainEnabled;
+    timingWindow.value = String(s.timingWindow);
+    timingLabel.textContent = `${s.timingWindow} ms`;
+    speedRange.value = String(s.speed);
+    speedLabel.textContent = `${s.speed}%`;
+    flameRange.value = String(Math.round((s.flameIntensity || 1) * 100));
+    flameLabel.textContent = flameLabelText(Number(flameRange.value));
+    flameStyle.value = s.flameStyle || "aurora";
+    if (trimStartInput) trimStartInput.value = String(s.trimStart ?? 0);
+    if (trimEndInput) trimEndInput.value = String(s.trimEnd ?? 0);
+    keyboardEnabled.checked = s.keyboardEnabled !== false;
+
+    AudioEngine.setDynamicPressure(s.dynamicPressure);
+    AudioEngine.setSustain(s.sustainEnabled);
+    Game.setTimingWindow(s.timingWindow);
+    Game.setSpeed(s.speed / 100);
+    Game.setFlameIntensity(s.flameIntensity || 1);
+    Game.setTrim(s.trimStart ?? 0, s.trimEnd ?? 0);
+    Game.setFlameStyle(s.flameStyle || "aurora");
+    window.KeyboardInput?.setEnabled(s.keyboardEnabled !== false);
+    if (effectHueInput) effectHueInput.value = String(s.effectHue ?? 275);
+    if (keyColorTopInput) keyColorTopInput.value = s.keyColorTop || "#e8d4ff";
+    if (keyColorMidInput) keyColorMidInput.value = s.keyColorMid || "#a855f7";
+    if (keyColorBottomInput) keyColorBottomInput.value = s.keyColorBottom || "#6b21a8";
+    if (hitLineColorInput) hitLineColorInput.value = s.hitLineColor || "#d8b4fe";
+    applyThemeFromSettings(s);
+    applyLabelSettings(s);
+    setSidebarVisible(s.sidebarVisible !== false, false);
+    populateOctaveSelects(s.octaveStart, s.octaveCount);
+    Piano.setAutoFit(true);
+    Piano.setKeySize(s.keyWidth, s.keyHeight);
+    const clamped = PianoRange.clampRange(s.octaveStart, s.octaveCount);
+    Piano.buildKeys(clamped.startOctave, clamped.octaveCount);
+  }
+
+  function setSidebarVisible(visible, save = true) {
+    document.body.classList.toggle("sidebar-hidden", !visible);
+    btnToggleSidebar.textContent = visible ? "☰ Menü" : "☰ Menüyü aç";
+    if (save) persistSettings({ sidebarVisible: visible });
+    setTimeout(() => requireMods().Game.resize(), 120);
+  }
+
+  async function toggleFullscreen() {
+    if (!window.pianoApi?.toggleFullscreen) return;
+    const on = await window.pianoApi.toggleFullscreen();
+    btnFullscreen.textContent = on ? "⛶ Pencere" : "⛶ Tam ekran";
+    toast(on ? "Tam ekran açık (F11 / Esc)" : "Pencere modu");
+    setTimeout(() => {
+      try {
+        requireMods().Game.resize();
+      } catch {
+        /* */
+      }
+    }, 200);
+  }
+
+  function persistSettings(partial) {
+    window.AppSettings.save(partial);
+  }
+
+  function populateOctaveSelects(startVal, countVal) {
+    if (!window.PianoRange) return;
+    const start = startVal ?? (Number(octaveStart.value) || 3);
+    const count = countVal ?? (Number(octaveCount.value) || 2);
+
+    octaveStart.innerHTML = "";
+    for (const o of PianoRange.getStartOctaveOptions()) {
+      const opt = document.createElement("option");
+      opt.value = String(o.value);
+      opt.textContent = o.label;
+      octaveStart.appendChild(opt);
+    }
+
+    octaveCount.innerHTML = "";
+    const countOpts = PianoRange.getOctaveCountOptions(start);
+    for (const o of countOpts) {
+      const opt = document.createElement("option");
+      opt.value = String(o.value);
+      opt.textContent = o.label;
+      octaveCount.appendChild(opt);
+    }
+
+    const clamped = PianoRange.clampRange(start, count);
+    octaveStart.value = String(clamped.startOctave);
+    octaveCount.value = String(clamped.octaveCount);
+    return clamped;
+  }
+
+  function getOctaveRange() {
+    return PianoRange
+      ? PianoRange.clampRange(Number(octaveStart.value), Number(octaveCount.value))
+      : {
+          startOctave: Number(octaveStart.value),
+          octaveCount: Number(octaveCount.value),
+        };
+  }
+
+  function rebuildPiano() {
+    const { Piano, Game } = requireMods();
+    window.KeyboardInput?.releaseAll?.();
+
+    const clamped =
+      populateOctaveSelects(
+        Number(octaveStart.value),
+        Number(octaveCount.value)
+      ) || getOctaveRange();
+
+    Piano.setAutoFit(true);
+    Piano.buildKeys(clamped.startOctave, clamped.octaveCount);
+    window.KeyboardInput?.rebuild?.();
+    applyLabelSettings(AppSettings.load());
+    persistSettings({
+      octaveStart: clamped.startOctave,
+      octaveCount: clamped.octaveCount,
+      octaveLockManual: true,
+      autoKeyboardFromSong: false,
+    });
+
+    setTimeout(() => {
+      Game.resize();
+      reloadTrackNotes();
+    }, 80);
+
+    toast(`Klavye: oktav ${clamped.startOctave}, ${clamped.octaveCount} oktav`);
+  }
+
+  function fitKeyboardToSong(notes) {
+    const s = AppSettings.load();
+    if (s.octaveLockManual || !s.autoKeyboardFromSong || !notes?.length) return null;
+    if (!window.PianoRange?.fitRangeToNotes) return null;
+
+    const fit = PianoRange.fitRangeToNotes(notes);
+    populateOctaveSelects(fit.startOctave, fit.octaveCount);
+    const { Piano } = requireMods();
+    Piano.setAutoFit(true);
+    Piano.buildKeys(fit.startOctave, fit.octaveCount);
+    persistSettings({
+      octaveStart: fit.startOctave,
+      octaveCount: fit.octaveCount,
+      autoKeyboardFromSong: true,
+    });
+    return fit;
+  }
+
+  async function reloadTrackNotes() {
+    const { Piano, Game, LibraryStore } = requireMods();
+    const notes = LibraryStore.getTrackNotes();
+    const s = AppSettings.load();
+    Game.setTrim(s.trimStart ?? 0, s.trimEnd ?? 0);
+    const fit = fitKeyboardToSong(notes);
+    if (fit) {
+      toast(
+        `Klavye şarkıya göre: ${fit.octaveCount} oktav (tam genişlik)`,
+        false
+      );
+    } else {
+      Piano.setAutoFit(true);
+      if (typeof Piano.autoSizeKeys === "function") {
+        /* buildKeys içinde autoSizeKeys çağrılır */
+      }
+    }
+    const range = Piano.getRange();
+    Game.loadNotes(notes, range);
+    btnPlay.disabled = !Game.hasNotes();
+    if (btnAutoPlay) btnAutoPlay.disabled = !Game.hasNotes();
+    setTimeout(() => Game.resize(), 100);
+  }
+
+  function updateHints() {
+    const LibraryStore = requireStore();
+    const libId = LibraryStore.getActiveLibraryId();
+    const lib = libId ? LibraryStore.getLibrary(libId) : null;
+    libraryHint.textContent = lib
+      ? `Seçili: ${lib.name} — MIDI eklemek için + MIDI`
+      : "Kütüphane seçin veya yukarıdan ekleyin.";
+    songHint.textContent = lib
+      ? lib.songs.length
+        ? "Çalmak için şarkı seçin."
+        : "Bu kütüphaneye + MIDI ile dosya ekleyin."
+      : "Önce bir kütüphane seçin.";
+  }
+
+  function renderLibraries() {
+    const LibraryStore = requireStore();
+    const libs = LibraryStore.getLibraries();
+    libraryList.innerHTML = "";
+    const activeId = LibraryStore.getActiveLibraryId();
+    if (!libs.length) {
+      const empty = document.createElement("li");
+      empty.className = "hint";
+      empty.textContent = "Henüz kütüphane yok.";
+      libraryList.appendChild(empty);
+    }
+    for (const lib of libs) {
+      const li = document.createElement("li");
+      li.textContent = lib.name;
+      li.title = "Çift tık: yeniden adlandır";
+      li.className = lib.id === activeId ? "active" : "";
+      li.addEventListener("click", () => selectLibrary(lib.id));
+      li.addEventListener("dblclick", (e) => {
+        e.preventDefault();
+        openModal(lib.id);
+      });
+      libraryList.appendChild(li);
+    }
+    btnImport.disabled = !activeId;
+    if (btnImportAudio) btnImportAudio.disabled = !activeId;
+    updateHints();
+  }
+
+  function showAudioImportProgress(show) {
+    audioImportOverlay.classList.toggle("hidden", !show);
+    if (!show) {
+      audioImportBarFill.style.width = "0%";
+      audioImportStatus.textContent = "";
+      audioImportFile.textContent = "";
+    }
+  }
+
+  function updateAudioImportProgress({ pct, message, file }) {
+    const p = Math.round((pct || 0) * 100);
+    audioImportBarFill.style.width = `${p}%`;
+    audioImportStatus.textContent = message || "";
+    if (file) audioImportFile.textContent = file;
+  }
+
+  function renderSongs() {
+    const LibraryStore = requireStore();
+    const lib = LibraryStore.getLibrary(LibraryStore.getActiveLibraryId());
+    songList.innerHTML = "";
+    if (!lib) {
+      updateHints();
+      return;
+    }
+    const activeSongId = LibraryStore.getActiveSongId();
+    if (!lib.songs.length) {
+      const empty = document.createElement("li");
+      empty.className = "hint";
+      empty.textContent = "Henüz şarkı yok.";
+      songList.appendChild(empty);
+    }
+    for (const song of lib.songs) {
+      const li = document.createElement("li");
+      const name = document.createElement("span");
+      name.textContent = song.name;
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "btn small";
+      del.textContent = "×";
+      del.title = "Sil";
+      del.addEventListener("click", (e) => {
+        e.stopPropagation();
+        deleteSong(song.id);
+      });
+      li.appendChild(name);
+      li.appendChild(del);
+      li.className = song.id === activeSongId ? "active" : "";
+      li.addEventListener("click", () => selectSong(song.id));
+      songList.appendChild(li);
+    }
+    updateHints();
+  }
+
+  async function selectLibrary(id) {
+    const LibraryStore = requireStore();
+    LibraryStore.setActiveLibrary(id);
+    renderLibraries();
+    renderSongs();
+    trackSelect.innerHTML = '<option value="">Şarkı seçin</option>';
+    trackSelect.disabled = true;
+    btnPlay.disabled = true;
+    try {
+      requireMods().Game.stop();
+    } catch {
+      /* oyun modülü yok */
+    }
+  }
+
+  async function selectSong(songId) {
+    const LibraryStore = requireStore();
+    try {
+      LibraryStore.setActiveSong(songId);
+      renderSongs();
+      const song = LibraryStore.getActiveSong();
+      if (!song) return;
+
+      const parsed = await LibraryStore.loadSongMidi(song);
+      if (parsed.error) {
+        toast(parsed.error, true);
+        return;
+      }
+      if (!parsed.tracks.length) {
+        toast("Bu MIDI dosyasında nota bulunamadı.", true);
+        return;
+      }
+
+      trackSelect.innerHTML = "";
+      parsed.tracks.forEach((t, i) => {
+        const opt = document.createElement("option");
+        opt.value = String(i);
+        const inst = t.instrument ? ` — ${t.instrument}` : "";
+        opt.textContent = `${t.name} (${t.noteCount} nota)${inst}`;
+        trackSelect.appendChild(opt);
+      });
+      trackSelect.disabled = false;
+      LibraryStore.setTrackIndex(0);
+      trackSelect.value = "0";
+      await reloadTrackNotes();
+      try {
+        btnPlay.disabled = !requireMods().Game.hasNotes();
+      } catch {
+        btnPlay.disabled = false;
+      }
+      toast(`"${song.name}" yüklendi.`);
+    } catch (err) {
+      toast(`Şarkı yüklenemedi: ${err.message}`, true);
+    }
+  }
+
+  async function deleteSong(songId) {
+    const LibraryStore = requireStore();
+    try {
+      await LibraryStore.deleteSong(LibraryStore.getActiveLibraryId(), songId);
+      renderSongs();
+      trackSelect.innerHTML = '<option value="">Şarkı seçin</option>';
+      trackSelect.disabled = true;
+      try {
+        requireMods().Game.stop();
+      } catch {
+        /* */
+      }
+      btnPlay.disabled = true;
+      toast("Şarkı silindi.");
+    } catch (err) {
+      toast(`Silinemedi: ${err.message}`, true);
+    }
+  }
+
+  function showFeedback(type, points) {
+    if (type === "complete") {
+      toast("Parça bitti! ■ ile yeniden başlayın.");
+      try {
+        requireMods().Game.setAutoPlayMode(false);
+      } catch {
+        /* */
+      }
+      btnPlay.textContent = "▶ Oynat (sen çal)";
+      if (btnAutoPlay) btnAutoPlay.textContent = "🎹 Sen çal";
+      return;
+    }
+    const el = document.createElement("div");
+    el.className = `feedback-pop ${type}`;
+    el.textContent = type === "good" ? `+${points}` : "Kaçırdın!";
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 650);
+  }
+
+  function onTimeUpdate(t) {
+    timeCurrent.textContent = t.currentText;
+    timeTotal.textContent = t.totalText;
+    timeRemaining.textContent = t.remainingText;
+    progressFill.style.width = `${t.percent}%`;
+  }
+
+  function onScoreChange({ score, combo }) {
+    scoreValue.textContent = String(score);
+    comboValue.textContent = combo > 1 ? `×${combo}` : "";
+    if (combo >= 5 && combo % 5 === 0 && combo !== lastComboShown) {
+      lastComboShown = combo;
+      comboFlare.textContent = `COMBO ×${combo}!`;
+      comboFlare.classList.remove("hidden");
+      setTimeout(() => comboFlare.classList.add("hidden"), 500);
+    }
+  }
+
+  btnNewLib.addEventListener("click", () => openModal());
+  libraryCancel.addEventListener("click", closeModal);
+  libraryBackdrop.addEventListener("click", closeModal);
+
+  libraryForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    await saveLibraryName(libraryNameInput.value);
+  });
+
+  inlineLibraryForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    editingLibraryId = null;
+    const ok = await saveLibraryName(inlineLibraryName.value);
+    if (ok) inlineLibraryName.value = "";
+  });
+
+  btnImport.addEventListener("click", async () => {
+    const LibraryStore = requireStore();
+    const libId = LibraryStore.getActiveLibraryId();
+    if (!libId) {
+      toast("Önce bir kütüphane seçin veya oluşturun.", true);
+      return;
+    }
+    try {
+      try {
+        requireMods().AudioEngine.ensure();
+      } catch {
+        /* ses yoksa da MIDI eklenebilir */
+      }
+      const imported = await window.pianoApi.importMidi(libId);
+      if (!imported.length) return;
+      await LibraryStore.importSongs(libId, imported);
+      renderSongs();
+      toast(`${imported.length} MIDI dosyası eklendi.`);
+    } catch (err) {
+      toast(`MIDI eklenemedi: ${err.message}`, true);
+    }
+  });
+
+  let unbindAudioProgress = null;
+  btnImportAudio?.addEventListener("click", async () => {
+    const LibraryStore = requireStore();
+    const libId = LibraryStore.getActiveLibraryId();
+    if (!libId) {
+      toast("Önce bir kütüphane seçin veya oluşturun.", true);
+      return;
+    }
+    if (!window.pianoApi?.importAudio) {
+      toast("Ses içe aktarma bu sürümde yok.", true);
+      return;
+    }
+    if (btnImportAudio) btnImportAudio.disabled = true;
+    btnImport.disabled = true;
+    showAudioImportProgress(true);
+    unbindAudioProgress?.();
+    unbindAudioProgress = window.pianoApi.onAudioProgress(updateAudioImportProgress);
+
+    try {
+      const imported = await window.pianoApi.importAudio(libId);
+      if (!imported.length) {
+        toast("İşlem iptal edildi veya dosya seçilmedi.");
+        return;
+      }
+      await LibraryStore.importSongs(libId, imported);
+      renderSongs();
+      const totalNotes = imported.reduce((s, x) => s + (x.noteCount || 0), 0);
+      toast(
+        `${imported.length} parça MIDI'ye çevrildi (${totalNotes} nota). Şarkıyı seçip oynatın.`
+      );
+      if (imported.length === 1) {
+        LibraryStore.setActiveSong(imported[0].id);
+        await selectSong(imported[0].id);
+      }
+    } catch (err) {
+      toast(`Ses dönüştürülemedi: ${err.message}`, true);
+    } finally {
+      unbindAudioProgress?.();
+      unbindAudioProgress = null;
+      showAudioImportProgress(false);
+      const activeId = LibraryStore.getActiveLibraryId();
+      btnImport.disabled = !activeId;
+      if (btnImportAudio) btnImportAudio.disabled = !activeId;
+    }
+  });
+
+  trackSelect.addEventListener("change", () => reloadTrackNotes());
+  octaveStart.addEventListener("change", () => {
+    persistSettings({ octaveLockManual: true, autoKeyboardFromSong: false });
+    populateOctaveSelects(Number(octaveStart.value), Number(octaveCount.value));
+    rebuildPiano();
+  });
+  octaveCount.addEventListener("change", () => {
+    persistSettings({ octaveLockManual: true, autoKeyboardFromSong: false });
+    rebuildPiano();
+  });
+
+  keyWidthRange.addEventListener("input", () => {
+    const { Piano } = requireMods();
+    const w = Number(keyWidthRange.value);
+    keyWidthLabel.textContent = `${w} px`;
+    const h = Number(keyHeightRange.value);
+    Piano.setKeySize(w, h);
+    persistSettings({ keyWidth: w, octaveLockManual: true });
+    reloadTrackNotes();
+  });
+
+  keyHeightRange.addEventListener("input", () => {
+    const { Piano } = requireMods();
+    const h = Number(keyHeightRange.value);
+    keyHeightLabel.textContent = `${h} px`;
+    const w = Number(keyWidthRange.value);
+    Piano.setKeySize(w, h);
+    persistSettings({ keyHeight: h, octaveLockManual: true });
+    reloadTrackNotes();
+  });
+
+  dynamicPressure.addEventListener("change", () => {
+    requireMods().AudioEngine.setDynamicPressure(dynamicPressure.checked);
+    persistSettings({ dynamicPressure: dynamicPressure.checked });
+    toast(dynamicPressure.checked ? "Dinamik basınç açık." : "Sabit ses şiddeti.");
+  });
+
+  sustainEnabled.addEventListener("change", () => {
+    requireMods().AudioEngine.setSustain(sustainEnabled.checked);
+    persistSettings({ sustainEnabled: sustainEnabled.checked });
+    toast(
+      sustainEnabled.checked
+        ? "Sustain açık — bırakınca ses yumuşak söner."
+        : "Sustain kapalı — bırakınca ses hemen kesilir."
+    );
+  });
+
+  speedRange.addEventListener("input", () => {
+    const pct = Number(speedRange.value);
+    speedLabel.textContent = `${pct}%`;
+    requireMods().Game.setSpeed(pct / 100);
+    persistSettings({ speed: pct });
+  });
+
+  timingWindow.addEventListener("input", () => {
+    const ms = Number(timingWindow.value);
+    timingLabel.textContent = `${ms} ms`;
+    requireMods().Game.setTimingWindow(ms);
+    persistSettings({ timingWindow: ms });
+  });
+
+  labelMode.addEventListener("change", () => {
+    const mode = labelMode.value;
+    persistSettings({ labelMode: mode });
+    applyLabelSettings(AppSettings.load());
+  });
+
+  labelPreset.addEventListener("change", () => {
+    persistSettings({ labelPreset: labelPreset.value });
+    applyLabelSettings(AppSettings.load());
+  });
+
+  btnApplyLabels.addEventListener("click", () => {
+    persistSettings({ customLabels: customLabels.value });
+    applyLabelSettings(AppSettings.load());
+    toast("Tuş harfleri güncellendi.");
+  });
+
+  customLabels.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") btnApplyLabels.click();
+  });
+
+  flameRange.addEventListener("input", () => {
+    const v = Number(flameRange.value);
+    const intensity = v / 100;
+    flameLabel.textContent = flameLabelText(v);
+    requireMods().Game.setFlameIntensity(intensity);
+    persistSettings({ flameIntensity: intensity });
+  });
+
+  flameStyle.addEventListener("change", () => {
+    const id = flameStyle.value;
+    requireMods().Game.setFlameStyle(id);
+    persistSettings({ flameStyle: id });
+    toast(`Alev stili: ${window.FlameStyles?.getStyleName(id) || id}`);
+  });
+
+  function applyTrim() {
+    const start = Number(trimStartInput?.value) || 0;
+    const end = Number(trimEndInput?.value) || 0;
+    persistSettings({ trimStart: start, trimEnd: end });
+    try {
+      requireMods().Game.setTrim(start, end);
+      reloadTrackNotes();
+      toast(`Kırpma: baş ${start} sn, son ${end} sn`);
+    } catch {
+      /* */
+    }
+  }
+
+  trimStartInput?.addEventListener("change", applyTrim);
+  trimEndInput?.addEventListener("change", applyTrim);
+
+  setupSettingsTabs();
+  effectHueInput?.addEventListener("input", persistThemeFromInputs);
+  keyColorTopInput?.addEventListener("input", persistThemeFromInputs);
+  keyColorMidInput?.addEventListener("input", persistThemeFromInputs);
+  keyColorBottomInput?.addEventListener("input", persistThemeFromInputs);
+  hitLineColorInput?.addEventListener("input", persistThemeFromInputs);
+
+  labelAssignSave?.addEventListener("click", saveLabelAssign);
+  labelAssignCancel?.addEventListener("click", closeLabelAssignModal);
+  labelAssignBackdrop?.addEventListener("click", closeLabelAssignModal);
+  labelAssignClear?.addEventListener("click", () => {
+    labelAssignInput.value = "";
+    saveLabelAssign();
+  });
+  labelAssignInput?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") saveLabelAssign();
+    if (e.key === "Escape") closeLabelAssignModal();
+  });
+
+  window.addEventListener("piano:edit-label", (e) => {
+    openLabelAssignModal(e.detail?.midi);
+  });
+
+  keyboardEnabled.addEventListener("change", () => {
+    const on = keyboardEnabled.checked;
+    window.KeyboardInput?.setEnabled(on);
+    if (on) window.KeyboardInput?.rebuild?.();
+    persistSettings({ keyboardEnabled: on });
+    toast(on ? "Klavye ile çalma açık." : "Klavye ile çalma kapalı.");
+  });
+
+  btnToggleSidebar.addEventListener("click", () => {
+    const hidden = document.body.classList.contains("sidebar-hidden");
+    setSidebarVisible(hidden);
+  });
+
+  btnFullscreen.addEventListener("click", () => toggleFullscreen());
+
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "F11") {
+      e.preventDefault();
+      toggleFullscreen();
+    }
+    if (e.code === "Escape" && document.body.classList.contains("sidebar-hidden") === false) {
+      /* Esc tam ekrandan çıkar — Electron halleder */
+    }
+  });
+
+  btnPlay.addEventListener("click", () => {
+    const { AudioEngine, Game } = requireMods();
+    Game.setAutoPlayMode(false);
+    AudioEngine.ensure();
+    if (Game.isPlaying()) {
+      Game.pause();
+      btnPlay.textContent = "▶ Oynat (sen çal)";
+    } else {
+      Game.play();
+      btnPlay.textContent = "⏸ Duraklat";
+      btnStop.disabled = false;
+    }
+  });
+
+  btnAutoPlay?.addEventListener("click", () => {
+    const { AudioEngine, Game } = requireMods();
+    AudioEngine.ensure();
+    Game.setAutoPlayMode(true);
+    if (Game.isPlaying()) {
+      Game.pause();
+      btnAutoPlay.textContent = "🎹 Sen çal";
+      btnPlay.textContent = "▶ Oynat (sen çal)";
+    } else {
+      Game.play();
+      btnAutoPlay.textContent = "⏸ Bilgisayar duraklat";
+      btnPlay.textContent = "▶ Oynat (sen çal)";
+      btnStop.disabled = false;
+      toast("Bilgisayar çalıyor — notalar otomatik vuruluyor.");
+    }
+  });
+
+  btnStop.addEventListener("click", () => {
+    const { Game, Piano } = requireMods();
+    Game.setAutoPlayMode(false);
+    Piano.releaseAll?.();
+    window.KeyboardInput?.releaseAll?.();
+    Game.resetRound();
+    btnPlay.textContent = "▶ Oynat (sen çal)";
+    btnAutoPlay.textContent = "🎹 Sen çal";
+    btnPlay.disabled = !Game.hasNotes();
+    btnAutoPlay.disabled = !Game.hasNotes();
+    btnStop.disabled = true;
+  });
+
+  applyThemeFromSettings(AppSettings.load());
+
+  (async function boot() {
+    window.__bootStatus = "başlıyor";
+    try {
+      await requireStore().load();
+      window.__bootStatus = "kütüphane yüklendi";
+      renderLibraries();
+      renderSongs();
+    } catch (err) {
+      window.__bootStatus = "hata: " + err.message;
+      toast(`Kütüphane hatası: ${err.message}`, true);
+      console.error(err);
+      return;
+    }
+
+    try {
+      const { Piano, Game, AppSettings } = requireMods();
+      Piano.init(
+        $("#pianoKeys"),
+        $("#pianoWrap"),
+        (midi) => Game.handleKeyPress(midi),
+        () => {}
+      );
+      Game.init($("#notesCanvas"), {
+        onScoreChange,
+        onFeedback: showFeedback,
+        onTimeUpdate,
+      });
+      applySettings(AppSettings.load());
+      window.KeyboardInput?.bind?.();
+      window.KeyboardInput?.rebuild?.();
+      window.__bootStatus = "piyano hazır";
+    } catch (err) {
+      window.__bootStatus = "piyano hata: " + err.message;
+      toast(`Piyano uyarısı: ${err.message}`, true);
+      console.error(err);
+    }
+
+    try {
+      const demo = requireStore().getLibrary("lib-demo");
+      if (demo) {
+        requireStore().setActiveLibrary(demo.id);
+        renderLibraries();
+        renderSongs();
+        if (demo.songs.length) {
+          await selectSong(demo.songs[0].id);
+        }
+        window.__bootStatus = "hazır";
+      }
+    } catch (err) {
+      window.__bootStatus = "demo hata: " + err.message;
+      toast(`Demo şarkı: ${err.message}`, true);
+      console.error(err);
+    }
+  })();
+})();

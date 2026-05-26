@@ -1,0 +1,50 @@
+{
+  "name": "touch-piano-midi",
+  "version": "1.0.0",
+  "description": "Windows dokunmatik piyano - MIDI kütüphaneleri, düşen notalar ve puanlama",
+  "main": "electron/main.js",
+  "scripts": {
+    "bundle": "node scripts/bundle-renderer.js",
+    "test:smoke": "node scripts/bundle-renderer.js && cross-env SMOKE_TEST=1 electron .",
+    "prestart": "node scripts/bundle-renderer.js",
+    "start": "electron .",
+    "pack": "electron-builder --win portable",
+    "build:pages": "node scripts/build-pages.js"
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^35.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "dependencies": {
+    "@spotify/basic-pitch": "^1.0.1",
+    "@tonejs/midi": "^2.0.28",
+    "audio-decode": "^3.10.1"
+  },
+  "build": {
+    "appId": "com.touchpiano.midi",
+    "productName": "Touch Piano MIDI",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        "portable"
+      ]
+    },
+    "files": [
+      "electron/**/*",
+      "src/**/*",
+      "src/touch-guard.js",
+      "assets/**/*",
+      "package.json",
+      "node_modules/@spotify/**/*",
+      "node_modules/@tensorflow/**/*",
+      "node_modules/@tonejs/**/*",
+      "node_modules/audio-decode/**/*",
+      "node_modules/@audio/**/*",
+      "node_modules/audio-type/**/*"
+    ]
+  }
+}

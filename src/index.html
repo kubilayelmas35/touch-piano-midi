@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Touch Piano MIDI</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="apiError" class="api-error hidden">
+    Uygulama köprüsü yüklenemedi. Lütfen <code>npm start</code> ile Electron içinde açın (tarayıcıda değil).
+  </div>
+
+  <header class="top-bar">
+    <h1>Touch Piano</h1>
+    <div class="score-panel">
+      <span class="score-label">Puan</span>
+      <span id="scoreValue">0</span>
+      <span class="combo" id="comboValue"></span>
+    </div>
+    <div class="time-panel">
+      <div class="time-row">
+        <span id="timeCurrent">0:00</span>
+        <span class="time-sep">/</span>
+        <span id="timeTotal">0:00</span>
+      </div>
+      <div class="time-remaining">Kalan: <strong id="timeRemaining">0:00</strong></div>
+      <div class="progress-track">
+        <div id="progressFill" class="progress-fill"></div>
+      </div>
+    </div>
+    <div class="view-controls">
+      <button type="button" id="btnToggleSidebar" class="btn small" title="Sol menü">☰ Menü</button>
+      <button type="button" id="btnFullscreen" class="btn small" title="Tam ekran (F11)">⛶ Tam ekran</button>
+    </div>
+    <div class="transport">
+      <button id="btnPlay" class="btn primary" disabled>▶ Oynat (sen çal)</button>
+      <button id="btnAutoPlay" class="btn" disabled title="Bilgisayar doğru notaları çalar">🎹 Sen çal</button>
+      <button id="btnStop" class="btn" disabled>■ Durdur</button>
+      <label class="speed-label">
+        Hız
+        <input type="range" id="speedRange" min="50" max="150" value="100" />
+        <span id="speedLabel">100%</span>
+      </label>
+    </div>
+  </header>
+
+  <aside class="sidebar">
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Kütüphaneler</h2>
+        <button type="button" id="btnNewLibrary" class="btn small" title="Yeni kütüphane">+</button>
+      </div>
+      <form id="inlineLibraryForm" class="inline-form">
+        <input type="text" id="inlineLibraryName" placeholder="Yeni kütüphane adı" maxlength="64" />
+        <button type="submit" class="btn small primary">Ekle</button>
+      </form>
+      <ul id="libraryList" class="list"></ul>
+      <p id="libraryHint" class="hint">Kütüphane seçin veya yukarıdan ekleyin.</p>
+    </section>
+
+    <section class="panel" id="songsPanel">
+      <div class="panel-head">
+        <h2>Şarkılar</h2>
+        <button type="button" id="btnImportMidi" class="btn small" disabled title="MIDI ekle">+ MIDI</button>
+        <button type="button" id="btnImportAudio" class="btn small" disabled title="MP3/ses → MIDI">♫ MP3→MIDI</button>
+      </div>
+      <p class="hint small-hint">MP3→MIDI: Spotify Basic Pitch ile nota çıkarımı. Tek enstrüman / vokal en iyi sonucu verir.</p>
+      <ul id="songList" class="list"></ul>
+      <p id="songHint" class="hint">Önce bir kütüphane seçin.</p>
+    </section>
+
+    <section class="panel settings-panel">
+      <h2>Ayarlar</h2>
+      <nav class="settings-tabs" role="tablist">
+        <button type="button" class="stab active" data-tab="song">Parça</button>
+        <button type="button" class="stab" data-tab="keys">Klavye</button>
+        <button type="button" class="stab" data-tab="look">Görünüm</button>
+        <button type="button" class="stab" data-tab="play">Oyun</button>
+      </nav>
+
+      <div class="stab-panel active" data-panel="song">
+        <label class="field">
+          MIDI izi
+          <select id="trackSelect" disabled>
+            <option value="">Önce şarkı seçin</option>
+          </select>
+        </label>
+        <label class="field">
+          Baştan kes (sn)
+          <input type="number" id="trimStart" min="0" max="600" step="0.5" value="0" />
+        </label>
+        <label class="field">
+          Sondan kes (sn)
+          <input type="number" id="trimEnd" min="0" max="600" step="0.5" value="0" />
+        </label>
+        <p class="hint small-hint">Kırpma sonrası parça yeniden yüklenir.</p>
+      </div>
+
+      <div class="stab-panel" data-panel="keys">
+        <label class="field">
+          Başlangıç oktavı
+          <select id="octaveStart"></select>
+        </label>
+        <label class="field">
+          Oktav sayısı
+          <select id="octaveCount"></select>
+        </label>
+        <p class="hint small-hint">Şarkı seçilince otomatik (tam genişlik).</p>
+        <label class="field">
+          Tuş genişliği: <span id="keyWidthLabel">48 px</span>
+          <input type="range" id="keyWidthRange" min="28" max="90" value="48" />
+        </label>
+        <label class="field">
+          Klavye yüksekliği: <span id="keyHeightLabel">160 px</span>
+          <input type="range" id="keyHeightRange" min="90" max="420" value="160" />
+        </label>
+        <label class="field">
+          Etiket modu
+          <select id="labelMode">
+            <option value="note">Nota adı</option>
+            <option value="letters">Harf düzeni</option>
+            <option value="custom">Özel liste</option>
+          </select>
+        </label>
+        <label class="field" id="labelPresetWrap">
+          Harf düzeni
+          <select id="labelPreset">
+            <option value="game">Oyun (ZXCV…)</option>
+            <option value="piano">Klavye (AWSE…)</option>
+          </select>
+        </label>
+        <label class="field" id="customLabelsWrap">
+          Özel harfler
+          <input type="text" id="customLabels" placeholder="Z,X,C,V,…" />
+          <button type="button" id="btnApplyLabels" class="btn small primary">Uygula</button>
+        </label>
+        <p class="hint small-hint">Tuşa <strong>sağ tık</strong> veya <strong>0,6 sn basılı tut</strong> (dokunmatik) → harf ata.</p>
+      </div>
+
+      <div class="stab-panel" data-panel="look">
+        <label class="field">
+          Efekt rengi (ton)
+          <input type="range" id="effectHue" min="0" max="360" value="275" />
+        </label>
+        <label class="field color-row">
+          Basılı tuş (üst)
+          <input type="color" id="keyColorTop" value="#e8d4ff" />
+        </label>
+        <label class="field color-row">
+          Basılı tuş (orta)
+          <input type="color" id="keyColorMid" value="#a855f7" />
+        </label>
+        <label class="field color-row">
+          Basılı tuş (alt)
+          <input type="color" id="keyColorBottom" value="#6b21a8" />
+        </label>
+        <label class="field color-row">
+          Vuruş çizgisi
+          <input type="color" id="hitLineColor" value="#d8b4fe" />
+        </label>
+        <label class="field">
+          Nota stili
+          <select id="flameStyle">
+            <option value="aurora" selected>Aurora</option>
+            <option value="fire">Alev</option>
+            <option value="ice">Buz</option>
+            <option value="neon">Neon</option>
+            <option value="rainbow">Gökkuşağı</option>
+            <option value="plasma">Plazma</option>
+            <option value="minimal">Sade</option>
+          </select>
+        </label>
+        <label class="field">
+          Efekt yoğunluğu: <span id="flameLabel">Normal</span>
+          <input type="range" id="flameRange" min="30" max="200" value="100" />
+        </label>
+      </div>
+
+      <div class="stab-panel" data-panel="play">
+        <label class="field toggle-row">
+          <span>Bilgisayar klavyesi</span>
+          <input type="checkbox" id="keyboardEnabled" checked />
+        </label>
+        <label class="field toggle-row">
+          <span>Dinamik basınç</span>
+          <input type="checkbox" id="dynamicPressure" checked />
+        </label>
+        <label class="field toggle-row">
+          <span>Sustain (yumuşak bırakış)</span>
+          <input type="checkbox" id="sustainEnabled" checked />
+        </label>
+        <label class="field">
+          Zaman toleransı: <span id="timingLabel">200 ms</span>
+          <input type="range" id="timingWindow" min="80" max="400" value="200" />
+        </label>
+        <p class="hint small-hint">Dokunmatik: çok parmaklı jestler kapatıldı. Windows’ta “Tablet modu” kapalı olsun.</p>
+      </div>
+    </section>
+  </aside>
+
+  <main class="game-area">
+    <canvas id="notesCanvas"></canvas>
+    <div id="hitLine" class="hit-line"></div>
+    <div id="comboFlare" class="combo-flare hidden"></div>
+  </main>
+
+  <footer id="pianoWrap" class="piano-wrap">
+    <div id="pianoKeys" class="piano-keys"></div>
+  </footer>
+
+  <div id="libraryModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop" id="libraryBackdrop"></div>
+    <div class="modal-box" role="dialog" aria-labelledby="libraryDialogTitle">
+      <h3 id="libraryDialogTitle">Yeni kütüphane</h3>
+      <form id="libraryForm">
+        <input type="text" id="libraryNameInput" placeholder="Kütüphane adı" maxlength="64" autocomplete="off" />
+        <div class="dialog-actions">
+          <button type="button" class="btn" id="libraryCancel">İptal</button>
+          <button type="submit" class="btn primary" id="librarySave">Kaydet</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <div id="labelAssignModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop" id="labelAssignBackdrop"></div>
+    <div class="modal-box" role="dialog">
+      <h3 id="labelAssignTitle">Tuş harfi ata</h3>
+      <p id="labelAssignHint" class="hint"></p>
+      <input type="text" id="labelAssignInput" maxlength="2" placeholder="Tek harf" autocomplete="off" />
+      <div class="dialog-actions">
+        <button type="button" class="btn" id="labelAssignClear">Temizle</button>
+        <button type="button" class="btn" id="labelAssignCancel">İptal</button>
+        <button type="button" class="btn primary" id="labelAssignSave">Kaydet</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="audioImportOverlay" class="audio-import-overlay hidden" aria-live="polite">
+    <div class="audio-import-card">
+      <h3>Ses → MIDI dönüştürülüyor</h3>
+      <p id="audioImportFile" class="audio-import-file"></p>
+      <div class="audio-import-bar"><div id="audioImportBarFill"></div></div>
+      <p id="audioImportStatus" class="audio-import-status">Hazırlanıyor…</p>
+    </div>
+  </div>
+
+  <script src="touch-guard.js"></script>
+  <script src="main.js?v=13"></script>
+</body>
+</html>
