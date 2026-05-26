@@ -4,29 +4,30 @@ Touch Piano web sürümü (GitHub Pages) Wix **Members** ile giriş yapar; MIDI 
 
 ## Kurulum sırası
 
-1. [CMS_SETUP.md](CMS_SETUP.md) — `UserPianoData` koleksiyonunu oluşturun.
-2. Velo’da `backend/pianoLibrary.web.js` dosyasını ekleyin (bu repodaki içeriği kopyalayın).
-3. `http-functions.js` dosyasını site backend’ine ekleyin (isteğe bağlı, doğrudan HTTP için).
-4. Yeni sayfa **Piyano** oluşturun:
-   - Embed / Custom Element, **ID:** `pianoHtml`
-   - **Kaynak URL:** GitHub Pages adresiniz (`npm run build:pages` sonrası)
-   - Sayfa kodu: [public/player-page.js](public/player-page.js) — `GITHUB_PAGES_ORIGIN` değerini düzenleyin.
-5. Üyelik: Site → **Members** → kayıt/giriş açık.
-6. Menüde “Piyano” sayfasına yalnızca üyeler gitsin (isteğe bağlı).
+1. [CMS_SETUP.md](CMS_SETUP.md) — `UserPianoData` koleksiyonunu oluşturun (**üye Create/Update izni şart**).
+2. Velo **Backend** — şu dosyaları ekleyin (repodan kopyalayın):
+   - `backend/pianoLibraryCore.js`
+   - `backend/pianoLibrary.web.js`
+   - `backend/pianoMedia.web.js` (isteğe bağlı; sayfa kodu Media kullanmıyor)
+3. `http-functions.js` (isteğe bağlı).
+4. Sayfa **Piyano**:
+   - Embed, **ID:** `pianoHtml`
+   - URL: `https://kubilayelmas35.github.io/touch-piano-midi/`
+   - Sayfa kodu: `public/player-page.js` (`GITHUB_PAGES_ORIGIN` doğru olsun).
+5. **Publish** (her Velo değişikliğinden sonra).
 
 ## Akış
 
-- Kullanıcı Wix’te giriş yapar → Piyano sayfası iframe’de GitHub Pages’i açar.
-- `player-page.js` üye bilgisini `postMessage` ile iframe’e gönderir.
-- MIDI yükleme / liste: iframe → köprü → `pianoLibrary.web.js` → Media + CMS.
-- Tekrar girişte aynı `memberId` ile `librariesJson` okunur.
+- Kullanıcı Wix’te giriş yapar → iframe GitHub Pages oynatıcıyı açar.
+- Kütüphane listesi: `player-page.js` → **wix-data** (CMS) — webMethod değil.
+- MIDI yükleme: `player-page.js` → `librariesJson` içinde base64 (Media API gerekmez; ~400 KB/dosya).
 
 ## Dosyalar
 
 | Dosya | Açıklama |
 |-------|----------|
-| `backend/pianoLibrary.web.js` | Kütüphane CRUD + MIDI yükleme |
+| `backend/pianoLibraryCore.js` | Paylaşılan CMS mantığı |
+| `backend/pianoLibrary.web.js` | HTTP / webMethod (isteğe bağlı) |
+| `backend/pianoMedia.web.js` | MIDI Media yükleme |
+| `public/player-page.js` | iframe köprüsü + CMS okuma/yazma |
 | `http-functions.js` | `post_piano*` HTTP uçları |
-| `public/player-page.js` | iframe köprüsü |
-
-Masaüstü uygulama (`npm start`) bu dosyalardan bağımsız çalışır; veriler `%APPDATA%` altındadır.

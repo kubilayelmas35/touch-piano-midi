@@ -21,5 +21,14 @@
 | Belirti | Olası neden |
 |---------|-------------|
 | Oturum bekleniyor | Giriş yok veya iframe dışı açılış |
+| **Kayıt hatası: Unable to handle the request** | Backend modülü yüklenemedi, CMS yok/yanlış ad, veya Velo **Publish** edilmedi |
 | Yükleme hatası | Backend / Media izinleri |
 | Boş liste | CMS adı `UserPianoData` |
+
+### "Unable to handle the request" adımları
+
+1. Wix → **Site Monitoring** → son hata satırına bakın (WDE kodu).
+2. **Backend** → `pianoLibrary.web.js` dosyasını repodaki güncel sürümle değiştirin → **Publish**.
+3. CMS’te koleksiyon ID: `UserPianoData`, alanlar: `memberId`, `librariesJson`.
+4. Piyano sayfasında **Wix üyesi olarak giriş** yapın (sadece GitHub Pages’te açmak yetmez).
+5. Editor’da **Run** ile `pianoPing` test edin (giriş yapmış üye gerekir).

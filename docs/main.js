@@ -2118,6 +2118,7 @@ const LibraryStore = (() => {
         fileName: item.fileName,
       };
       if (item.midiUrl) entry.midiUrl = item.midiUrl;
+      if (item.midiBase64) entry.midiBase64 = item.midiBase64;
       if (item.relativePath) entry.relativePath = item.relativePath;
       lib.songs.push(entry);
     }
@@ -2125,6 +2126,13 @@ const LibraryStore = (() => {
   }
 
   async function loadSongMidi(song) {
+    if (song.midiBase64) {
+      const binary = atob(song.midiBase64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      parsedMidi = window.pianoApi.parseMidi(Array.from(bytes));
+      return parsedMidi;
+    }
     const ref = songStorageRef(song);
     if (!ref) throw new Error("Şarkı dosya adresi yok");
     const bytes = await window.pianoApi.readMidi(ref);

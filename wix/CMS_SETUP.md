@@ -9,10 +9,22 @@ Wix Editor → CMS → **Create Collection**:
 
 ## İzinler (önerilen)
 
-- **Read**: Site member author (veya Admin only — veri zaten `memberId` ile filtrelenir)
-- **Create / Update / Delete**: Site member author
+Koleksiyon → **Settings** → **Permissions**:
 
-`pianoLibrary.web.js` her istekte `auth.getTokenInfo()` ile yalnızca oturum açmış üyenin verisini okur/yazar.
+| İşlem | Öneri |
+|--------|--------|
+| Read | Anyone (veya Site member author) |
+| Create | **Anyone** veya Site member author |
+| Update | **Anyone** veya Site member author |
+| Delete | Site member author |
+
+**Önemli:** Koleksiyon **ID** tam olarak `UserPianoData` olmalı (boşluk veya Türkçe karakter yok).
+
+Alan **Field key** (ID) tam olarak: `memberId`, `librariesJson` (büyük/küçük harf aynı).
+
+`player-page.js` yalnızca giriş yapmış üyenin `memberId` satırını okur/yazar. Backend (`pianoLibraryCore.js`) aynı filtreyi kullanır.
+
+**Kritik:** Create ve Update en az **Site member author** veya **Anyone** olmalı; yoksa sayfa kodu `WDE0027` verir.
 
 ## Medya klasörü
 
