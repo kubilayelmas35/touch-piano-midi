@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="styles.css" />
   <style>
     #authBanner {
-      grid-column: 1 / -1;
+      grid-area: banner;
       padding: 0.45rem 1rem;
       font-size: 0.85rem;
       background: #2a3048;
@@ -16,9 +16,28 @@
     }
     #authBanner.ok { background: #1a3d2e; color: #bbf7d0; }
     #authBanner.warn { background: #4a3520; color: #fde68a; }
-    body.has-auth-banner { grid-template-rows: auto auto 1fr auto; }
-    body.has-auth-banner .top-bar { grid-row: 2; }
-    body.has-auth-banner #authBanner { grid-row: 1; }
+    body.has-auth-banner {
+      grid-template-rows: auto auto minmax(0, 1fr) auto;
+      grid-template-areas:
+        "banner banner"
+        "header header"
+        "sidebar main"
+        "sidebar piano";
+    }
+    body.has-auth-banner .top-bar {
+      grid-area: header;
+    }
+    body.has-auth-banner .view-controls {
+      margin-left: auto;
+    }
+    @media (max-width: 900px) {
+      body.has-auth-banner .view-controls {
+        margin-left: 0;
+      }
+      body.has-auth-banner .top-bar h1 {
+        display: none;
+      }
+    }
   </style>
 </head>
 <body class="has-auth-banner">

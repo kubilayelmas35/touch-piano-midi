@@ -1,5 +1,28 @@
-/** Web: oturum banner ve köprü durumu */
+/** Web: oturum banner, köprü durumu, iframe yükseklik senkronu */
 (function () {
+  function syncEmbedHeight() {
+    const h = window.innerHeight;
+    if (h > 0) {
+      document.documentElement.style.height = `${h}px`;
+      document.body.style.height = `${h}px`;
+      document.body.style.maxHeight = `${h}px`;
+    }
+    try {
+      window.Game?.resize?.();
+    } catch {
+      /* oyun henüz yüklenmedi */
+    }
+  }
+
+  window.addEventListener("resize", syncEmbedHeight);
+  window.addEventListener("orientationchange", () => setTimeout(syncEmbedHeight, 100));
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", syncEmbedHeight);
+  } else {
+    syncEmbedHeight();
+  }
+  setTimeout(syncEmbedHeight, 250);
+
   const banner = document.getElementById("authBanner");
   if (!banner || !window.pianoApi?.isWeb) return;
 
@@ -16,6 +39,7 @@
         "ok"
       );
     }
+    syncEmbedHeight();
   });
 
   setTimeout(() => {
