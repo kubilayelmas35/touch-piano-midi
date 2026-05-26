@@ -20,7 +20,13 @@
   padding: 0;
   -webkit-tap-highlight-color: transparent;
   user-select: none;
-  touch-action: manipulation;
+}
+
+.game-area,
+.piano-wrap,
+.piano-keys {
+  touch-action: none;
+  -ms-touch-action: none;
 }
 
 html, body {

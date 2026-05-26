@@ -1110,12 +1110,7 @@ const Piano = (() => {
   }
 
   function bindContextMenu(el, midi) {
-    let longPressTimer = null;
-    const cancelLong = () => {
-      if (longPressTimer) clearTimeout(longPressTimer);
-      longPressTimer = null;
-    };
-    const open = (e) => {
+    const openMouse = (e) => {
       if (e) {
         e.preventDefault();
         e.stopPropagation();
@@ -1123,23 +1118,21 @@ const Piano = (() => {
       openLabelEditor(midi);
     };
 
-    el.addEventListener("contextmenu", open);
+    el.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (window.__touchPianoTouchInput) return;
+      if (e.pointerType === "touch") return;
+      openLabelEditor(midi);
+    });
+
     el.addEventListener("auxclick", (e) => {
-      if (e.button === 2) open(e);
+      if (e.button !== 2) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (window.__touchPianoTouchInput || e.pointerType === "touch") return;
+      openMouse(e);
     });
-    el.addEventListener("pointerdown", (e) => {
-      if (e.button === 2) {
-        open(e);
-        return;
-      }
-      if (e.pointerType === "touch" && e.button === 0) {
-        cancelLong();
-        longPressTimer = setTimeout(() => open(e), 650);
-      }
-    });
-    el.addEventListener("pointerup", cancelLong);
-    el.addEventListener("pointercancel", cancelLong);
-    el.addEventListener("pointermove", cancelLong);
   }
 
   function releaseAll() {
@@ -1160,6 +1153,7 @@ const Piano = (() => {
   function bindPointer(el, midi) {
     const down = (e) => {
       if (e.pointerType === "mouse" && e.button !== 0) return;
+      if (e.pointerType === "touch" && e.button !== 0) return;
       e.preventDefault();
       el.setPointerCapture(e.pointerId);
       const vel = window.AudioEngine.velocityFromPointer(e);
