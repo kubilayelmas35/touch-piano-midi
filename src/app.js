@@ -67,6 +67,10 @@
   const keyHeightRange = $("#keyHeightRange");
   const keyWidthLabel = $("#keyWidthLabel");
   const keyHeightLabel = $("#keyHeightLabel");
+  const pianoDock = $("#pianoDock");
+  const pianoAlign = $("#pianoAlign");
+  const instrumentSelect = $("#instrumentSelect");
+  const pianoWrap = $("#pianoWrap");
   const dynamicPressure = $("#dynamicPressure");
   const sustainEnabled = $("#sustainEnabled");
   const speedRange = $("#speedRange");
@@ -259,6 +263,31 @@
     return "Alevli!";
   }
 
+  function applyPianoLayout(s) {
+    const dock = s.pianoDock || "bottom";
+    const align = s.pianoAlign || "stretch";
+    document.body.classList.remove("piano-dock-bottom", "piano-dock-top", "piano-dock-middle");
+    document.body.classList.add(`piano-dock-${dock}`);
+    if (pianoWrap) {
+      pianoWrap.classList.remove(
+        "piano-align-stretch",
+        "piano-align-left",
+        "piano-align-center",
+        "piano-align-right"
+      );
+      pianoWrap.classList.add(`piano-align-${align}`);
+    }
+    if (pianoDock) pianoDock.value = dock;
+    if (pianoAlign) pianoAlign.value = align;
+    setTimeout(() => {
+      try {
+        requireMods().Game.resize();
+      } catch {
+        /* */
+      }
+    }, 80);
+  }
+
   function applySettings(s) {
     const { Piano, Game, AudioEngine } = requireMods();
     keyWidthRange.value = String(s.keyWidth);
@@ -280,6 +309,8 @@
 
     AudioEngine.setDynamicPressure(s.dynamicPressure);
     AudioEngine.setSustain(s.sustainEnabled);
+    AudioEngine.setInstrument(s.instrumentId || "piano");
+    if (instrumentSelect) instrumentSelect.value = s.instrumentId || "piano";
     Game.setTimingWindow(s.timingWindow);
     Game.setSpeed(s.speed / 100);
     Game.setFlameIntensity(s.flameIntensity || 1);
@@ -294,8 +325,9 @@
     applyThemeFromSettings(s);
     applyLabelSettings(s);
     setSidebarVisible(s.sidebarVisible !== false, false);
+    applyPianoLayout(s);
     populateOctaveSelects(s.octaveStart, s.octaveCount);
-    Piano.setAutoFit(true);
+    Piano.setAutoFit((s.pianoAlign || "stretch") === "stretch");
     Piano.setKeySize(s.keyWidth, s.keyHeight);
     const clamped = PianoRange.clampRange(s.octaveStart, s.octaveCount);
     Piano.buildKeys(clamped.startOctave, clamped.octaveCount);
@@ -373,7 +405,7 @@
         Number(octaveCount.value)
       ) || getOctaveRange();
 
-    Piano.setAutoFit(true);
+    Piano.setAutoFit((AppSettings.load().pianoAlign || "stretch") === "stretch");
     Piano.buildKeys(clamped.startOctave, clamped.octaveCount);
     window.KeyboardInput?.rebuild?.();
     applyLabelSettings(AppSettings.load());
@@ -400,7 +432,7 @@
     const fit = PianoRange.fitRangeToNotes(notes);
     populateOctaveSelects(fit.startOctave, fit.octaveCount);
     const { Piano } = requireMods();
-    Piano.setAutoFit(true);
+    Piano.setAutoFit((s.pianoAlign || "stretch") === "stretch");
     Piano.buildKeys(fit.startOctave, fit.octaveCount);
     persistSettings({
       octaveStart: fit.startOctave,
@@ -422,7 +454,7 @@
         false
       );
     } else {
-      Piano.setAutoFit(true);
+      Piano.setAutoFit((s.pianoAlign || "stretch") === "stretch");
       if (typeof Piano.autoSizeKeys === "function") {
         /* buildKeys içinde autoSizeKeys çağrılır */
       }
@@ -771,6 +803,27 @@
     Piano.setKeySize(w, h);
     persistSettings({ keyHeight: h, octaveLockManual: true });
     reloadTrackNotes();
+  });
+
+  pianoDock?.addEventListener("change", () => {
+    persistSettings({ pianoDock: pianoDock.value });
+    applyPianoLayout(AppSettings.load());
+  });
+
+  pianoAlign?.addEventListener("change", () => {
+    const align = pianoAlign.value;
+    persistSettings({ pianoAlign: align });
+    const s = AppSettings.load();
+    requireMods().Piano.setAutoFit(align === "stretch");
+    applyPianoLayout(s);
+    rebuildKeyboardFromSettings();
+  });
+
+  instrumentSelect?.addEventListener("change", () => {
+    const id = instrumentSelect.value;
+    requireMods().AudioEngine.setInstrument(id);
+    persistSettings({ instrumentId: id });
+    toast(`Enstrüman: ${instrumentSelect.selectedOptions[0]?.textContent || id}`);
   });
 
   dynamicPressure.addEventListener("change", () => {
