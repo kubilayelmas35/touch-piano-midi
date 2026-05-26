@@ -61,6 +61,7 @@ const LibraryStore = (() => {
       };
       if (item.midiUrl) entry.midiUrl = item.midiUrl;
       if (item.midiBase64) entry.midiBase64 = item.midiBase64;
+      if (item.storage) entry.storage = item.storage;
       if (item.relativePath) entry.relativePath = item.relativePath;
       lib.songs.push(entry);
     }
@@ -73,6 +74,14 @@ const LibraryStore = (() => {
       const bytes = new Uint8Array(binary.length);
       for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
       parsedMidi = window.pianoApi.parseMidi(Array.from(bytes));
+      return parsedMidi;
+    }
+    if (
+      window.pianoApi.isWeb &&
+      (song.storage === "cms" || (!song.midiUrl && !song.relativePath && song.id))
+    ) {
+      const bytes = await window.pianoApi.readMidi(`cms:${song.id}`);
+      parsedMidi = window.pianoApi.parseMidi(bytes);
       return parsedMidi;
     }
     const ref = songStorageRef(song);

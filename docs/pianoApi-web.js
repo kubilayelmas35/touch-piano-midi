@@ -53,7 +53,7 @@
       const timer = setTimeout(() => {
         pending.delete(id);
         reject(new Error("Wix yanıt vermedi (zaman aşımı). Giriş yaptığınızdan emin olun."));
-      }, 120000);
+      }, 300000);
       pending.set(id, {
         resolve: (v) => {
           clearTimeout(timer);
@@ -187,6 +187,14 @@
   async function readMidi(ref) {
     if (!ref) throw new Error("MIDI yolu yok");
     const str = String(ref);
+    if (str.startsWith("cms:")) {
+      const songId = str.slice(4);
+      const out = await apiCall("pianoGetMidi", { songId });
+      const binary = atob(out.base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      return Array.from(bytes);
+    }
     if (/^https?:\/\//i.test(str) || str.startsWith("wix:")) {
       const res = await fetch(str);
       if (!res.ok) throw new Error(`MIDI indirilemedi: ${res.status}`);

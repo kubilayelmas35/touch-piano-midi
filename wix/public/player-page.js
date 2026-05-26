@@ -1,7 +1,8 @@
 /**
  * Wix sayfa kodu — Piyano sayfası (#pianoHtml = HTML iframe / Embed).
  *
- * Kütüphane + MIDI: sayfa kodunda wix-data (Media webMethod kullanılmaz).
+ * Kütüphane listesi: UserPianoData (küçük JSON)
+ * MIDI dosyaları: UserPianoMidi (parça başına ayrı satır, ~15 MB)
  */
 import wixData from "wix-data";
 import { currentMember } from "wix-members-frontend";
@@ -10,10 +11,11 @@ import { currentMember } from "wix-members-frontend";
 const GITHUB_PAGES_ORIGIN = "https://kubilayelmas35.github.io";
 
 const COLLECTION = "UserPianoData";
+const MIDI_COLLECTION = "UserPianoMidi";
 const MSG_IN = "touch-piano";
 const MSG_OUT = "touch-piano-wix";
-/** Tek MIDI ~400 KB (base64 dahil) — CMS metin alanı limiti */
-const MAX_MIDI_BYTES = 400000;
+/** Parça başına ham MIDI (base64 öncesi) — Wix Long Text alanı */
+const MAX_MIDI_BYTES = 15 * 1024 * 1024;
 
 function pagesOrigin() {
   const o = (GITHUB_PAGES_ORIGIN || "").replace(/\/$/, "");
@@ -23,10 +25,10 @@ function pagesOrigin() {
 function formatCmsError(where, err) {
   const msg = err?.message || String(err);
   if (msg.includes("WDE0027") || msg.includes("WDE0177") || msg.includes("permission")) {
-    return `CMS izin hatası (${COLLECTION}). CMS → Permissions → Create/Update: Site member author veya Anyone.`;
+    return `CMS izin hatası. ${COLLECTION} ve ${MIDI_COLLECTION} için Create/Update açın.`;
   }
   if (msg.includes("WDE0007") || msg.toLowerCase().includes("not found")) {
-    return `CMS koleksiyonu bulunamadı: "${COLLECTION}".`;
+    return `CMS koleksiyonu bulunamadı. "${COLLECTION}" ve "${MIDI_COLLECTION}" oluşturun.`;
   }
   return `${where}: ${msg}`;
 }
@@ -39,40 +41,34 @@ async function requireMemberId() {
   return member._id;
 }
 
-async function loadLibraries() {
-  const memberId = await requireMemberId();
-  const result = await wixData
-    .query(COLLECTION)
-    .eq("memberId", memberId)
-    .limit(1)
-    .find();
-
-  if (!result.items.length) {
-    return { libraries: [] };
-  }
-
-  const row = result.items[0];
+function parseLibrariesJson(row) {
   const raw =
     typeof row.librariesJson === "string"
       ? JSON.parse(row.librariesJson)
       : row.librariesJson;
 
   if (raw && Array.isArray(raw.libraries)) {
-    return { libraries: raw.libraries };
+    return raw.libraries;
   }
   if (Array.isArray(raw)) {
-    return { libraries: raw };
+    return raw;
   }
-  return { libraries: [] };
+  return [];
 }
 
-async function saveLibraries(libraries) {
-  if (!Array.isArray(libraries)) {
-    throw new Error("libraries dizi olmalı");
-  }
+/** İstemciye base64 gönderme — sadece metadata */
+function clientLibraries(libraries) {
+  return libraries.map((lib) => ({
+    ...lib,
+    songs: (lib.songs || []).map(({ midiBase64, ...song }) => ({
+      ...song,
+      storage: song.storage || (song.midiUrl || song.relativePath ? undefined : "cms"),
+    })),
+  }));
+}
 
-  const memberId = await requireMemberId();
-  const librariesJson = JSON.stringify({ libraries });
+async function persistLibrariesJson(memberId, libraries) {
+  const librariesJson = JSON.stringify({ libraries: clientLibraries(libraries) });
 
   const existing = await wixData
     .query(COLLECTION)
@@ -91,10 +87,138 @@ async function saveLibraries(libraries) {
   }
 }
 
+async function migrateInlineMidi(memberId, libraries) {
+  let dirty = false;
+  for (const lib of libraries) {
+    for (const song of lib.songs || []) {
+      if (!song.midiBase64) continue;
+      await upsertMidiRow(memberId, lib.id, song.id, song.fileName, song.midiBase64);
+      delete song.midiBase64;
+      song.storage = "cms";
+      dirty = true;
+    }
+  }
+  if (dirty) {
+    await persistLibrariesJson(memberId, libraries);
+  }
+}
+
+async function loadLibraries() {
+  const memberId = await requireMemberId();
+  const result = await wixData
+    .query(COLLECTION)
+    .eq("memberId", memberId)
+    .limit(1)
+    .find();
+
+  if (!result.items.length) {
+    return { libraries: [] };
+  }
+
+  const libraries = parseLibrariesJson(result.items[0]);
+  await migrateInlineMidi(memberId, libraries);
+  return { libraries: clientLibraries(libraries) };
+}
+
+async function saveLibraries(libraries) {
+  if (!Array.isArray(libraries)) {
+    throw new Error("libraries dizi olmalı");
+  }
+  const memberId = await requireMemberId();
+  await persistLibrariesJson(memberId, libraries);
+}
+
+async function upsertMidiRow(memberId, libraryId, songId, fileName, base64) {
+  const existing = await wixData
+    .query(MIDI_COLLECTION)
+    .eq("memberId", memberId)
+    .eq("songId", songId)
+    .limit(1)
+    .find();
+
+  const row = {
+    memberId,
+    songId,
+    libraryId: libraryId || "",
+    fileName: fileName || "",
+    midiData: String(base64),
+  };
+
+  if (existing.items.length) {
+    await wixData.update(MIDI_COLLECTION, { _id: existing.items[0]._id, ...row });
+  } else {
+    await wixData.insert(MIDI_COLLECTION, row);
+  }
+}
+
+async function getMidiRow(memberId, songId) {
+  const result = await wixData
+    .query(MIDI_COLLECTION)
+    .eq("memberId", memberId)
+    .eq("songId", songId)
+    .limit(1)
+    .find();
+
+  if (!result.items.length) {
+    throw new Error("MIDI kaydı bulunamadı. Dosyayı yeniden yükleyin.");
+  }
+  return result.items[0];
+}
+
+async function removeMidiRow(memberId, songId) {
+  const result = await wixData
+    .query(MIDI_COLLECTION)
+    .eq("memberId", memberId)
+    .eq("songId", songId)
+    .limit(1)
+    .find();
+
+  if (result.items.length) {
+    await wixData.remove(MIDI_COLLECTION, result.items[0]._id);
+  }
+}
+
+async function uploadMidi({ libraryId, fileName, base64, name }) {
+  if (!libraryId || !fileName || !base64) {
+    throw new Error("libraryId, fileName ve base64 gerekli");
+  }
+
+  const approxBytes = Math.floor((String(base64).length * 3) / 4);
+  if (approxBytes > MAX_MIDI_BYTES) {
+    throw new Error(
+      `MIDI çok büyük (~${Math.round(approxBytes / 1024)} KB). Parça başına en fazla ~${Math.round(MAX_MIDI_BYTES / 1024 / 1024 * 10) / 10} MB.`
+    );
+  }
+
+  const memberId = await requireMemberId();
+  const safeName = String(fileName).replace(/[<>:"/\\|?*]/g, "_");
+  const songId = `song-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+  await upsertMidiRow(memberId, libraryId, songId, safeName, base64);
+
+  return {
+    id: songId,
+    name: (name || safeName).replace(/\.(mid|midi)$/i, ""),
+    fileName: safeName,
+    storage: "cms",
+  };
+}
+
+async function getMidiData({ songId }) {
+  if (!songId) {
+    throw new Error("songId gerekli");
+  }
+  const memberId = await requireMemberId();
+  const row = await getMidiRow(memberId, songId);
+  return { base64: row.midiData };
+}
+
 async function deleteSong(payload) {
   const { songId, libraryId, midiUrl } = payload || {};
+  const memberId = await requireMemberId();
   const data = await loadLibraries();
   let removed = false;
+  let removedSongId = songId;
 
   for (const lib of data.libraries) {
     if (libraryId && lib.id !== libraryId) continue;
@@ -102,10 +226,12 @@ async function deleteSong(payload) {
     lib.songs = (lib.songs || []).filter((s) => {
       if (songId && s.id === songId) {
         removed = true;
+        removedSongId = s.id;
         return false;
       }
       if (midiUrl && s.midiUrl === midiUrl) {
         removed = true;
+        removedSongId = s.id;
         return false;
       }
       return true;
@@ -119,28 +245,12 @@ async function deleteSong(payload) {
     throw new Error("Şarkı bulunamadı");
   }
 
+  if (removedSongId) {
+    await removeMidiRow(memberId, removedSongId);
+  }
+
   await saveLibraries(data.libraries);
   return { ok: true };
-}
-
-/** MIDI metadata döner; kayıt iframe tarafında importSongs + saveLibraries ile yapılır */
-function prepareMidiEntry({ fileName, base64, name }) {
-  if (!fileName || !base64) {
-    throw new Error("fileName ve base64 gerekli");
-  }
-  const approxBytes = Math.floor((String(base64).length * 3) / 4);
-  if (approxBytes > MAX_MIDI_BYTES) {
-    throw new Error(
-      `MIDI çok büyük (~${Math.round(approxBytes / 1024)} KB). En fazla ~${Math.round(MAX_MIDI_BYTES / 1024)} KB desteklenir.`
-    );
-  }
-  const safeName = String(fileName).replace(/[<>:"/\\|?*]/g, "_");
-  return {
-    id: `song-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    name: (name || safeName).replace(/\.(mid|midi)$/i, ""),
-    fileName: safeName,
-    midiBase64: String(base64),
-  };
 }
 
 async function sendSession(html) {
@@ -174,7 +284,10 @@ async function handleApi(html, data) {
         result = { ok: true };
         break;
       case "pianoUploadMidi":
-        result = prepareMidiEntry(payload || {});
+        result = await uploadMidi(payload || {});
+        break;
+      case "pianoGetMidi":
+        result = await getMidiData(payload || {});
         break;
       case "pianoDeleteSong":
         result = await deleteSong(payload);

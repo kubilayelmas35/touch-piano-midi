@@ -20,7 +20,7 @@ Touch Piano web sürümü (GitHub Pages) Wix **Members** ile giriş yapar; MIDI 
 
 - Kullanıcı Wix’te giriş yapar → iframe GitHub Pages oynatıcıyı açar.
 - Kütüphane listesi: `player-page.js` → **wix-data** (CMS) — webMethod değil.
-- MIDI yükleme: `player-page.js` → `librariesJson` içinde base64 (Media API gerekmez; ~400 KB/dosya).
+- MIDI yükleme: `player-page.js` → `UserPianoMidi` koleksiyonu (~15 MB / parça).
 
 ## Dosyalar
 

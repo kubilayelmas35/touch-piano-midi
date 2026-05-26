@@ -2119,6 +2119,7 @@ const LibraryStore = (() => {
       };
       if (item.midiUrl) entry.midiUrl = item.midiUrl;
       if (item.midiBase64) entry.midiBase64 = item.midiBase64;
+      if (item.storage) entry.storage = item.storage;
       if (item.relativePath) entry.relativePath = item.relativePath;
       lib.songs.push(entry);
     }
@@ -2131,6 +2132,14 @@ const LibraryStore = (() => {
       const bytes = new Uint8Array(binary.length);
       for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
       parsedMidi = window.pianoApi.parseMidi(Array.from(bytes));
+      return parsedMidi;
+    }
+    if (
+      window.pianoApi.isWeb &&
+      (song.storage === "cms" || (!song.midiUrl && !song.relativePath && song.id))
+    ) {
+      const bytes = await window.pianoApi.readMidi(`cms:${song.id}`);
+      parsedMidi = window.pianoApi.parseMidi(bytes);
       return parsedMidi;
     }
     const ref = songStorageRef(song);
@@ -2653,14 +2662,30 @@ window.mainJsOk = true;
     const LibraryStore = requireStore();
     const libId = LibraryStore.getActiveLibraryId();
     const lib = libId ? LibraryStore.getLibrary(libId) : null;
+    const isWeb = !!window.pianoApi?.isWeb;
     libraryHint.textContent = lib
       ? `Seçili: ${lib.name} — MIDI eklemek için + MIDI`
-      : "Kütüphane seçin veya yukarıdan ekleyin.";
-    songHint.textContent = lib
-      ? lib.songs.length
-        ? "Çalmak için şarkı seçin."
-        : "Bu kütüphaneye + MIDI ile dosya ekleyin."
-      : "Önce bir kütüphane seçin.";
+      : isWeb
+        ? "Kütüphane seçin veya yukarıdan ekleyin. Veriler Wix hesabınızda saklanır."
+        : "Kütüphane seçin veya yukarıdan ekleyin.";
+    const activeSong = LibraryStore.getActiveSongId();
+    let playReady = false;
+    try {
+      playReady = !!requireMods().Game.hasNotes();
+    } catch {
+      /* */
+    }
+    if (lib && activeSong && playReady) {
+      songHint.textContent = isWeb
+        ? "▶ Oynat — düşen notalar üstte başlar. Dokunmatik veya bilgisayar klavyesi ile çalın."
+        : "▶ Oynat ile başlayın. Dokunmatik veya klavye ile çalın.";
+    } else if (lib) {
+      songHint.textContent = lib.songs.length
+        ? "Çalmak için listeden bir şarkı seçin."
+        : "Bu kütüphaneye + MIDI ile dosya ekleyin.";
+    } else {
+      songHint.textContent = "Önce bir kütüphane seçin.";
+    }
   }
 
   function renderLibraries() {

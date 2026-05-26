@@ -438,14 +438,30 @@
     const LibraryStore = requireStore();
     const libId = LibraryStore.getActiveLibraryId();
     const lib = libId ? LibraryStore.getLibrary(libId) : null;
+    const isWeb = !!window.pianoApi?.isWeb;
     libraryHint.textContent = lib
       ? `Seçili: ${lib.name} — MIDI eklemek için + MIDI`
-      : "Kütüphane seçin veya yukarıdan ekleyin.";
-    songHint.textContent = lib
-      ? lib.songs.length
-        ? "Çalmak için şarkı seçin."
-        : "Bu kütüphaneye + MIDI ile dosya ekleyin."
-      : "Önce bir kütüphane seçin.";
+      : isWeb
+        ? "Kütüphane seçin veya yukarıdan ekleyin. Veriler Wix hesabınızda saklanır."
+        : "Kütüphane seçin veya yukarıdan ekleyin.";
+    const activeSong = LibraryStore.getActiveSongId();
+    let playReady = false;
+    try {
+      playReady = !!requireMods().Game.hasNotes();
+    } catch {
+      /* */
+    }
+    if (lib && activeSong && playReady) {
+      songHint.textContent = isWeb
+        ? "▶ Oynat — düşen notalar üstte başlar. Dokunmatik veya bilgisayar klavyesi ile çalın."
+        : "▶ Oynat ile başlayın. Dokunmatik veya klavye ile çalın.";
+    } else if (lib) {
+      songHint.textContent = lib.songs.length
+        ? "Çalmak için listeden bir şarkı seçin."
+        : "Bu kütüphaneye + MIDI ile dosya ekleyin.";
+    } else {
+      songHint.textContent = "Önce bir kütüphane seçin.";
+    }
   }
 
   function renderLibraries() {
