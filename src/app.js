@@ -82,6 +82,13 @@
   const playModeSelect = $("#playModeSelect");
   const btnMoveInstrument = $("#btnMoveInstrument");
   const instrumentPickerModal = $("#instrumentPickerModal");
+  const stabKeys = $("#stabKeys");
+  const keyWidthDesc = $("#keyWidthDesc");
+  const keyHeightDesc = $("#keyHeightDesc");
+  const dockDesc = $("#dockDesc");
+  const alignDesc = $("#alignDesc");
+  const stringVibratoSens = $("#stringVibratoSens");
+  const vibratoSensLabel = $("#vibratoSensLabel");
   const dynamicPressure = $("#dynamicPressure");
   const sustainEnabled = $("#sustainEnabled");
   const speedRange = $("#speedRange");
@@ -267,6 +274,59 @@
     }
   }
 
+  function vibratoSensLabelText(v) {
+    if (v < 70) return "Hafif";
+    if (v < 130) return "Normal";
+    if (v < 170) return "Güçlü";
+    return "Çok güçlü";
+  }
+
+  function applyInstrumentKeySize(w, h) {
+    const mode = window.PlaySurface?.getMode?.() || "piano";
+    if (mode === "piano") {
+      requireMods().Piano.setKeySize(w, h);
+    } else {
+      window.PlaySurface?.setKeySize?.(w, h);
+    }
+  }
+
+  function updateSettingsForPlayMode(mode) {
+    const m = mode || window.PlaySurface?.getMode?.() || "piano";
+    const tabLabels = { piano: "Klavye", guitar: "Gitar", violin: "Keman" };
+    if (stabKeys) stabKeys.textContent = tabLabels[m] || "Klavye";
+
+    const widthLabels = {
+      piano: "Tuş genişliği",
+      guitar: "Perde hücre genişliği",
+      violin: "Perde hücre genişliği",
+    };
+    const heightLabels = {
+      piano: "Klavye yüksekliği",
+      guitar: "Panel yüksekliği",
+      violin: "Panel yüksekliği",
+    };
+    if (keyWidthDesc) keyWidthDesc.textContent = widthLabels[m] || widthLabels.piano;
+    if (keyHeightDesc) keyHeightDesc.textContent = heightLabels[m] || heightLabels.piano;
+    if (dockDesc) {
+      dockDesc.textContent =
+        m === "piano" ? "Klavye konumu (dikey)" : "Enstrüman konumu (dikey)";
+    }
+    if (alignDesc) {
+      alignDesc.textContent =
+        m === "piano" ? "Klavye hizası (yatay)" : "Enstrüman hizası (yatay)";
+    }
+
+    if (pianoAlign && m !== "piano") {
+      pianoAlign.querySelector('option[value="stretch"]')?.toggleAttribute(
+        "disabled",
+        true
+      );
+      if (pianoAlign.value === "stretch") pianoAlign.value = "center";
+    } else {
+      pianoAlign?.querySelector('option[value="stretch"]')?.removeAttribute("disabled");
+    }
+  }
+
   function flameLabelText(v) {
     if (v < 60) return "Hafif";
     if (v < 120) return "Normal";
@@ -283,6 +343,9 @@
     if (instrumentSelect) instrumentSelect.value = sound;
     persistSettings({ playMode: m, instrumentId: sound, ...(opts.markPrompt ? { instrumentPromptDone: true } : {}) });
     applyPianoLayout(AppSettings.load());
+    updateSettingsForPlayMode(m);
+    const s = AppSettings.load();
+    applyInstrumentKeySize(s.keyWidth, s.keyHeight);
     setTimeout(() => requireMods().Game.resize(), 100);
     return m;
   }
@@ -375,6 +438,13 @@
     if (playModeSelect) playModeSelect.value = playMode;
     const { PlaySurface } = requireMods();
     PlaySurface.setMode(playMode, { force: true, syncSound: false });
+    updateSettingsForPlayMode(playMode);
+    applyInstrumentKeySize(s.keyWidth, s.keyHeight);
+    if (stringVibratoSens) {
+      const vib = Math.round((s.stringVibratoSens ?? 1) * 100);
+      stringVibratoSens.value = String(vib);
+      if (vibratoSensLabel) vibratoSensLabel.textContent = vibratoSensLabelText(vib);
+    }
     if (playMode === "piano") {
       Piano.setAutoFit((s.pianoAlign || "stretch") === "stretch");
       Piano.setKeySize(s.keyWidth, s.keyHeight);
@@ -841,23 +911,31 @@
   });
 
   keyWidthRange.addEventListener("input", () => {
-    const { Piano } = requireMods();
     const w = Number(keyWidthRange.value);
     keyWidthLabel.textContent = `${w} px`;
     const h = Number(keyHeightRange.value);
-    Piano.setKeySize(w, h);
+    applyInstrumentKeySize(w, h);
     persistSettings({ keyWidth: w, octaveLockManual: true });
     reloadTrackNotes();
   });
 
   keyHeightRange.addEventListener("input", () => {
-    const { Piano } = requireMods();
     const h = Number(keyHeightRange.value);
     keyHeightLabel.textContent = `${h} px`;
     const w = Number(keyWidthRange.value);
-    Piano.setKeySize(w, h);
+    applyInstrumentKeySize(w, h);
     persistSettings({ keyHeight: h, octaveLockManual: true });
     reloadTrackNotes();
+  });
+
+  stringVibratoSens?.addEventListener("input", () => {
+    const v = Number(stringVibratoSens.value);
+    if (vibratoSensLabel) vibratoSensLabel.textContent = vibratoSensLabelText(v);
+    persistSettings({ stringVibratoSens: v / 100 });
+  });
+
+  window.addEventListener("touch-piano:play-mode", (e) => {
+    updateSettingsForPlayMode(e.detail?.mode);
   });
 
   pianoDock?.addEventListener("change", () => {
@@ -1105,6 +1183,7 @@
       window.KeyboardInput?.bind?.();
       window.KeyboardInput?.rebuild?.();
       showInstrumentPickerIfNeeded();
+      updateSettingsForPlayMode(PlaySurface.getMode());
       window.__bootStatus = "piyano hazır";
     } catch (err) {
       window.__bootStatus = "piyano hata: " + err.message;
