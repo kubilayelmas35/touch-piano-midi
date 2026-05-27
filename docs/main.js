@@ -1459,7 +1459,7 @@ const Guitar = (() => {
 
   function applySize() {
     applySizeVars();
-    if (window.Game?.resize) window.Game.resize();
+    if (window.Game?.isReady?.()) window.Game.resize();
   }
 
   function setKeySize(width, height) {
@@ -1681,7 +1681,7 @@ const Violin = (() => {
 
   function applySize() {
     applySizeVars();
-    if (window.Game?.resize) window.Game.resize();
+    if (window.Game?.isReady?.()) window.Game.resize();
   }
 
   function setKeySize(width, height) {
@@ -2032,7 +2032,9 @@ const PlaySurface = (() => {
     }
 
     window.dispatchEvent(new CustomEvent("touch-piano:play-mode", { detail: { mode } }));
-    setTimeout(() => window.Game?.resize?.(), 80);
+    requestAnimationFrame(() => {
+      if (window.Game?.isReady?.()) window.Game.resize();
+    });
     return mode;
   }
 
@@ -2088,9 +2090,9 @@ const InstrumentMove = (() => {
 
   const PANELS = {
     guitarFrets: { selector: "#guitarFretsPanel", defaultPos: { x: 2, y: 4 } },
-    guitarStrings: { selector: "#guitarStringsPanel", defaultPos: { x: 2, y: 72 } },
+    guitarStrings: { selector: "#guitarStringsPanel", defaultPos: { x: 3, y: 38 } },
     violinBoard: { selector: "#violinBoardPanel", defaultPos: { x: 4, y: 8 } },
-    violinStrings: { selector: "#violinStringsPanel", defaultPos: { x: 68, y: 10 } },
+    violinStrings: { selector: "#violinStringsPanel", defaultPos: { x: 70, y: 10 } },
   };
 
   function layoutKey(id) {
@@ -2406,12 +2408,18 @@ const Game = (() => {
     onTimeUpdate = callbacks.onTimeUpdate;
     resize();
     window.addEventListener("resize", resize);
-    const pianoWrap = document.getElementById("pianoWrap");
-    if (pianoWrap && typeof ResizeObserver !== "undefined") {
-      new ResizeObserver(() => {
+    const observeTargets = [
+      document.getElementById("instrumentFooter"),
+      document.getElementById("pianoWrap"),
+      document.getElementById("guitarWrap"),
+      document.getElementById("violinWrap"),
+    ].filter(Boolean);
+    if (typeof ResizeObserver !== "undefined") {
+      const ro = new ResizeObserver(() => {
         resize();
         updateKeyPositions();
-      }).observe(pianoWrap);
+      });
+      for (const el of observeTargets) ro.observe(el);
     }
   }
 
@@ -2450,7 +2458,12 @@ const Game = (() => {
     });
   }
 
+  function isReady() {
+    return !!(canvas && canvas.parentElement);
+  }
+
   function resize() {
+    if (!canvas?.parentElement) return;
     const parent = canvas.parentElement;
     canvas.width = parent.clientWidth * devicePixelRatio;
     canvas.height = parent.clientHeight * devicePixelRatio;
@@ -2481,6 +2494,7 @@ const Game = (() => {
 
   function updateKeyPositions() {
     keyPositions.clear();
+    if (!canvas?.parentElement) return;
     const surface = window.PlaySurface;
     if (!surface) return;
     const range = surface.getRange();
@@ -2990,6 +3004,7 @@ const Game = (() => {
     getSongDuration: () => songDuration,
     isPlaying: () => playing,
     hasNotes: () => notes.length > 0,
+    isReady,
     resize: () => {
       resize();
       updateKeyPositions();
@@ -3461,6 +3476,7 @@ window.mainJsOk = true;
 
   function updateSettingsForPlayMode(mode) {
     const m = mode || window.PlaySurface?.getMode?.() || "piano";
+    document.body.dataset.playMode = m;
     const tabLabels = { piano: "Klavye", guitar: "Gitar", violin: "Keman" };
     if (stabKeys) stabKeys.textContent = tabLabels[m] || "Klavye";
 
@@ -4129,9 +4145,16 @@ window.mainJsOk = true;
   });
 
   playModeSelect?.addEventListener("change", () => {
-    const m = applyPlayMode(playModeSelect.value, { force: true });
-    reloadTrackNotes();
-    toast(`Enstrüman: ${window.PlaySurface.getModes()[m]?.label || m}`);
+    try {
+      const m = applyPlayMode(playModeSelect.value, { force: true });
+      reloadTrackNotes();
+      updateSettingsForPlayMode(m);
+      toast(`Enstrüman: ${window.PlaySurface.getModes()[m]?.label || m}`);
+    } catch (err) {
+      console.error(err);
+      updateSettingsForPlayMode(playModeSelect.value);
+      toast(`Enstrüman değişti; bazı ayarlar yenilenemedi: ${err.message}`, true);
+    }
   });
 
   btnMoveInstrument?.addEventListener("click", () => {
@@ -4338,16 +4361,16 @@ window.mainJsOk = true;
 
     try {
       const { PlaySurface, Game, AppSettings } = requireMods();
-      PlaySurface.init(
-        (midi) => Game.handleKeyPress(midi),
-        () => {}
-      );
-      if (window.InstrumentMove) window.InstrumentMove.applyLayout(AppSettings.load());
       Game.init($("#notesCanvas"), {
         onScoreChange,
         onFeedback: showFeedback,
         onTimeUpdate,
       });
+      PlaySurface.init(
+        (midi) => Game.handleKeyPress(midi),
+        () => {}
+      );
+      if (window.InstrumentMove) window.InstrumentMove.applyLayout(AppSettings.load());
       applySettings(AppSettings.load());
       window.KeyboardInput?.bind?.();
       window.KeyboardInput?.rebuild?.();

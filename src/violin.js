@@ -24,7 +24,7 @@ const Violin = (() => {
 
   function applySize() {
     applySizeVars();
-    if (window.Game?.resize) window.Game.resize();
+    if (window.Game?.isReady?.()) window.Game.resize();
   }
 
   function setKeySize(width, height) {
