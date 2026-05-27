@@ -5,6 +5,7 @@
   function mods() {
     return {
       Piano: window.Piano,
+      PlaySurface: window.PlaySurface,
       Game: window.Game,
       LibraryStore: window.LibraryStore,
       AppSettings: window.AppSettings,
@@ -21,11 +22,18 @@
 
   function requireMods() {
     const m = mods();
-    if (!m.Piano || !m.Game) {
+    if (!m.Piano || !m.Game || !m.PlaySurface) {
       throw new Error("Piyano modülü yüklenemedi. Uygulamayı kapatıp npm start ile açın.");
     }
     if (!m.LibraryStore) throw new Error("Kütüphane modülü yüklenemedi.");
     return m;
+  }
+
+  function playInstrument() {
+    const mode = window.PlaySurface?.getMode?.() || "piano";
+    if (mode === "guitar") return window.Guitar;
+    if (mode === "violin") return window.Violin;
+    return window.Piano;
   }
 
   if (!window.mainJsOk || !window.LibraryStore) {
@@ -71,6 +79,9 @@
   const pianoAlign = $("#pianoAlign");
   const instrumentSelect = $("#instrumentSelect");
   const pianoWrap = $("#pianoWrap");
+  const playModeSelect = $("#playModeSelect");
+  const btnMoveInstrument = $("#btnMoveInstrument");
+  const instrumentPickerModal = $("#instrumentPickerModal");
   const dynamicPressure = $("#dynamicPressure");
   const sustainEnabled = $("#sustainEnabled");
   const speedRange = $("#speedRange");
@@ -263,6 +274,39 @@
     return "Alevli!";
   }
 
+  function applyPlayMode(mode, opts = {}) {
+    const { PlaySurface, AudioEngine } = requireMods();
+    const m = PlaySurface.setMode(mode, opts);
+    const sound = PlaySurface.getModes()[m]?.sound || "piano";
+    AudioEngine.setInstrument(sound);
+    if (playModeSelect) playModeSelect.value = m;
+    if (instrumentSelect) instrumentSelect.value = sound;
+    persistSettings({ playMode: m, instrumentId: sound, ...(opts.markPrompt ? { instrumentPromptDone: true } : {}) });
+    applyPianoLayout(AppSettings.load());
+    setTimeout(() => requireMods().Game.resize(), 100);
+    return m;
+  }
+
+  function showInstrumentPickerIfNeeded() {
+    const s = AppSettings.load();
+    if (!instrumentPickerModal) return;
+    if (s.instrumentPromptDone) {
+      instrumentPickerModal.classList.add("hidden");
+      instrumentPickerModal.setAttribute("aria-hidden", "true");
+      return;
+    }
+    instrumentPickerModal.classList.remove("hidden");
+    instrumentPickerModal.setAttribute("aria-hidden", "false");
+    instrumentPickerModal.querySelectorAll("[data-mode]").forEach((btn) => {
+      btn.onclick = () => {
+        applyPlayMode(btn.dataset.mode, { force: true, markPrompt: true });
+        instrumentPickerModal.classList.add("hidden");
+        instrumentPickerModal.setAttribute("aria-hidden", "true");
+        toast(`Enstrüman: ${window.PlaySurface.getModes()[btn.dataset.mode]?.label || btn.dataset.mode}`);
+      };
+    });
+  }
+
   function applyPianoLayout(s) {
     const dock = s.pianoDock || "bottom";
     const align = s.pianoAlign || "stretch";
@@ -327,10 +371,16 @@
     setSidebarVisible(s.sidebarVisible !== false, false);
     applyPianoLayout(s);
     populateOctaveSelects(s.octaveStart, s.octaveCount);
-    Piano.setAutoFit((s.pianoAlign || "stretch") === "stretch");
-    Piano.setKeySize(s.keyWidth, s.keyHeight);
-    const clamped = PianoRange.clampRange(s.octaveStart, s.octaveCount);
-    Piano.buildKeys(clamped.startOctave, clamped.octaveCount);
+    const playMode = s.playMode || "piano";
+    if (playModeSelect) playModeSelect.value = playMode;
+    const { PlaySurface } = requireMods();
+    PlaySurface.setMode(playMode, { force: true, syncSound: false });
+    if (playMode === "piano") {
+      Piano.setAutoFit((s.pianoAlign || "stretch") === "stretch");
+      Piano.setKeySize(s.keyWidth, s.keyHeight);
+      const clamped = PianoRange.clampRange(s.octaveStart, s.octaveCount);
+      Piano.buildKeys(clamped.startOctave, clamped.octaveCount);
+    }
   }
 
   function setSidebarVisible(visible, save = true) {
@@ -396,6 +446,10 @@
   }
 
   function rebuildPiano() {
+    if (window.PlaySurface?.getMode?.() !== "piano") {
+      toast("Oktav ayarları yalnızca piyano modunda geçerlidir.");
+      return;
+    }
     const { Piano, Game } = requireMods();
     window.KeyboardInput?.releaseAll?.();
 
@@ -426,6 +480,7 @@
 
   function fitKeyboardToSong(notes) {
     const s = AppSettings.load();
+    if ((window.PlaySurface?.getMode?.() || s.playMode || "piano") !== "piano") return null;
     if (s.octaveLockManual || !s.autoKeyboardFromSong || !notes?.length) return null;
     if (!window.PianoRange?.fitRangeToNotes) return null;
 
@@ -453,13 +508,13 @@
         `Klavye şarkıya göre: ${fit.octaveCount} oktav (tam genişlik)`,
         false
       );
-    } else {
+    } else if ((window.PlaySurface?.getMode?.() || "piano") === "piano") {
       Piano.setAutoFit((s.pianoAlign || "stretch") === "stretch");
       if (typeof Piano.autoSizeKeys === "function") {
         /* buildKeys içinde autoSizeKeys çağrılır */
       }
     }
-    const range = Piano.getRange();
+    const range = playInstrument().getRange();
     Game.loadNotes(notes, range);
     btnPlay.disabled = !Game.hasNotes();
     if (btnAutoPlay) btnAutoPlay.disabled = !Game.hasNotes();
@@ -823,7 +878,25 @@
     const id = instrumentSelect.value;
     requireMods().AudioEngine.setInstrument(id);
     persistSettings({ instrumentId: id });
-    toast(`Enstrüman: ${instrumentSelect.selectedOptions[0]?.textContent || id}`);
+    toast(`Ses: ${instrumentSelect.selectedOptions[0]?.textContent || id}`);
+  });
+
+  playModeSelect?.addEventListener("change", () => {
+    const m = applyPlayMode(playModeSelect.value, { force: true });
+    reloadTrackNotes();
+    toast(`Enstrüman: ${window.PlaySurface.getModes()[m]?.label || m}`);
+  });
+
+  btnMoveInstrument?.addEventListener("click", () => {
+    const mode = window.PlaySurface?.getMode?.() || "piano";
+    if (mode === "piano") {
+      toast("Piyano konumu: Ayarlar → Klavye → konum / hiza.");
+      return;
+    }
+    if (!window.InstrumentMove) return;
+    const next = !window.InstrumentMove.isMoveMode();
+    window.InstrumentMove.setMoveMode(next);
+    toast(next ? "Panelleri sürükleyin, bitince tekrar tıklayın." : "Konum kaydedildi.");
   });
 
   dynamicPressure.addEventListener("change", () => {
@@ -988,9 +1061,9 @@
   });
 
   btnStop.addEventListener("click", () => {
-    const { Game, Piano } = requireMods();
+    const { Game, PlaySurface } = requireMods();
     Game.setAutoPlayMode(false);
-    Piano.releaseAll?.();
+    PlaySurface.releaseAll?.();
     window.KeyboardInput?.releaseAll?.();
     Game.resetRound();
     btnPlay.textContent = "▶ Oynat (sen çal)";
@@ -1017,13 +1090,12 @@
     }
 
     try {
-      const { Piano, Game, AppSettings } = requireMods();
-      Piano.init(
-        $("#pianoKeys"),
-        $("#pianoWrap"),
+      const { PlaySurface, Game, AppSettings } = requireMods();
+      PlaySurface.init(
         (midi) => Game.handleKeyPress(midi),
         () => {}
       );
+      if (window.InstrumentMove) window.InstrumentMove.applyLayout(AppSettings.load());
       Game.init($("#notesCanvas"), {
         onScoreChange,
         onFeedback: showFeedback,
@@ -1032,6 +1104,7 @@
       applySettings(AppSettings.load());
       window.KeyboardInput?.bind?.();
       window.KeyboardInput?.rebuild?.();
+      showInstrumentPickerIfNeeded();
       window.__bootStatus = "piyano hazır";
     } catch (err) {
       window.__bootStatus = "piyano hata: " + err.message;

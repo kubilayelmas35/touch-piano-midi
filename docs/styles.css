@@ -24,7 +24,12 @@
 
 .game-area,
 .piano-wrap,
-.piano-keys {
+.piano-keys,
+.guitar-wrap,
+.guitar-cell,
+.guitar-string,
+.violin-wrap,
+.violin-cell {
   touch-action: none;
   -ms-touch-action: none;
 }
@@ -57,10 +62,12 @@ body.piano-dock-top {
 }
 
 body.piano-dock-middle .game-area,
+body.piano-dock-middle .instrument-footer,
 body.piano-dock-middle .piano-wrap {
   grid-area: main;
 }
 
+body.piano-dock-middle .instrument-footer,
 body.piano-dock-middle .piano-wrap {
   align-self: end;
   z-index: 8;
@@ -422,7 +429,9 @@ body.sidebar-hidden #btnToggleSidebar {
 }
 
 .piano-wrap {
-  grid-area: piano;
+  grid-area: unset;
+  width: 100%;
+  height: 100%;
   background: #0a0c10;
   border-top: none;
   padding: 0 0.25rem 0.25rem;
@@ -761,4 +770,224 @@ body.sidebar-hidden #btnToggleSidebar {
   margin: 0;
   font-size: 0.9rem;
   color: var(--text);
+}
+
+.instrument-footer {
+  grid-area: piano;
+  position: relative;
+  min-height: 150px;
+  background: #0a0c10;
+  overflow: hidden;
+}
+
+.instrument-panel.hidden {
+  display: none !important;
+}
+
+.play-mode-bar select {
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid #3a4050;
+  border-radius: 6px;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.85rem;
+  max-width: 9rem;
+}
+
+.panel-actions {
+  margin-bottom: 0.5rem;
+}
+
+.panel-actions .btn.active {
+  background: var(--accent-dim);
+  color: #fff;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+.instrument-picker-box {
+  max-width: 420px;
+}
+
+.instrument-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+
+.instrument-pick {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 1rem 0.5rem;
+  min-height: 5.5rem;
+}
+
+.instrument-pick-icon {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.instrument-pick-label {
+  font-size: 0.85rem;
+}
+
+.guitar-wrap,
+.violin-wrap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 180px;
+}
+
+.movable-panel {
+  position: absolute;
+  z-index: 5;
+  background: rgba(18, 22, 32, 0.96);
+  border: 1px solid #3a4055;
+  border-radius: 8px;
+  padding: 0.35rem;
+  touch-action: none;
+}
+
+.move-handle {
+  display: none;
+  font-size: 0.75rem;
+  color: var(--accent);
+  padding: 0.2rem 0.35rem;
+  cursor: grab;
+  user-select: none;
+  border-bottom: 1px solid #2a3040;
+  margin-bottom: 0.25rem;
+}
+
+.instrument-move-mode .move-handle {
+  display: block;
+}
+
+.instrument-move-mode .movable-panel {
+  outline: 2px dashed rgba(108, 158, 255, 0.55);
+}
+
+.guitar-frets-panel {
+  width: min(96%, 720px);
+}
+
+.guitar-strings-panel {
+  width: min(92%, 280px);
+}
+
+.guitar-fret-header,
+.guitar-string-row,
+.violin-pos-header,
+.violin-string-row {
+  display: grid;
+  grid-template-columns: 2rem repeat(15, minmax(1.6rem, 1fr));
+  gap: 2px;
+  align-items: stretch;
+}
+
+.violin-pos-header,
+.violin-string-row {
+  grid-template-columns: 2rem repeat(14, minmax(1.5rem, 1fr));
+}
+
+.guitar-fret-num,
+.guitar-string-label,
+.violin-string-row > span:first-child {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.guitar-cell,
+.violin-cell {
+  min-height: 1.75rem;
+  border: 1px solid #3a4050;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #2a3040, #1a1e28);
+  cursor: pointer;
+  touch-action: none;
+}
+
+.guitar-cell.open-fret {
+  background: linear-gradient(180deg, #3a4558, #252a38);
+}
+
+.guitar-cell.active,
+.violin-cell.active,
+.guitar-string.active {
+  background: var(--accent-dim);
+  box-shadow: 0 0 8px rgba(108, 158, 255, 0.5);
+}
+
+.guitar-cell.hit-target,
+.violin-cell.hit-target {
+  box-shadow: 0 0 10px var(--good);
+}
+
+.guitar-strings {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.guitar-strings-title {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  margin-bottom: 0.25rem;
+}
+
+.guitar-string {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.2rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid #4a5068;
+  border-radius: 6px;
+  background: #1a1e28;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.guitar-string-line {
+  flex: 1;
+  height: 2px;
+  background: linear-gradient(90deg, #8a8fa8, #c4cad8, #8a8fa8);
+}
+
+.guitar-string-name {
+  width: 1.2rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.violin-board-panel {
+  width: min(96%, 640px);
+}
+
+.violin-board {
+  padding: 0.25rem;
+}
+
+#btnMoveInstrument {
+  width: 100%;
+}
+
+body[data-play-mode="piano"] #btnMoveInstrument {
+  opacity: 0.65;
 }

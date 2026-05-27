@@ -1,6 +1,6 @@
 /** Windows dokunmatik — sağ tık, uzun basış menüsü, istenmeyen jestler */
 (function () {
-  const PIANO_ZONE = ".piano-wrap, .piano-keys, .key";
+  const PIANO_ZONE = ".piano-wrap, .piano-keys, .key, .guitar-wrap, .guitar-cell, .guitar-string, .violin-wrap, .violin-cell";
 
   function inPianoZone(target) {
     return target && target.closest && target.closest(PIANO_ZONE);
