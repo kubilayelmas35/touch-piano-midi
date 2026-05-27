@@ -62,6 +62,7 @@ const PlaySurface = (() => {
       } else if (mode === "violin") {
         mod.init?.(
           document.getElementById("violinBoard"),
+          document.getElementById("violinStrings"),
           document.getElementById("violinWrap"),
           noteDownCb,
           noteUpCb

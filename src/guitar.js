@@ -12,16 +12,28 @@ const Guitar = (() => {
   let onNoteDown = null;
   let onNoteUp = null;
   let cellMap = new Map();
+  let cellW = 48;
+  let boardH = 140;
 
   function midiAt(stringIdx, fret) {
     return STRING_OPEN[stringIdx] + fret;
   }
 
+  function applySizeVars() {
+    if (!wrapEl) return;
+    wrapEl.style.setProperty("--inst-cell-w", `${Math.max(1.25, cellW * 0.034)}rem`);
+    wrapEl.style.setProperty("--inst-row-h", `${Math.max(1.5, boardH / 5.5)}rem`);
+    wrapEl.style.setProperty("--inst-string-h", `${Math.max(2.2, boardH / 7)}rem`);
+  }
+
   function applySize() {
+    applySizeVars();
     if (window.Game?.resize) window.Game.resize();
   }
 
-  function setKeySize() {
+  function setKeySize(width, height) {
+    cellW = Math.max(28, Math.min(90, width));
+    boardH = Math.max(90, Math.min(420, height));
     applySize();
   }
 
@@ -30,7 +42,7 @@ const Guitar = (() => {
   }
 
   function getKeySize() {
-    return { keyWidth: 48, keyHeight: 140 };
+    return { keyWidth: cellW, keyHeight: boardH };
   }
 
   function getRange() {
@@ -42,12 +54,15 @@ const Guitar = (() => {
   function releaseAll() {
     for (const [, m] of activePointers) window.AudioEngine.noteOff(m);
     activePointers.clear();
-    fretsRoot?.querySelectorAll(".guitar-cell.active, .guitar-string.active").forEach((el) => {
+    fretsRoot?.querySelectorAll(".guitar-cell.active").forEach((el) => {
       el.classList.remove("active");
+    });
+    stringsRoot?.querySelectorAll(".guitar-string.active, .guitar-string.string-held").forEach((el) => {
+      el.classList.remove("active", "string-held", "string-vibrating");
     });
   }
 
-  function bindPointer(el, midi) {
+  function bindFretCell(el, midi) {
     const down = (e) => {
       if (e.pointerType === "mouse" && e.button !== 0) return;
       if (e.pointerType === "touch" && e.button !== 0) return;
@@ -88,22 +103,39 @@ const Guitar = (() => {
 
     const header = document.createElement("div");
     header.className = "guitar-fret-header";
-    header.innerHTML = '<span class="guitar-corner"></span>';
+    const corner = document.createElement("span");
+    corner.className = "guitar-corner";
+    header.appendChild(corner);
+    const nums = document.createElement("div");
+    nums.className = "guitar-fret-cells guitar-fret-header-cells";
     for (let f = 0; f <= FRET_COUNT; f++) {
       const h = document.createElement("span");
       h.className = "guitar-fret-num";
       h.textContent = f === 0 ? "∅" : String(f);
-      header.appendChild(h);
+      nums.appendChild(h);
     }
+    header.appendChild(nums);
     fretsRoot.appendChild(header);
 
     for (let s = 0; s < 6; s++) {
       const row = document.createElement("div");
       row.className = "guitar-string-row";
+      row.dataset.string = String(s);
+
       const label = document.createElement("span");
       label.className = "guitar-string-label";
       label.textContent = STRING_NAMES[s];
       row.appendChild(label);
+
+      const lane = document.createElement("div");
+      lane.className = "guitar-fret-lane";
+      const wire = document.createElement("div");
+      wire.className = "guitar-row-wire";
+      wire.setAttribute("aria-hidden", "true");
+      lane.appendChild(wire);
+
+      const cells = document.createElement("div");
+      cells.className = "guitar-fret-cells";
 
       for (let f = 0; f <= FRET_COUNT; f++) {
         const midi = midiAt(s, f);
@@ -115,10 +147,13 @@ const Guitar = (() => {
         cell.dataset.fret = String(f);
         cell.title = `${STRING_NAMES[s]} ${f === 0 ? "açık" : `perde ${f}`}`;
         if (f === 0) cell.classList.add("open-fret");
-        bindPointer(cell, midi);
+        bindFretCell(cell, midi);
         cellMap.set(midi, cell);
-        row.appendChild(cell);
+        cells.appendChild(cell);
       }
+
+      lane.appendChild(cells);
+      row.appendChild(lane);
       fretsRoot.appendChild(row);
     }
 
@@ -133,17 +168,20 @@ const Guitar = (() => {
     stringsRoot.innerHTML = "";
     const title = document.createElement("div");
     title.className = "guitar-strings-title";
-    title.textContent = "Teller — dokunarak çal";
+    title.textContent = "Teller — basılı tutup sürükleyerek titreştirin";
     stringsRoot.appendChild(title);
 
     for (let s = 0; s < 6; s++) {
       const midi = STRING_OPEN[s];
       const row = document.createElement("button");
       row.type = "button";
-      row.className = "guitar-string";
+      row.className = "guitar-string string-touch-target";
       row.dataset.midi = String(midi);
-      row.innerHTML = `<span class="guitar-string-name">${STRING_NAMES[s]}</span><span class="guitar-string-line"></span>`;
-      bindPointer(row, midi);
+      row.innerHTML = `<span class="guitar-string-name">${STRING_NAMES[s]}</span><span class="guitar-string-line string-line"></span>`;
+      window.StringTouch?.bind(row, midi, {
+        onDown: (m, vel, e) => onNoteDown?.(m, vel, e),
+        onUp: (m, e) => onNoteUp?.(m, e),
+      });
       stringsRoot.appendChild(row);
     }
   }

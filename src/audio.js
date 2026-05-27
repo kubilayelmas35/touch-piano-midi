@@ -92,6 +92,8 @@ const AudioEngine = (() => {
           filterEnd: 600,
           filterVel: 800,
           filterQ: 1.2,
+          vibratoHz: 5.5,
+          vibratoDepth: 0.003,
         };
       case "flute":
         return {
@@ -197,18 +199,32 @@ const AudioEngine = (() => {
       oscNodes.push(osc);
     }
 
-    if (cfg.vibratoHz && oscNodes[0]) {
-      const lfo = ac.createOscillator();
-      const lfoGain = ac.createGain();
-      lfo.frequency.value = cfg.vibratoHz;
-      lfoGain.gain.value = freq * (cfg.vibratoDepth || 0.006);
+    let lfo = null;
+    let lfoGain = null;
+    const vibHz = cfg.vibratoHz ?? 0;
+    const vibDepth = cfg.vibratoDepth ?? 0;
+    if (vibHz > 0 && oscNodes[0]) {
+      lfo = ac.createOscillator();
+      lfoGain = ac.createGain();
+      lfo.frequency.value = vibHz;
+      lfoGain.gain.value = freq * vibDepth;
       lfo.connect(lfoGain);
       lfoGain.connect(oscNodes[0].frequency);
       lfo.start(t);
       oscNodes.push(lfo);
     }
 
-    return { oscs: oscNodes, master, filter, started: t, peak: vol };
+    return {
+      oscs: oscNodes,
+      master,
+      filter,
+      lfo,
+      lfoGain,
+      baseFreq: freq,
+      maxVibratoDepth: freq * Math.max(vibDepth, 0.018),
+      started: t,
+      peak: vol,
+    };
   }
 
   function noteOn(midi, velocity = 0.75) {
@@ -264,6 +280,18 @@ const AudioEngine = (() => {
     setTimeout(() => noteOff(midi), ms);
   }
 
+  function setLiveVibrato(midi, depthMultiplier = 0, hz = null) {
+    const voice = voices.get(midi);
+    if (!voice?.lfoGain) return;
+    const ac = ensure();
+    const t = ac.currentTime;
+    const depth = Math.max(0, depthMultiplier) * (voice.maxVibratoDepth || 0);
+    voice.lfoGain.gain.setTargetAtTime(depth, t, 0.025);
+    if (hz != null && voice.lfo) {
+      voice.lfo.frequency.setTargetAtTime(hz, t, 0.025);
+    }
+  }
+
   function stopAll() {
     for (const midi of [...voices.keys()]) noteOff(midi, true);
   }
@@ -274,6 +302,7 @@ const AudioEngine = (() => {
     noteOff,
     play,
     stopAll,
+    setLiveVibrato,
     setDynamicPressure,
     setSustain,
     setInstrument,

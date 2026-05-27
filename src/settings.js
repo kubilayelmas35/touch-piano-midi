@@ -32,6 +32,7 @@ const AppSettings = (() => {
     playMode: "piano",
     instrumentPromptDone: false,
     panelLayout: {},
+    stringVibratoSens: 1,
   };
 
   function load() {

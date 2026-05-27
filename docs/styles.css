@@ -893,19 +893,56 @@ body.sidebar-hidden #btnToggleSidebar {
 .violin-pos-header,
 .violin-string-row {
   display: grid;
-  grid-template-columns: 2rem repeat(15, minmax(1.6rem, 1fr));
+  grid-template-columns: 2rem 1fr;
   gap: 2px;
   align-items: stretch;
 }
 
-.violin-pos-header,
-.violin-string-row {
-  grid-template-columns: 2rem repeat(14, minmax(1.5rem, 1fr));
+.guitar-fret-lane,
+.violin-string-lane {
+  position: relative;
+  min-height: var(--inst-row-h, 1.75rem);
+}
+
+.guitar-row-wire,
+.violin-row-wire {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 3px;
+  background: linear-gradient(90deg, #5a4a38, #c9b896, #f0e4d0, #c9b896, #5a4a38);
+  border-radius: 2px;
+  z-index: 0;
+  pointer-events: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+}
+
+.guitar-fret-cells,
+.violin-fret-cells {
+  display: grid;
+  gap: 2px;
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  align-items: stretch;
+}
+
+.guitar-fret-cells,
+.guitar-fret-header-cells {
+  grid-template-columns: repeat(15, minmax(var(--inst-cell-w, 1.6rem), 1fr));
+}
+
+.violin-fret-cells,
+.violin-pos-header-cells {
+  grid-template-columns: repeat(14, minmax(var(--inst-cell-w, 1.5rem), 1fr));
 }
 
 .guitar-fret-num,
 .guitar-string-label,
-.violin-string-row > span:first-child {
+.violin-string-label,
+.violin-pos-num {
   font-size: 0.65rem;
   color: var(--text-dim);
   display: flex;
@@ -913,12 +950,26 @@ body.sidebar-hidden #btnToggleSidebar {
   justify-content: center;
 }
 
+.settings-scope-strings {
+  display: none;
+}
+
+body[data-play-mode="guitar"] .settings-scope-piano,
+body[data-play-mode="violin"] .settings-scope-piano {
+  display: none !important;
+}
+
+body[data-play-mode="guitar"] .settings-scope-strings,
+body[data-play-mode="violin"] .settings-scope-strings {
+  display: block !important;
+}
+
 .guitar-cell,
 .violin-cell {
-  min-height: 1.75rem;
+  min-height: var(--inst-row-h, 1.75rem);
   border: 1px solid #3a4050;
   border-radius: 4px;
-  background: linear-gradient(180deg, #2a3040, #1a1e28);
+  background: rgba(26, 30, 40, 0.82);
   cursor: pointer;
   touch-action: none;
 }
@@ -955,7 +1006,7 @@ body.sidebar-hidden #btnToggleSidebar {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  min-height: 2.2rem;
+  min-height: var(--inst-string-h, 2.2rem);
   padding: 0.25rem 0.5rem;
   border: 1px solid #4a5068;
   border-radius: 6px;
@@ -964,16 +1015,82 @@ body.sidebar-hidden #btnToggleSidebar {
   touch-action: none;
 }
 
-.guitar-string-line {
+.guitar-string-line,
+.violin-string-line {
   flex: 1;
-  height: 2px;
-  background: linear-gradient(90deg, #8a8fa8, #c4cad8, #8a8fa8);
+  height: 3px;
+  background: linear-gradient(90deg, #6b5344, #d4c4a8, #f5e6d3, #d4c4a8, #6b5344);
+  border-radius: 2px;
+  transform-origin: center;
+  transition: transform 0.05s linear;
+}
+
+.string-line-active,
+.string-vibrating .guitar-string-line,
+.string-vibrating .violin-string-line {
+  box-shadow: 0 0 calc(4px + var(--vib-intensity, 0) * 8px) rgba(212, 196, 168, 0.65);
+}
+
+.string-vibrating .guitar-string-line,
+.string-vibrating .violin-string-line {
+  animation: string-shake 0.08s ease-in-out infinite alternate;
+  animation-duration: calc(0.14s - var(--vib-intensity, 0) * 0.06s);
+}
+
+@keyframes string-shake {
+  from {
+    transform: translateY(calc(var(--vib-intensity, 0.3) * -2px)) scaleY(calc(1 + var(--vib-intensity, 0) * 0.35));
+  }
+  to {
+    transform: translateY(calc(var(--vib-intensity, 0.3) * 2px)) scaleY(calc(1 + var(--vib-intensity, 0) * 0.35));
+  }
 }
 
 .guitar-string-name {
   width: 1.2rem;
   font-weight: 700;
   color: var(--text);
+}
+
+.violin-strings-panel {
+  width: min(88%, 240px);
+}
+
+.violin-strings {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.violin-strings-title {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  margin-bottom: 0.25rem;
+}
+
+.violin-string {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: var(--inst-string-h, 2.4rem);
+  padding: 0.25rem 0.5rem;
+  border: 1px solid #4a5068;
+  border-radius: 6px;
+  background: #1a1e28;
+  cursor: pointer;
+  touch-action: none;
+  width: 100%;
+}
+
+.violin-string-name {
+  width: 1.2rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.violin-string.active {
+  background: var(--accent-dim);
+  box-shadow: 0 0 8px rgba(108, 158, 255, 0.5);
 }
 
 .violin-board-panel {

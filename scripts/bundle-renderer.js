@@ -14,6 +14,7 @@ const coreFiles = [
   "piano.js",
   "guitar.js",
   "violin.js",
+  "string-touch.js",
   "play-surface.js",
   "instrument-move.js",
   "keyboard-input.js",
