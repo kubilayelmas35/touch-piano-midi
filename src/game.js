@@ -40,12 +40,18 @@ const Game = (() => {
     onTimeUpdate = callbacks.onTimeUpdate;
     resize();
     window.addEventListener("resize", resize);
-    const pianoWrap = document.getElementById("pianoWrap");
-    if (pianoWrap && typeof ResizeObserver !== "undefined") {
-      new ResizeObserver(() => {
+    const observeTargets = [
+      document.getElementById("instrumentFooter"),
+      document.getElementById("pianoWrap"),
+      document.getElementById("guitarWrap"),
+      document.getElementById("violinWrap"),
+    ].filter(Boolean);
+    if (typeof ResizeObserver !== "undefined") {
+      const ro = new ResizeObserver(() => {
         resize();
         updateKeyPositions();
-      }).observe(pianoWrap);
+      });
+      for (const el of observeTargets) ro.observe(el);
     }
   }
 
@@ -84,7 +90,12 @@ const Game = (() => {
     });
   }
 
+  function isReady() {
+    return !!(canvas && canvas.parentElement);
+  }
+
   function resize() {
+    if (!canvas?.parentElement) return;
     const parent = canvas.parentElement;
     canvas.width = parent.clientWidth * devicePixelRatio;
     canvas.height = parent.clientHeight * devicePixelRatio;
@@ -115,6 +126,7 @@ const Game = (() => {
 
   function updateKeyPositions() {
     keyPositions.clear();
+    if (!canvas?.parentElement) return;
     const surface = window.PlaySurface;
     if (!surface) return;
     const range = surface.getRange();
@@ -624,6 +636,7 @@ const Game = (() => {
     getSongDuration: () => songDuration,
     isPlaying: () => playing,
     hasNotes: () => notes.length > 0,
+    isReady,
     resize: () => {
       resize();
       updateKeyPositions();

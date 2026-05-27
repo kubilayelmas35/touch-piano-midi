@@ -775,9 +775,14 @@ body.sidebar-hidden #btnToggleSidebar {
 .instrument-footer {
   grid-area: piano;
   position: relative;
-  min-height: 150px;
+  min-height: 200px;
   background: #0a0c10;
-  overflow: hidden;
+  overflow: visible;
+}
+
+body[data-play-mode="guitar"] .instrument-footer,
+body[data-play-mode="violin"] .instrument-footer {
+  min-height: 240px;
 }
 
 .instrument-panel.hidden {
@@ -880,12 +885,14 @@ body.sidebar-hidden #btnToggleSidebar {
   outline: 2px dashed rgba(108, 158, 255, 0.55);
 }
 
-.guitar-frets-panel {
-  width: min(96%, 720px);
+.guitar-strings-panel {
+  width: min(92%, 300px);
+  z-index: 7;
 }
 
-.guitar-strings-panel {
-  width: min(92%, 280px);
+.guitar-frets-panel {
+  width: min(96%, 720px);
+  z-index: 6;
 }
 
 .guitar-fret-header,
@@ -911,12 +918,12 @@ body.sidebar-hidden #btnToggleSidebar {
   right: 0;
   top: 50%;
   transform: translateY(-50%);
-  height: 3px;
-  background: linear-gradient(90deg, #5a4a38, #c9b896, #f0e4d0, #c9b896, #5a4a38);
+  height: 4px;
+  background: linear-gradient(90deg, #6b5344, #e8d4b8, #fff8e8, #e8d4b8, #6b5344);
   border-radius: 2px;
-  z-index: 0;
+  z-index: 2;
   pointer-events: none;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 0 6px rgba(232, 212, 168, 0.45);
 }
 
 .guitar-fret-cells,
@@ -969,7 +976,7 @@ body[data-play-mode="violin"] .settings-scope-strings {
   min-height: var(--inst-row-h, 1.75rem);
   border: 1px solid #3a4050;
   border-radius: 4px;
-  background: rgba(26, 30, 40, 0.82);
+  background: rgba(26, 30, 40, 0.55);
   cursor: pointer;
   touch-action: none;
 }

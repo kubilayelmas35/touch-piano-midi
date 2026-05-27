@@ -5,9 +5,9 @@ const InstrumentMove = (() => {
 
   const PANELS = {
     guitarFrets: { selector: "#guitarFretsPanel", defaultPos: { x: 2, y: 4 } },
-    guitarStrings: { selector: "#guitarStringsPanel", defaultPos: { x: 2, y: 72 } },
+    guitarStrings: { selector: "#guitarStringsPanel", defaultPos: { x: 3, y: 38 } },
     violinBoard: { selector: "#violinBoardPanel", defaultPos: { x: 4, y: 8 } },
-    violinStrings: { selector: "#violinStringsPanel", defaultPos: { x: 68, y: 10 } },
+    violinStrings: { selector: "#violinStringsPanel", defaultPos: { x: 70, y: 10 } },
   };
 
   function layoutKey(id) {

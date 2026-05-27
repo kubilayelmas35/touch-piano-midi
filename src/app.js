@@ -292,6 +292,7 @@
 
   function updateSettingsForPlayMode(mode) {
     const m = mode || window.PlaySurface?.getMode?.() || "piano";
+    document.body.dataset.playMode = m;
     const tabLabels = { piano: "Klavye", guitar: "Gitar", violin: "Keman" };
     if (stabKeys) stabKeys.textContent = tabLabels[m] || "Klavye";
 
@@ -960,9 +961,16 @@
   });
 
   playModeSelect?.addEventListener("change", () => {
-    const m = applyPlayMode(playModeSelect.value, { force: true });
-    reloadTrackNotes();
-    toast(`Enstrüman: ${window.PlaySurface.getModes()[m]?.label || m}`);
+    try {
+      const m = applyPlayMode(playModeSelect.value, { force: true });
+      reloadTrackNotes();
+      updateSettingsForPlayMode(m);
+      toast(`Enstrüman: ${window.PlaySurface.getModes()[m]?.label || m}`);
+    } catch (err) {
+      console.error(err);
+      updateSettingsForPlayMode(playModeSelect.value);
+      toast(`Enstrüman değişti; bazı ayarlar yenilenemedi: ${err.message}`, true);
+    }
   });
 
   btnMoveInstrument?.addEventListener("click", () => {
@@ -1169,16 +1177,16 @@
 
     try {
       const { PlaySurface, Game, AppSettings } = requireMods();
-      PlaySurface.init(
-        (midi) => Game.handleKeyPress(midi),
-        () => {}
-      );
-      if (window.InstrumentMove) window.InstrumentMove.applyLayout(AppSettings.load());
       Game.init($("#notesCanvas"), {
         onScoreChange,
         onFeedback: showFeedback,
         onTimeUpdate,
       });
+      PlaySurface.init(
+        (midi) => Game.handleKeyPress(midi),
+        () => {}
+      );
+      if (window.InstrumentMove) window.InstrumentMove.applyLayout(AppSettings.load());
       applySettings(AppSettings.load());
       window.KeyboardInput?.bind?.();
       window.KeyboardInput?.rebuild?.();

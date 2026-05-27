@@ -75,7 +75,9 @@ const PlaySurface = (() => {
     }
 
     window.dispatchEvent(new CustomEvent("touch-piano:play-mode", { detail: { mode } }));
-    setTimeout(() => window.Game?.resize?.(), 80);
+    requestAnimationFrame(() => {
+      if (window.Game?.isReady?.()) window.Game.resize();
+    });
     return mode;
   }
 
