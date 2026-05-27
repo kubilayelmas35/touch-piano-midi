@@ -29,6 +29,9 @@ const AppSettings = (() => {
     pianoDock: "bottom",
     pianoAlign: "stretch",
     instrumentId: "piano",
+    playMode: "piano",
+    instrumentPromptDone: false,
+    panelLayout: {},
   };
 
   function load() {

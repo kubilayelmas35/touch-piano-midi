@@ -32,6 +32,9 @@ const AppSettings = (() => {
     pianoDock: "bottom",
     pianoAlign: "stretch",
     instrumentId: "piano",
+    playMode: "piano",
+    instrumentPromptDone: false,
+    panelLayout: {},
   };
 
   function load() {
@@ -1395,6 +1398,585 @@ const Piano = (() => {
 window.Piano = Piano;
 
 
+/* === guitar.js === */
+/** Dokunmatik gitar — perdeler + tel çalma */
+const Guitar = (() => {
+  const STRING_OPEN = [40, 45, 50, 55, 59, 64];
+  const STRING_NAMES = ["E", "A", "D", "G", "B", "e"];
+  const FRET_COUNT = 14;
+
+  let fretsRoot = null;
+  let stringsRoot = null;
+  let wrapEl = null;
+  let range = { startMidi: 40, endMidi: 78 };
+  let activePointers = new Map();
+  let onNoteDown = null;
+  let onNoteUp = null;
+  let cellMap = new Map();
+
+  function midiAt(stringIdx, fret) {
+    return STRING_OPEN[stringIdx] + fret;
+  }
+
+  function applySize() {
+    if (window.Game?.resize) window.Game.resize();
+  }
+
+  function setKeySize() {
+    applySize();
+  }
+
+  function setAutoFit() {
+    applySize();
+  }
+
+  function getKeySize() {
+    return { keyWidth: 48, keyHeight: 140 };
+  }
+
+  function getRange() {
+    return { ...range };
+  }
+
+  function refreshLabels() {}
+
+  function releaseAll() {
+    for (const [, m] of activePointers) window.AudioEngine.noteOff(m);
+    activePointers.clear();
+    fretsRoot?.querySelectorAll(".guitar-cell.active, .guitar-string.active").forEach((el) => {
+      el.classList.remove("active");
+    });
+  }
+
+  function bindPointer(el, midi) {
+    const down = (e) => {
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      if (e.pointerType === "touch" && e.button !== 0) return;
+      e.preventDefault();
+      el.setPointerCapture(e.pointerId);
+      const vel = window.AudioEngine.velocityFromPointer(e);
+      el.classList.add("active");
+      activePointers.set(e.pointerId, midi);
+      window.AudioEngine.noteOn(midi, vel);
+      onNoteDown?.(midi, vel, e);
+    };
+    const up = (e) => {
+      if (!activePointers.has(e.pointerId)) return;
+      e.preventDefault();
+      const m = activePointers.get(e.pointerId);
+      activePointers.delete(e.pointerId);
+      el.classList.remove("active");
+      try {
+        el.releasePointerCapture(e.pointerId);
+      } catch {
+        /* */
+      }
+      window.AudioEngine.noteOff(m);
+      onNoteUp?.(m, e);
+    };
+    el.addEventListener("pointerdown", down);
+    el.addEventListener("pointerup", up);
+    el.addEventListener("pointercancel", up);
+    el.addEventListener("pointerleave", (e) => {
+      if (activePointers.get(e.pointerId) === midi) up(e);
+    });
+  }
+
+  function buildFretGrid() {
+    if (!fretsRoot) return;
+    fretsRoot.innerHTML = "";
+    cellMap.clear();
+
+    const header = document.createElement("div");
+    header.className = "guitar-fret-header";
+    header.innerHTML = '<span class="guitar-corner"></span>';
+    for (let f = 0; f <= FRET_COUNT; f++) {
+      const h = document.createElement("span");
+      h.className = "guitar-fret-num";
+      h.textContent = f === 0 ? "∅" : String(f);
+      header.appendChild(h);
+    }
+    fretsRoot.appendChild(header);
+
+    for (let s = 0; s < 6; s++) {
+      const row = document.createElement("div");
+      row.className = "guitar-string-row";
+      const label = document.createElement("span");
+      label.className = "guitar-string-label";
+      label.textContent = STRING_NAMES[s];
+      row.appendChild(label);
+
+      for (let f = 0; f <= FRET_COUNT; f++) {
+        const midi = midiAt(s, f);
+        const cell = document.createElement("button");
+        cell.type = "button";
+        cell.className = "guitar-cell";
+        cell.dataset.midi = String(midi);
+        cell.dataset.string = String(s);
+        cell.dataset.fret = String(f);
+        cell.title = `${STRING_NAMES[s]} ${f === 0 ? "açık" : `perde ${f}`}`;
+        if (f === 0) cell.classList.add("open-fret");
+        bindPointer(cell, midi);
+        cellMap.set(midi, cell);
+        row.appendChild(cell);
+      }
+      fretsRoot.appendChild(row);
+    }
+
+    range = {
+      startMidi: STRING_OPEN[0],
+      endMidi: STRING_OPEN[5] + FRET_COUNT,
+    };
+  }
+
+  function buildStringPlucks() {
+    if (!stringsRoot) return;
+    stringsRoot.innerHTML = "";
+    const title = document.createElement("div");
+    title.className = "guitar-strings-title";
+    title.textContent = "Teller — dokunarak çal";
+    stringsRoot.appendChild(title);
+
+    for (let s = 0; s < 6; s++) {
+      const midi = STRING_OPEN[s];
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "guitar-string";
+      row.dataset.midi = String(midi);
+      row.innerHTML = `<span class="guitar-string-name">${STRING_NAMES[s]}</span><span class="guitar-string-line"></span>`;
+      bindPointer(row, midi);
+      stringsRoot.appendChild(row);
+    }
+  }
+
+  function buildKeys() {
+    buildFretGrid();
+    buildStringPlucks();
+    applySize();
+  }
+
+  function init(fretsEl, stringsEl, wrap, noteDownCb, noteUpCb) {
+    fretsRoot = fretsEl;
+    stringsRoot = stringsEl;
+    wrapEl = wrap;
+    onNoteDown = noteDownCb;
+    onNoteUp = noteUpCb;
+    buildKeys();
+  }
+
+  function highlightMidi(midi, on) {
+    const cell = cellMap.get(midi) || stringsRoot?.querySelector(`[data-midi="${midi}"]`);
+    if (cell) cell.classList.toggle("hit-target", on);
+  }
+
+  return {
+    init,
+    buildKeys,
+    getRange,
+    releaseAll,
+    setKeySize,
+    setAutoFit,
+    getKeySize,
+    refreshLabels,
+    highlightMidi,
+    getWrap: () => wrapEl,
+  };
+})();
+
+window.Guitar = Guitar;
+
+
+/* === violin.js === */
+/** Dokunmatik keman — 4 tel, perde noktaları */
+const Violin = (() => {
+  const STRING_OPEN = [55, 62, 69, 76];
+  const STRING_NAMES = ["G", "D", "A", "E"];
+  const POSITIONS = 13;
+
+  let boardRoot = null;
+  let wrapEl = null;
+  let range = { startMidi: 55, endMidi: 88 };
+  let activePointers = new Map();
+  let onNoteDown = null;
+  let onNoteUp = null;
+  let cellMap = new Map();
+
+  function applySize() {
+    if (window.Game?.resize) window.Game.resize();
+  }
+
+  function setKeySize() {
+    applySize();
+  }
+
+  function setAutoFit() {
+    applySize();
+  }
+
+  function getKeySize() {
+    return { keyWidth: 40, keyHeight: 160 };
+  }
+
+  function getRange() {
+    return { ...range };
+  }
+
+  function refreshLabels() {}
+
+  function releaseAll() {
+    for (const [, m] of activePointers) window.AudioEngine.noteOff(m);
+    activePointers.clear();
+    boardRoot?.querySelectorAll(".violin-cell.active").forEach((el) => el.classList.remove("active"));
+  }
+
+  function bindPointer(el, midi) {
+    const down = (e) => {
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      if (e.pointerType === "touch" && e.button !== 0) return;
+      e.preventDefault();
+      el.setPointerCapture(e.pointerId);
+      const vel = window.AudioEngine.velocityFromPointer(e);
+      el.classList.add("active");
+      activePointers.set(e.pointerId, midi);
+      window.AudioEngine.noteOn(midi, vel);
+      onNoteDown?.(midi, vel, e);
+    };
+    const up = (e) => {
+      if (!activePointers.has(e.pointerId)) return;
+      e.preventDefault();
+      const m = activePointers.get(e.pointerId);
+      activePointers.delete(e.pointerId);
+      el.classList.remove("active");
+      try {
+        el.releasePointerCapture(e.pointerId);
+      } catch {
+        /* */
+      }
+      window.AudioEngine.noteOff(m);
+      onNoteUp?.(m, e);
+    };
+    el.addEventListener("pointerdown", down);
+    el.addEventListener("pointerup", up);
+    el.addEventListener("pointercancel", up);
+  }
+
+  function buildBoard() {
+    if (!boardRoot) return;
+    boardRoot.innerHTML = "";
+    cellMap.clear();
+
+    const header = document.createElement("div");
+    header.className = "violin-pos-header";
+    header.innerHTML = '<span></span>';
+    for (let p = 0; p <= POSITIONS; p++) {
+      const h = document.createElement("span");
+      h.textContent = p === 0 ? "açık" : String(p);
+      header.appendChild(h);
+    }
+    boardRoot.appendChild(header);
+
+    for (let s = 0; s < 4; s++) {
+      const row = document.createElement("div");
+      row.className = "violin-string-row";
+      const label = document.createElement("span");
+      label.className = "violin-string-label";
+      label.textContent = STRING_NAMES[s];
+      row.appendChild(label);
+
+      for (let p = 0; p <= POSITIONS; p++) {
+        const midi = STRING_OPEN[s] + p;
+        const cell = document.createElement("button");
+        cell.type = "button";
+        cell.className = "violin-cell";
+        cell.dataset.midi = String(midi);
+        bindPointer(cell, midi);
+        cellMap.set(midi, cell);
+        row.appendChild(cell);
+      }
+      boardRoot.appendChild(row);
+    }
+
+    range = {
+      startMidi: STRING_OPEN[0],
+      endMidi: STRING_OPEN[3] + POSITIONS,
+    };
+    applySize();
+  }
+
+  function buildKeys() {
+    buildBoard();
+  }
+
+  function init(boardEl, wrap, noteDownCb, noteUpCb) {
+    boardRoot = boardEl;
+    wrapEl = wrap;
+    onNoteDown = noteDownCb;
+    onNoteUp = noteUpCb;
+    buildKeys();
+  }
+
+  return {
+    init,
+    buildKeys,
+    getRange,
+    releaseAll,
+    setKeySize,
+    setAutoFit,
+    getKeySize,
+    refreshLabels,
+    getWrap: () => wrapEl,
+  };
+})();
+
+window.Violin = Violin;
+
+
+/* === play-surface.js === */
+/** Aktif çalma yüzeyi — piyano / gitar / keman */
+const PlaySurface = (() => {
+  const MODES = {
+    piano: { label: "Piyano", icon: "🎹", sound: "piano" },
+    guitar: { label: "Gitar", icon: "🎸", sound: "guitar" },
+    violin: { label: "Keman", icon: "🎻", sound: "violin" },
+  };
+
+  let mode = "piano";
+  let noteDownCb = null;
+  let noteUpCb = null;
+
+  function activeModule() {
+    if (mode === "guitar") return window.Guitar;
+    if (mode === "violin") return window.Violin;
+    return window.Piano;
+  }
+
+  function getWrapEl() {
+    if (mode === "guitar") return document.getElementById("guitarWrap");
+    if (mode === "violin") return document.getElementById("violinWrap");
+    return document.getElementById("pianoWrap");
+  }
+
+  function showPanel() {
+    document.getElementById("pianoWrap")?.classList.toggle("hidden", mode !== "piano");
+    document.getElementById("guitarWrap")?.classList.toggle("hidden", mode !== "guitar");
+    document.getElementById("violinWrap")?.classList.toggle("hidden", mode !== "violin");
+    document.body.dataset.playMode = mode;
+    if (window.InstrumentMove) window.InstrumentMove.applyLayout(window.AppSettings.load());
+  }
+
+  function setMode(next, opts = {}) {
+    const m = MODES[next] ? next : "piano";
+    if (m === mode && !opts.force) return mode;
+
+    window.Piano?.releaseAll?.();
+    window.Guitar?.releaseAll?.();
+    window.Violin?.releaseAll?.();
+    window.KeyboardInput?.releaseAll?.();
+
+    mode = m;
+    showPanel();
+
+    const mod = activeModule();
+    if (mod && noteDownCb) {
+      if (mode === "piano") {
+        mod.init?.(
+          document.getElementById("pianoKeys"),
+          document.getElementById("pianoWrap"),
+          noteDownCb,
+          noteUpCb
+        );
+      } else if (mode === "guitar") {
+        mod.init?.(
+          document.getElementById("guitarFrets"),
+          document.getElementById("guitarStrings"),
+          document.getElementById("guitarWrap"),
+          noteDownCb,
+          noteUpCb
+        );
+      } else if (mode === "violin") {
+        mod.init?.(
+          document.getElementById("violinBoard"),
+          document.getElementById("violinWrap"),
+          noteDownCb,
+          noteUpCb
+        );
+      }
+    }
+
+    if (opts.syncSound !== false) {
+      window.AudioEngine?.setInstrument?.(MODES[mode].sound);
+    }
+
+    window.dispatchEvent(new CustomEvent("touch-piano:play-mode", { detail: { mode } }));
+    setTimeout(() => window.Game?.resize?.(), 80);
+    return mode;
+  }
+
+  function getMode() {
+    return mode;
+  }
+
+  function getModes() {
+    return MODES;
+  }
+
+  function init(noteDown, noteUp) {
+    noteDownCb = noteDown;
+    noteUpCb = noteUp;
+    const s = window.AppSettings?.load?.() || {};
+    setMode(s.playMode || "piano", { force: true, syncSound: false });
+    if (s.instrumentId) window.AudioEngine?.setInstrument?.(s.instrumentId);
+  }
+
+  function delegate(name, ...args) {
+    const mod = activeModule();
+    if (mod && typeof mod[name] === "function") return mod[name](...args);
+  }
+
+  return {
+    init,
+    setMode,
+    getMode,
+    getModes,
+    getWrapEl,
+    getRange: () => delegate("getRange"),
+    releaseAll: () => {
+      window.Piano?.releaseAll?.();
+      window.Guitar?.releaseAll?.();
+      window.Violin?.releaseAll?.();
+    },
+    buildKeys: (...a) => delegate("buildKeys", ...a),
+    setKeySize: (...a) => delegate("setKeySize", ...a),
+    setAutoFit: (...a) => delegate("setAutoFit", ...a),
+    getKeySize: () => delegate("getKeySize"),
+    refreshLabels: () => delegate("refreshLabels"),
+  };
+})();
+
+window.PlaySurface = PlaySurface;
+
+
+/* === instrument-move.js === */
+/** Enstrüman panellerini sürükleyerek konumlandır */
+const InstrumentMove = (() => {
+  let moveMode = false;
+  let drag = null;
+
+  const PANELS = {
+    guitarFrets: { selector: "#guitarFretsPanel", defaultPos: { x: 2, y: 4 } },
+    guitarStrings: { selector: "#guitarStringsPanel", defaultPos: { x: 2, y: 72 } },
+    violinBoard: { selector: "#violinBoardPanel", defaultPos: { x: 4, y: 8 } },
+  };
+
+  function layoutKey(id) {
+    return `panel_${id}`;
+  }
+
+  function applyPanelPosition(el, pos) {
+    if (!el || !pos) return;
+    el.style.left = `${pos.x}%`;
+    el.style.top = `${pos.y}%`;
+  }
+
+  function applyLayout(settings) {
+    const layout = settings?.panelLayout || {};
+    for (const [id, meta] of Object.entries(PANELS)) {
+      const el = document.querySelector(meta.selector);
+      if (!el) continue;
+      const pos = layout[layoutKey(id)] || meta.defaultPos;
+      applyPanelPosition(el, pos);
+    }
+  }
+
+  function savePanelPosition(id, x, y) {
+    const s = window.AppSettings.load();
+    const layout = { ...(s.panelLayout || {}) };
+    layout[layoutKey(id)] = {
+      x: Math.max(0, Math.min(92, x)),
+      y: Math.max(0, Math.min(92, y)),
+    };
+    window.AppSettings.save({ panelLayout: layout });
+  }
+
+  function setMoveMode(on) {
+    moveMode = !!on;
+    document.body.classList.toggle("instrument-move-mode", moveMode);
+    const btn = document.getElementById("btnMoveInstrument");
+    if (btn) {
+      btn.classList.toggle("active", moveMode);
+      btn.textContent = moveMode ? "✓ Konumu kaydet" : "↔ Hareket ettir";
+    }
+  }
+
+  function isMoveMode() {
+    return moveMode;
+  }
+
+  function onPointerDown(e) {
+    if (!moveMode) return;
+    const handle = e.target.closest(".move-handle");
+    if (!handle) return;
+    const panel = handle.closest(".movable-panel");
+    if (!panel) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const parent = panel.offsetParent || panel.parentElement;
+    const pr = parent.getBoundingClientRect();
+    const left = parseFloat(panel.style.left) || 0;
+    const top = parseFloat(panel.style.top) || 0;
+    drag = {
+      panel,
+      id: panel.dataset.moveId,
+      parentW: pr.width,
+      parentH: pr.height,
+      startX: e.clientX,
+      startY: e.clientY,
+      origX: left,
+      origY: top,
+    };
+    panel.setPointerCapture(e.pointerId);
+  }
+
+  function onPointerMove(e) {
+    if (!drag) return;
+    e.preventDefault();
+    const dx = ((e.clientX - drag.startX) / drag.parentW) * 100;
+    const dy = ((e.clientY - drag.startY) / drag.parentH) * 100;
+    const x = Math.max(0, Math.min(92, drag.origX + dx));
+    const y = Math.max(0, Math.min(92, drag.origY + dy));
+    drag.panel.style.left = `${x}%`;
+    drag.panel.style.top = `${y}%`;
+  }
+
+  function onPointerUp(e) {
+    if (!drag) return;
+    const x = parseFloat(drag.panel.style.left) || 0;
+    const y = parseFloat(drag.panel.style.top) || 0;
+    if (drag.id) savePanelPosition(drag.id, x, y);
+    try {
+      drag.panel.releasePointerCapture(e.pointerId);
+    } catch {
+      /* */
+    }
+    drag = null;
+    window.Game?.resize?.();
+  }
+
+  function bind() {
+    document.addEventListener("pointerdown", onPointerDown, { capture: true });
+    document.addEventListener("pointermove", onPointerMove, { capture: true });
+    document.addEventListener("pointerup", onPointerUp, { capture: true });
+    document.addEventListener("pointercancel", onPointerUp, { capture: true });
+  }
+
+  bind();
+
+  return { setMoveMode, isMoveMode, applyLayout };
+})();
+
+window.InstrumentMove = InstrumentMove;
+
+
 /* === keyboard-input.js === */
 /** Bilgisayar klavyesi → piyano (oktav değişince yeniden eşleme) */
 const KeyboardInput = (() => {
@@ -1655,10 +2237,13 @@ const Game = (() => {
 
   function getHitY() {
     const area = canvas?.parentElement;
-    const pianoWrap = document.getElementById("pianoWrap");
-    if (!area || !pianoWrap) return area?.clientHeight * HIT_LINE_FALLBACK || 400;
+    const instWrap =
+      window.PlaySurface?.getWrapEl?.() || document.getElementById("pianoWrap");
+    if (!area || !instWrap || instWrap.classList.contains("hidden")) {
+      return area?.clientHeight * HIT_LINE_FALLBACK || 400;
+    }
     const ar = area.getBoundingClientRect();
-    const pr = pianoWrap.getBoundingClientRect();
+    const pr = instWrap.getBoundingClientRect();
     return Math.max(48, Math.round(pr.top - ar.top));
   }
 
@@ -1671,15 +2256,21 @@ const Game = (() => {
 
   function updateKeyPositions() {
     keyPositions.clear();
-    if (!window.Piano) return;
-    const range = window.Piano.getRange();
-    const keys = document.querySelectorAll(".piano-keys .key");
+    const surface = window.PlaySurface;
+    if (!surface) return;
+    const range = surface.getRange();
+    if (!range) return;
+    const mode = surface.getMode();
+    let selector = ".piano-keys .key";
+    if (mode === "guitar") selector = ".guitar-cell, .guitar-string";
+    if (mode === "violin") selector = ".violin-cell";
+
     const area = canvas.parentElement;
     const areaRect = area.getBoundingClientRect();
 
-    keys.forEach((key) => {
+    document.querySelectorAll(selector).forEach((key) => {
       const midi = Number(key.dataset.midi);
-      if (midi < range.startMidi || midi > range.endMidi) return;
+      if (!midi || midi < range.startMidi || midi > range.endMidi) return;
       const r = key.getBoundingClientRect();
       const centerX = r.left + r.width / 2 - areaRect.left;
       keyPositions.set(midi, { x: centerX, w: r.width });
@@ -1704,7 +2295,7 @@ const Game = (() => {
 
   function releaseAllSound() {
     window.AudioEngine?.stopAll?.();
-    window.Piano?.releaseAll?.();
+    window.PlaySurface?.releaseAll?.();
     window.KeyboardInput?.releaseAll?.();
   }
 
@@ -2358,6 +2949,7 @@ window.mainJsOk = true;
   function mods() {
     return {
       Piano: window.Piano,
+      PlaySurface: window.PlaySurface,
       Game: window.Game,
       LibraryStore: window.LibraryStore,
       AppSettings: window.AppSettings,
@@ -2374,11 +2966,18 @@ window.mainJsOk = true;
 
   function requireMods() {
     const m = mods();
-    if (!m.Piano || !m.Game) {
+    if (!m.Piano || !m.Game || !m.PlaySurface) {
       throw new Error("Piyano modülü yüklenemedi. Uygulamayı kapatıp npm start ile açın.");
     }
     if (!m.LibraryStore) throw new Error("Kütüphane modülü yüklenemedi.");
     return m;
+  }
+
+  function playInstrument() {
+    const mode = window.PlaySurface?.getMode?.() || "piano";
+    if (mode === "guitar") return window.Guitar;
+    if (mode === "violin") return window.Violin;
+    return window.Piano;
   }
 
   if (!window.mainJsOk || !window.LibraryStore) {
@@ -2424,6 +3023,9 @@ window.mainJsOk = true;
   const pianoAlign = $("#pianoAlign");
   const instrumentSelect = $("#instrumentSelect");
   const pianoWrap = $("#pianoWrap");
+  const playModeSelect = $("#playModeSelect");
+  const btnMoveInstrument = $("#btnMoveInstrument");
+  const instrumentPickerModal = $("#instrumentPickerModal");
   const dynamicPressure = $("#dynamicPressure");
   const sustainEnabled = $("#sustainEnabled");
   const speedRange = $("#speedRange");
@@ -2616,6 +3218,39 @@ window.mainJsOk = true;
     return "Alevli!";
   }
 
+  function applyPlayMode(mode, opts = {}) {
+    const { PlaySurface, AudioEngine } = requireMods();
+    const m = PlaySurface.setMode(mode, opts);
+    const sound = PlaySurface.getModes()[m]?.sound || "piano";
+    AudioEngine.setInstrument(sound);
+    if (playModeSelect) playModeSelect.value = m;
+    if (instrumentSelect) instrumentSelect.value = sound;
+    persistSettings({ playMode: m, instrumentId: sound, ...(opts.markPrompt ? { instrumentPromptDone: true } : {}) });
+    applyPianoLayout(AppSettings.load());
+    setTimeout(() => requireMods().Game.resize(), 100);
+    return m;
+  }
+
+  function showInstrumentPickerIfNeeded() {
+    const s = AppSettings.load();
+    if (!instrumentPickerModal) return;
+    if (s.instrumentPromptDone) {
+      instrumentPickerModal.classList.add("hidden");
+      instrumentPickerModal.setAttribute("aria-hidden", "true");
+      return;
+    }
+    instrumentPickerModal.classList.remove("hidden");
+    instrumentPickerModal.setAttribute("aria-hidden", "false");
+    instrumentPickerModal.querySelectorAll("[data-mode]").forEach((btn) => {
+      btn.onclick = () => {
+        applyPlayMode(btn.dataset.mode, { force: true, markPrompt: true });
+        instrumentPickerModal.classList.add("hidden");
+        instrumentPickerModal.setAttribute("aria-hidden", "true");
+        toast(`Enstrüman: ${window.PlaySurface.getModes()[btn.dataset.mode]?.label || btn.dataset.mode}`);
+      };
+    });
+  }
+
   function applyPianoLayout(s) {
     const dock = s.pianoDock || "bottom";
     const align = s.pianoAlign || "stretch";
@@ -2680,10 +3315,16 @@ window.mainJsOk = true;
     setSidebarVisible(s.sidebarVisible !== false, false);
     applyPianoLayout(s);
     populateOctaveSelects(s.octaveStart, s.octaveCount);
-    Piano.setAutoFit((s.pianoAlign || "stretch") === "stretch");
-    Piano.setKeySize(s.keyWidth, s.keyHeight);
-    const clamped = PianoRange.clampRange(s.octaveStart, s.octaveCount);
-    Piano.buildKeys(clamped.startOctave, clamped.octaveCount);
+    const playMode = s.playMode || "piano";
+    if (playModeSelect) playModeSelect.value = playMode;
+    const { PlaySurface } = requireMods();
+    PlaySurface.setMode(playMode, { force: true, syncSound: false });
+    if (playMode === "piano") {
+      Piano.setAutoFit((s.pianoAlign || "stretch") === "stretch");
+      Piano.setKeySize(s.keyWidth, s.keyHeight);
+      const clamped = PianoRange.clampRange(s.octaveStart, s.octaveCount);
+      Piano.buildKeys(clamped.startOctave, clamped.octaveCount);
+    }
   }
 
   function setSidebarVisible(visible, save = true) {
@@ -2749,6 +3390,10 @@ window.mainJsOk = true;
   }
 
   function rebuildPiano() {
+    if (window.PlaySurface?.getMode?.() !== "piano") {
+      toast("Oktav ayarları yalnızca piyano modunda geçerlidir.");
+      return;
+    }
     const { Piano, Game } = requireMods();
     window.KeyboardInput?.releaseAll?.();
 
@@ -2779,6 +3424,7 @@ window.mainJsOk = true;
 
   function fitKeyboardToSong(notes) {
     const s = AppSettings.load();
+    if ((window.PlaySurface?.getMode?.() || s.playMode || "piano") !== "piano") return null;
     if (s.octaveLockManual || !s.autoKeyboardFromSong || !notes?.length) return null;
     if (!window.PianoRange?.fitRangeToNotes) return null;
 
@@ -2806,13 +3452,13 @@ window.mainJsOk = true;
         `Klavye şarkıya göre: ${fit.octaveCount} oktav (tam genişlik)`,
         false
       );
-    } else {
+    } else if ((window.PlaySurface?.getMode?.() || "piano") === "piano") {
       Piano.setAutoFit((s.pianoAlign || "stretch") === "stretch");
       if (typeof Piano.autoSizeKeys === "function") {
         /* buildKeys içinde autoSizeKeys çağrılır */
       }
     }
-    const range = Piano.getRange();
+    const range = playInstrument().getRange();
     Game.loadNotes(notes, range);
     btnPlay.disabled = !Game.hasNotes();
     if (btnAutoPlay) btnAutoPlay.disabled = !Game.hasNotes();
@@ -3176,7 +3822,25 @@ window.mainJsOk = true;
     const id = instrumentSelect.value;
     requireMods().AudioEngine.setInstrument(id);
     persistSettings({ instrumentId: id });
-    toast(`Enstrüman: ${instrumentSelect.selectedOptions[0]?.textContent || id}`);
+    toast(`Ses: ${instrumentSelect.selectedOptions[0]?.textContent || id}`);
+  });
+
+  playModeSelect?.addEventListener("change", () => {
+    const m = applyPlayMode(playModeSelect.value, { force: true });
+    reloadTrackNotes();
+    toast(`Enstrüman: ${window.PlaySurface.getModes()[m]?.label || m}`);
+  });
+
+  btnMoveInstrument?.addEventListener("click", () => {
+    const mode = window.PlaySurface?.getMode?.() || "piano";
+    if (mode === "piano") {
+      toast("Piyano konumu: Ayarlar → Klavye → konum / hiza.");
+      return;
+    }
+    if (!window.InstrumentMove) return;
+    const next = !window.InstrumentMove.isMoveMode();
+    window.InstrumentMove.setMoveMode(next);
+    toast(next ? "Panelleri sürükleyin, bitince tekrar tıklayın." : "Konum kaydedildi.");
   });
 
   dynamicPressure.addEventListener("change", () => {
@@ -3341,9 +4005,9 @@ window.mainJsOk = true;
   });
 
   btnStop.addEventListener("click", () => {
-    const { Game, Piano } = requireMods();
+    const { Game, PlaySurface } = requireMods();
     Game.setAutoPlayMode(false);
-    Piano.releaseAll?.();
+    PlaySurface.releaseAll?.();
     window.KeyboardInput?.releaseAll?.();
     Game.resetRound();
     btnPlay.textContent = "▶ Oynat (sen çal)";
@@ -3370,13 +4034,12 @@ window.mainJsOk = true;
     }
 
     try {
-      const { Piano, Game, AppSettings } = requireMods();
-      Piano.init(
-        $("#pianoKeys"),
-        $("#pianoWrap"),
+      const { PlaySurface, Game, AppSettings } = requireMods();
+      PlaySurface.init(
         (midi) => Game.handleKeyPress(midi),
         () => {}
       );
+      if (window.InstrumentMove) window.InstrumentMove.applyLayout(AppSettings.load());
       Game.init($("#notesCanvas"), {
         onScoreChange,
         onFeedback: showFeedback,
@@ -3385,6 +4048,7 @@ window.mainJsOk = true;
       applySettings(AppSettings.load());
       window.KeyboardInput?.bind?.();
       window.KeyboardInput?.rebuild?.();
+      showInstrumentPickerIfNeeded();
       window.__bootStatus = "piyano hazır";
     } catch (err) {
       window.__bootStatus = "piyano hata: " + err.message;

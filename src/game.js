@@ -96,10 +96,13 @@ const Game = (() => {
 
   function getHitY() {
     const area = canvas?.parentElement;
-    const pianoWrap = document.getElementById("pianoWrap");
-    if (!area || !pianoWrap) return area?.clientHeight * HIT_LINE_FALLBACK || 400;
+    const instWrap =
+      window.PlaySurface?.getWrapEl?.() || document.getElementById("pianoWrap");
+    if (!area || !instWrap || instWrap.classList.contains("hidden")) {
+      return area?.clientHeight * HIT_LINE_FALLBACK || 400;
+    }
     const ar = area.getBoundingClientRect();
-    const pr = pianoWrap.getBoundingClientRect();
+    const pr = instWrap.getBoundingClientRect();
     return Math.max(48, Math.round(pr.top - ar.top));
   }
 
@@ -112,15 +115,21 @@ const Game = (() => {
 
   function updateKeyPositions() {
     keyPositions.clear();
-    if (!window.Piano) return;
-    const range = window.Piano.getRange();
-    const keys = document.querySelectorAll(".piano-keys .key");
+    const surface = window.PlaySurface;
+    if (!surface) return;
+    const range = surface.getRange();
+    if (!range) return;
+    const mode = surface.getMode();
+    let selector = ".piano-keys .key";
+    if (mode === "guitar") selector = ".guitar-cell, .guitar-string";
+    if (mode === "violin") selector = ".violin-cell";
+
     const area = canvas.parentElement;
     const areaRect = area.getBoundingClientRect();
 
-    keys.forEach((key) => {
+    document.querySelectorAll(selector).forEach((key) => {
       const midi = Number(key.dataset.midi);
-      if (midi < range.startMidi || midi > range.endMidi) return;
+      if (!midi || midi < range.startMidi || midi > range.endMidi) return;
       const r = key.getBoundingClientRect();
       const centerX = r.left + r.width / 2 - areaRect.left;
       keyPositions.set(midi, { x: centerX, w: r.width });
@@ -145,7 +154,7 @@ const Game = (() => {
 
   function releaseAllSound() {
     window.AudioEngine?.stopAll?.();
-    window.Piano?.releaseAll?.();
+    window.PlaySurface?.releaseAll?.();
     window.KeyboardInput?.releaseAll?.();
   }
 

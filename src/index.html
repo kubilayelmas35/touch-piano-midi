@@ -30,6 +30,14 @@
       </div>
     </div>
     <div class="view-controls">
+      <label class="play-mode-bar">
+        <span class="sr-only">Enstrüman</span>
+        <select id="playModeSelect" title="Çalma enstrümanı">
+          <option value="piano">🎹 Piyano</option>
+          <option value="guitar">🎸 Gitar</option>
+          <option value="violin">🎻 Keman</option>
+        </select>
+      </label>
       <button type="button" id="btnToggleSidebar" class="btn small" title="Sol menü">☰ Menü</button>
       <button type="button" id="btnFullscreen" class="btn small" title="Tam ekran (F11)">⛶ Tam ekran</button>
     </div>
@@ -72,6 +80,9 @@
 
     <section class="panel settings-panel">
       <h2>Ayarlar</h2>
+      <div class="panel-actions">
+        <button type="button" id="btnMoveInstrument" class="btn small" title="Gitar/keman panellerini sürükleyin">↔ Hareket ettir</button>
+      </div>
       <nav class="settings-tabs" role="tablist">
         <button type="button" class="stab active" data-tab="song">Parça</button>
         <button type="button" class="stab" data-tab="keys">Klavye</button>
@@ -234,9 +245,49 @@
     <div id="comboFlare" class="combo-flare hidden"></div>
   </main>
 
-  <footer id="pianoWrap" class="piano-wrap">
-    <div id="pianoKeys" class="piano-keys"></div>
+  <footer id="instrumentFooter" class="instrument-footer">
+    <div id="pianoWrap" class="piano-wrap instrument-panel">
+      <div id="pianoKeys" class="piano-keys"></div>
+    </div>
+    <div id="guitarWrap" class="guitar-wrap instrument-panel hidden">
+      <div id="guitarFretsPanel" class="movable-panel guitar-frets-panel" data-move-id="guitarFrets">
+        <div class="move-handle" title="Sürükleyin">⠿ Perdeler</div>
+        <div id="guitarFrets" class="guitar-frets"></div>
+      </div>
+      <div id="guitarStringsPanel" class="movable-panel guitar-strings-panel" data-move-id="guitarStrings">
+        <div class="move-handle" title="Sürükleyin">⠿ Teller</div>
+        <div id="guitarStrings" class="guitar-strings"></div>
+      </div>
+    </div>
+    <div id="violinWrap" class="violin-wrap instrument-panel hidden">
+      <div id="violinBoardPanel" class="movable-panel violin-board-panel" data-move-id="violinBoard">
+        <div class="move-handle" title="Sürükleyin">⠿ Keman klavyesi</div>
+        <div id="violinBoard" class="violin-board"></div>
+      </div>
+    </div>
   </footer>
+
+  <div id="instrumentPickerModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop"></div>
+    <div class="modal-box instrument-picker-box" role="dialog" aria-labelledby="instrumentPickerTitle">
+      <h3 id="instrumentPickerTitle">Hangi enstrümanla çalmak istersiniz?</h3>
+      <p class="hint">Düşen notalar aynı kalır; alt kısımdaki çalma yüzeyi değişir. Sonra üst menüden değiştirebilirsiniz.</p>
+      <div class="instrument-picker-grid">
+        <button type="button" class="instrument-pick btn" data-mode="piano">
+          <span class="instrument-pick-icon">🎹</span>
+          <span class="instrument-pick-label">Piyano</span>
+        </button>
+        <button type="button" class="instrument-pick btn" data-mode="guitar">
+          <span class="instrument-pick-icon">🎸</span>
+          <span class="instrument-pick-label">Gitar</span>
+        </button>
+        <button type="button" class="instrument-pick btn" data-mode="violin">
+          <span class="instrument-pick-icon">🎻</span>
+          <span class="instrument-pick-label">Keman</span>
+        </button>
+      </div>
+    </div>
+  </div>
 
   <div id="libraryModal" class="modal hidden" aria-hidden="true">
     <div class="modal-backdrop" id="libraryBackdrop"></div>
@@ -278,6 +329,6 @@
   </div>
 
   <script src="touch-guard.js"></script>
-  <script src="main.js?v=13"></script>
+  <script src="main.js?v=14"></script>
 </body>
 </html>
