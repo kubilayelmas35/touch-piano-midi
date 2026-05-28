@@ -33,6 +33,7 @@ const AppSettings = (() => {
     pianoAlign: "stretch",
     instrumentId: "piano",
     playMode: "piano",
+    themesByMode: {},
     instrumentPromptDone: false,
     panelLayout: {},
     stringVibratoSens: 1,
@@ -61,39 +62,93 @@ window.AppSettings = AppSettings;
 
 
 /* === theme.js === */
-/** Tema renkleri — CSS değişkenleri */
+/** Tema — enstrümana göre ayrı renk paletleri */
 const AppTheme = (() => {
-  const defaults = {
-    effectHue: 275,
-    keyColorTop: "#e8d4ff",
-    keyColorMid: "#a855f7",
-    keyColorBottom: "#6b21a8",
-    hitLineColor: "#d8b4fe",
+  const PRESETS = {
+    piano: {
+      effectHue: 275,
+      keyColorTop: "#e8d4ff",
+      keyColorMid: "#a855f7",
+      keyColorBottom: "#6b21a8",
+      hitLineColor: "#d8b4fe",
+      surfaceAccent: "#6c9eff",
+    },
+    guitar: {
+      effectHue: 38,
+      keyColorTop: "#f5e6c8",
+      keyColorMid: "#c9a227",
+      keyColorBottom: "#5c4a1e",
+      hitLineColor: "#e8c468",
+      surfaceAccent: "#d4a017",
+    },
+    violin: {
+      effectHue: 350,
+      keyColorTop: "#ffe4ec",
+      keyColorMid: "#e11d48",
+      keyColorBottom: "#881337",
+      hitLineColor: "#fda4af",
+      surfaceAccent: "#fb7185",
+    },
   };
 
   function apply(partial) {
-    const s = { ...defaults, ...partial };
+    const s = { ...PRESETS.piano, ...partial };
     const r = document.documentElement;
     r.style.setProperty("--effect-hue", String(s.effectHue));
     r.style.setProperty("--key-active-top", s.keyColorTop);
     r.style.setProperty("--key-active-mid", s.keyColorMid);
     r.style.setProperty("--key-active-bottom", s.keyColorBottom);
     r.style.setProperty("--hit-line-color", s.hitLineColor);
+    if (s.surfaceAccent) r.style.setProperty("--accent", s.surfaceAccent);
     window.__effectHue = s.effectHue;
     return s;
   }
 
-  function fromSettings(s) {
-    return apply({
-      effectHue: s.effectHue,
-      keyColorTop: s.keyColorTop,
-      keyColorMid: s.keyColorMid,
-      keyColorBottom: s.keyColorBottom,
-      hitLineColor: s.hitLineColor,
-    });
+  function getPreset(mode) {
+    return { ...(PRESETS[mode] || PRESETS.piano) };
   }
 
-  return { apply, fromSettings, defaults };
+  function fromSettings(s, playMode) {
+    const mode = playMode || s.playMode || "piano";
+    const saved = s.themesByMode?.[mode];
+    return apply({ ...getPreset(mode), ...saved });
+  }
+
+  function readFromInputs(inputs, mode) {
+    const base = getPreset(mode);
+    return {
+      ...base,
+      effectHue: Number(inputs.effectHue?.value) || base.effectHue,
+      keyColorTop: inputs.keyColorTop?.value || base.keyColorTop,
+      keyColorMid: inputs.keyColorMid?.value || base.keyColorMid,
+      keyColorBottom: inputs.keyColorBottom?.value || base.keyColorBottom,
+      hitLineColor: inputs.hitLineColor?.value || base.hitLineColor,
+    };
+  }
+
+  function fillInputs(inputs, theme) {
+    if (inputs.effectHue) inputs.effectHue.value = String(theme.effectHue);
+    if (inputs.keyColorTop) inputs.keyColorTop.value = theme.keyColorTop;
+    if (inputs.keyColorMid) inputs.keyColorMid.value = theme.keyColorMid;
+    if (inputs.keyColorBottom) inputs.keyColorBottom.value = theme.keyColorBottom;
+    if (inputs.hitLineColor) inputs.hitLineColor.value = theme.hitLineColor;
+  }
+
+  function saveForMode(mode, theme, settings) {
+    const themesByMode = { ...(settings.themesByMode || {}) };
+    themesByMode[mode] = { ...themesByMode[mode], ...theme };
+    return themesByMode;
+  }
+
+  return {
+    apply,
+    fromSettings,
+    getPreset,
+    readFromInputs,
+    fillInputs,
+    saveForMode,
+    PRESETS,
+  };
 })();
 
 window.AppTheme = AppTheme;
@@ -1429,25 +1484,33 @@ window.Piano = Piano;
 
 
 /* === guitar.js === */
-/** Dokunmatik gitar — perdeler + tel çalma */
+/** Dokunmatik gitar — sol: perde (akor), sağ: teller (ince→kalın). Ses sadece tel vurulunca. */
 const Guitar = (() => {
   const STRING_OPEN = [40, 45, 50, 55, 59, 64];
   const STRING_NAMES = ["E", "A", "D", "G", "B", "e"];
+  /** Ekranda üstten alta: ince e → kalın E */
+  const DISPLAY_STRINGS = [5, 4, 3, 2, 1, 0];
   const FRET_COUNT = 14;
 
   let fretsRoot = null;
   let stringsRoot = null;
   let wrapEl = null;
   let range = { startMidi: 40, endMidi: 78 };
-  let activePointers = new Map();
   let onNoteDown = null;
   let onNoteUp = null;
   let cellMap = new Map();
+  let fretCellsByString = [];
+  let fretted = [0, 0, 0, 0, 0, 0];
+  let fretPointers = new Map();
   let cellW = 48;
   let boardH = 140;
 
   function midiAt(stringIdx, fret) {
     return STRING_OPEN[stringIdx] + fret;
+  }
+
+  function currentMidiForString(stringIdx) {
+    return midiAt(stringIdx, fretted[stringIdx] || 0);
   }
 
   function applySizeVars() {
@@ -1482,48 +1545,68 @@ const Guitar = (() => {
 
   function refreshLabels() {}
 
-  function releaseAll() {
-    for (const [, m] of activePointers) window.AudioEngine.noteOff(m);
-    activePointers.clear();
-    fretsRoot?.querySelectorAll(".guitar-cell.active").forEach((el) => {
-      el.classList.remove("active");
-    });
-    stringsRoot?.querySelectorAll(".guitar-string.active, .guitar-string.string-held").forEach((el) => {
-      el.classList.remove("active", "string-held", "string-vibrating");
+  function updateStringHighlights() {
+    if (!stringsRoot) return;
+    stringsRoot.querySelectorAll(".guitar-string").forEach((row) => {
+      const s = Number(row.dataset.string);
+      const fret = fretted[s] || 0;
+      row.classList.toggle("has-fret", fret > 0);
+      const label = row.querySelector(".guitar-string-fret");
+      if (label) label.textContent = fret > 0 ? `perde ${fret}` : "açık";
     });
   }
 
-  function bindFretCell(el, midi) {
+  function setFretForString(stringIdx, fret) {
+    fretted[stringIdx] = fret;
+    fretCellsByString[stringIdx]?.forEach((cell) => {
+      const f = Number(cell.dataset.fret);
+      cell.classList.toggle("fret-held", f === fret && fret > 0);
+      cell.classList.toggle("open-selected", f === 0 && fret === 0);
+    });
+    updateStringHighlights();
+  }
+
+  function releaseAll() {
+    fretPointers.clear();
+    fretted = [0, 0, 0, 0, 0, 0];
+    window.AudioEngine?.stopAll?.();
+    fretsRoot?.querySelectorAll(".guitar-cell").forEach((el) => {
+      el.classList.remove("active", "fret-held", "open-selected");
+    });
+    stringsRoot?.querySelectorAll(".guitar-string").forEach((el) => {
+      el.classList.remove("active", "string-held", "string-vibrating", "has-fret");
+    });
+  }
+
+  function bindFretCell(el, stringIdx, fret) {
     const down = (e) => {
       if (e.pointerType === "mouse" && e.button !== 0) return;
       if (e.pointerType === "touch" && e.button !== 0) return;
       e.preventDefault();
       el.setPointerCapture(e.pointerId);
-      const vel = window.AudioEngine.velocityFromPointer(e);
-      el.classList.add("active");
-      activePointers.set(e.pointerId, midi);
-      window.AudioEngine.noteOn(midi, vel);
-      onNoteDown?.(midi, vel, e);
+      fretPointers.set(e.pointerId, { stringIdx, fret });
+      setFretForString(stringIdx, fret);
     };
     const up = (e) => {
-      if (!activePointers.has(e.pointerId)) return;
+      const st = fretPointers.get(e.pointerId);
+      if (!st || st.stringIdx !== stringIdx) return;
       e.preventDefault();
-      const m = activePointers.get(e.pointerId);
-      activePointers.delete(e.pointerId);
-      el.classList.remove("active");
+      fretPointers.delete(e.pointerId);
       try {
         el.releasePointerCapture(e.pointerId);
       } catch {
         /* */
       }
-      window.AudioEngine.noteOff(m);
-      onNoteUp?.(m, e);
+      if (fretted[stringIdx] === fret) {
+        setFretForString(stringIdx, 0);
+      }
     };
     el.addEventListener("pointerdown", down);
     el.addEventListener("pointerup", up);
     el.addEventListener("pointercancel", up);
     el.addEventListener("pointerleave", (e) => {
-      if (activePointers.get(e.pointerId) === midi) up(e);
+      const st = fretPointers.get(e.pointerId);
+      if (st?.stringIdx === stringIdx) up(e);
     });
   }
 
@@ -1531,24 +1614,22 @@ const Guitar = (() => {
     if (!fretsRoot) return;
     fretsRoot.innerHTML = "";
     cellMap.clear();
+    fretCellsByString = [[], [], [], [], [], []];
 
     const header = document.createElement("div");
     header.className = "guitar-fret-header";
-    const corner = document.createElement("span");
-    corner.className = "guitar-corner";
-    header.appendChild(corner);
-    const nums = document.createElement("div");
-    nums.className = "guitar-fret-cells guitar-fret-header-cells";
+    header.innerHTML =
+      '<span class="guitar-corner"></span><div class="guitar-fret-cells guitar-fret-header-cells"></div>';
+    const nums = header.querySelector(".guitar-fret-header-cells");
     for (let f = 0; f <= FRET_COUNT; f++) {
       const h = document.createElement("span");
       h.className = "guitar-fret-num";
       h.textContent = f === 0 ? "∅" : String(f);
       nums.appendChild(h);
     }
-    header.appendChild(nums);
     fretsRoot.appendChild(header);
 
-    for (let s = 0; s < 6; s++) {
+    for (const s of DISPLAY_STRINGS) {
       const row = document.createElement("div");
       row.className = "guitar-string-row";
       row.dataset.string = String(s);
@@ -1576,10 +1657,11 @@ const Guitar = (() => {
         cell.dataset.midi = String(midi);
         cell.dataset.string = String(s);
         cell.dataset.fret = String(f);
-        cell.title = `${STRING_NAMES[s]} ${f === 0 ? "açık" : `perde ${f}`}`;
+        cell.title = `${STRING_NAMES[s]} — ${f === 0 ? "açık tel" : `perde ${f}`}`;
         if (f === 0) cell.classList.add("open-fret");
-        bindFretCell(cell, midi);
+        bindFretCell(cell, s, f);
         cellMap.set(midi, cell);
+        fretCellsByString[s].push(cell);
         cells.appendChild(cell);
       }
 
@@ -1599,22 +1681,28 @@ const Guitar = (() => {
     stringsRoot.innerHTML = "";
     const title = document.createElement("div");
     title.className = "guitar-strings-title";
-    title.textContent = "Teller — basılı tutup sürükleyerek titreştirin";
+    title.textContent = "Teller (ince → kalın) — önce perde, sonra tele vurun";
     stringsRoot.appendChild(title);
 
-    for (let s = 0; s < 6; s++) {
-      const midi = STRING_OPEN[s];
+    for (const s of DISPLAY_STRINGS) {
       const row = document.createElement("button");
       row.type = "button";
       row.className = "guitar-string string-touch-target";
-      row.dataset.midi = String(midi);
-      row.innerHTML = `<span class="guitar-string-name">${STRING_NAMES[s]}</span><span class="guitar-string-line string-line"></span>`;
-      window.StringTouch?.bind(row, midi, {
-        onDown: (m, vel, e) => onNoteDown?.(m, vel, e),
-        onUp: (m, e) => onNoteUp?.(m, e),
-      });
+      row.dataset.string = String(s);
+      row.dataset.midi = String(STRING_OPEN[s]);
+      row.innerHTML = `<span class="guitar-string-name">${STRING_NAMES[s]}</span><span class="guitar-string-fret">açık</span><span class="guitar-string-line string-line"></span>`;
+
+      window.StringTouch?.bind(
+        row,
+        () => currentMidiForString(s),
+        {
+          onDown: (m, vel, e) => onNoteDown?.(m, vel, e),
+          onUp: (m, e) => onNoteUp?.(m, e),
+        }
+      );
       stringsRoot.appendChild(row);
     }
+    updateStringHighlights();
   }
 
   function buildKeys() {
@@ -1633,8 +1721,31 @@ const Guitar = (() => {
   }
 
   function highlightMidi(midi, on) {
-    const cell = cellMap.get(midi) || stringsRoot?.querySelector(`[data-midi="${midi}"]`);
+    const cell = cellMap.get(midi);
     if (cell) cell.classList.toggle("hit-target", on);
+    stringsRoot?.querySelectorAll(".guitar-string").forEach((row) => {
+      const s = Number(row.dataset.string);
+      if (currentMidiForString(s) === midi) row.classList.toggle("hit-target", on);
+    });
+  }
+
+  function flash(midi, type) {
+    highlightMidi(midi, type === "good");
+    setTimeout(() => highlightMidi(midi, false), 320);
+  }
+
+  function pressKey(midi, velocity = 0.85) {
+    const el = cellMap.get(midi);
+    if (el) el.classList.add("active");
+    window.AudioEngine.noteOn(midi, velocity);
+    onNoteDown?.(midi, velocity);
+  }
+
+  function releaseKey(midi) {
+    const el = cellMap.get(midi);
+    if (el) el.classList.remove("active");
+    window.AudioEngine.noteOff(midi);
+    onNoteUp?.(midi);
   }
 
   return {
@@ -1647,6 +1758,9 @@ const Guitar = (() => {
     getKeySize,
     refreshLabels,
     highlightMidi,
+    flash,
+    pressKey,
+    releaseKey,
     getWrap: () => wrapEl,
   };
 })();
@@ -1655,22 +1769,34 @@ window.Guitar = Guitar;
 
 
 /* === violin.js === */
-/** Dokunmatik keman — 4 tel, perde noktaları + tel titreşimi */
+/** Dokunmatik keman — sol: parmak pozisyonu, sağ: teller. Ses sadece tel vurulunca. */
 const Violin = (() => {
   const STRING_OPEN = [55, 62, 69, 76];
   const STRING_NAMES = ["G", "D", "A", "E"];
+  /** Üstten alta ince E → kalın G */
+  const DISPLAY_STRINGS = [3, 2, 1, 0];
   const POSITIONS = 13;
 
   let boardRoot = null;
   let stringsRoot = null;
   let wrapEl = null;
   let range = { startMidi: 55, endMidi: 88 };
-  let activePointers = new Map();
   let onNoteDown = null;
   let onNoteUp = null;
   let cellMap = new Map();
+  let fretCellsByString = [[], [], [], []];
+  let fretted = [0, 0, 0, 0];
+  let fretPointers = new Map();
   let cellW = 40;
   let boardH = 160;
+
+  function midiAt(stringIdx, pos) {
+    return STRING_OPEN[stringIdx] + pos;
+  }
+
+  function currentMidiForString(stringIdx) {
+    return midiAt(stringIdx, fretted[stringIdx] || 0);
+  }
 
   function applySizeVars() {
     if (!wrapEl) return;
@@ -1704,40 +1830,59 @@ const Violin = (() => {
 
   function refreshLabels() {}
 
-  function releaseAll() {
-    for (const [, m] of activePointers) window.AudioEngine.noteOff(m);
-    activePointers.clear();
-    boardRoot?.querySelectorAll(".violin-cell.active").forEach((el) => el.classList.remove("active"));
-    stringsRoot?.querySelectorAll(".violin-string.active, .violin-string.string-held").forEach((el) => {
-      el.classList.remove("active", "string-held", "string-vibrating");
+  function updateStringHighlights() {
+    if (!stringsRoot) return;
+    stringsRoot.querySelectorAll(".violin-string").forEach((row) => {
+      const s = Number(row.dataset.string);
+      const pos = fretted[s] || 0;
+      row.classList.toggle("has-fret", pos > 0);
+      const label = row.querySelector(".violin-string-fret");
+      if (label) label.textContent = pos > 0 ? `pos ${pos}` : "açık";
     });
   }
 
-  function bindFretCell(el, midi) {
+  function setFretForString(stringIdx, pos) {
+    fretted[stringIdx] = pos;
+    fretCellsByString[stringIdx]?.forEach((cell) => {
+      const p = Number(cell.dataset.pos);
+      cell.classList.toggle("fret-held", p === pos && pos > 0);
+      cell.classList.toggle("open-selected", p === 0 && pos === 0);
+    });
+    updateStringHighlights();
+  }
+
+  function releaseAll() {
+    fretPointers.clear();
+    fretted = [0, 0, 0, 0];
+    window.AudioEngine?.stopAll?.();
+    boardRoot?.querySelectorAll(".violin-cell").forEach((el) => {
+      el.classList.remove("active", "fret-held", "open-selected");
+    });
+    stringsRoot?.querySelectorAll(".violin-string").forEach((el) => {
+      el.classList.remove("active", "string-held", "string-vibrating", "has-fret");
+    });
+  }
+
+  function bindFretCell(el, stringIdx, pos) {
     const down = (e) => {
       if (e.pointerType === "mouse" && e.button !== 0) return;
       if (e.pointerType === "touch" && e.button !== 0) return;
       e.preventDefault();
       el.setPointerCapture(e.pointerId);
-      const vel = window.AudioEngine.velocityFromPointer(e);
-      el.classList.add("active");
-      activePointers.set(e.pointerId, midi);
-      window.AudioEngine.noteOn(midi, vel);
-      onNoteDown?.(midi, vel, e);
+      fretPointers.set(e.pointerId, { stringIdx, pos });
+      setFretForString(stringIdx, pos);
     };
     const up = (e) => {
-      if (!activePointers.has(e.pointerId)) return;
+      const st = fretPointers.get(e.pointerId);
+      if (!st || st.stringIdx !== stringIdx) return;
       e.preventDefault();
-      const m = activePointers.get(e.pointerId);
-      activePointers.delete(e.pointerId);
-      el.classList.remove("active");
+      fretPointers.delete(e.pointerId);
       try {
         el.releasePointerCapture(e.pointerId);
       } catch {
         /* */
       }
-      window.AudioEngine.noteOff(m);
-      onNoteUp?.(m, e);
+      if (fretted[stringIdx] === pos) setFretForString(stringIdx, 0);
     };
     el.addEventListener("pointerdown", down);
     el.addEventListener("pointerup", up);
@@ -1748,24 +1893,22 @@ const Violin = (() => {
     if (!boardRoot) return;
     boardRoot.innerHTML = "";
     cellMap.clear();
+    fretCellsByString = [[], [], [], []];
 
     const header = document.createElement("div");
     header.className = "violin-pos-header";
-    const corner = document.createElement("span");
-    corner.className = "violin-corner";
-    header.appendChild(corner);
-    const nums = document.createElement("div");
-    nums.className = "violin-fret-cells violin-pos-header-cells";
+    header.innerHTML =
+      '<span class="violin-corner"></span><div class="violin-fret-cells violin-pos-header-cells"></div>';
+    const nums = header.querySelector(".violin-pos-header-cells");
     for (let p = 0; p <= POSITIONS; p++) {
       const h = document.createElement("span");
       h.className = "violin-pos-num";
-      h.textContent = p === 0 ? "açık" : String(p);
+      h.textContent = p === 0 ? "∅" : String(p);
       nums.appendChild(h);
     }
-    header.appendChild(nums);
     boardRoot.appendChild(header);
 
-    for (let s = 0; s < 4; s++) {
+    for (const s of DISPLAY_STRINGS) {
       const row = document.createElement("div");
       row.className = "violin-string-row";
       row.dataset.string = String(s);
@@ -1777,7 +1920,6 @@ const Violin = (() => {
 
       const lane = document.createElement("div");
       lane.className = "violin-string-lane";
-
       const wire = document.createElement("div");
       wire.className = "violin-row-wire";
       wire.setAttribute("aria-hidden", "true");
@@ -1787,13 +1929,16 @@ const Violin = (() => {
       cells.className = "violin-fret-cells";
 
       for (let p = 0; p <= POSITIONS; p++) {
-        const midi = STRING_OPEN[s] + p;
+        const midi = midiAt(s, p);
         const cell = document.createElement("button");
         cell.type = "button";
         cell.className = "violin-cell";
         cell.dataset.midi = String(midi);
-        bindFretCell(cell, midi);
+        cell.dataset.string = String(s);
+        cell.dataset.pos = String(p);
+        bindFretCell(cell, s, p);
         cellMap.set(midi, cell);
+        fretCellsByString[s].push(cell);
         cells.appendChild(cell);
       }
 
@@ -1813,22 +1958,28 @@ const Violin = (() => {
     stringsRoot.innerHTML = "";
     const title = document.createElement("div");
     title.className = "violin-strings-title";
-    title.textContent = "Teller — basılı tutup sürükleyerek titreştirin";
+    title.textContent = "Teller (ince → kalın) — önce pozisyon, sonra tel";
     stringsRoot.appendChild(title);
 
-    for (let s = 0; s < 4; s++) {
-      const midi = STRING_OPEN[s];
+    for (const s of DISPLAY_STRINGS) {
       const row = document.createElement("button");
       row.type = "button";
       row.className = "violin-string string-touch-target";
-      row.dataset.midi = String(midi);
-      row.innerHTML = `<span class="violin-string-name">${STRING_NAMES[s]}</span><span class="violin-string-line string-line"></span>`;
-      window.StringTouch?.bind(row, midi, {
-        onDown: (m, vel, e) => onNoteDown?.(m, vel, e),
-        onUp: (m, e) => onNoteUp?.(m, e),
-      });
+      row.dataset.string = String(s);
+      row.dataset.midi = String(STRING_OPEN[s]);
+      row.innerHTML = `<span class="violin-string-name">${STRING_NAMES[s]}</span><span class="violin-string-fret">açık</span><span class="violin-string-line string-line"></span>`;
+
+      window.StringTouch?.bind(
+        row,
+        () => currentMidiForString(s),
+        {
+          onDown: (m, vel, e) => onNoteDown?.(m, vel, e),
+          onUp: (m, e) => onNoteUp?.(m, e),
+        }
+      );
       stringsRoot.appendChild(row);
     }
+    updateStringHighlights();
   }
 
   function buildKeys() {
@@ -1846,6 +1997,34 @@ const Violin = (() => {
     buildKeys();
   }
 
+  function highlightMidi(midi, on) {
+    const cell = cellMap.get(midi);
+    if (cell) cell.classList.toggle("hit-target", on);
+    stringsRoot?.querySelectorAll(".violin-string").forEach((row) => {
+      const s = Number(row.dataset.string);
+      if (currentMidiForString(s) === midi) row.classList.toggle("hit-target", on);
+    });
+  }
+
+  function flash(midi, type) {
+    highlightMidi(midi, type === "good");
+    setTimeout(() => highlightMidi(midi, false), 320);
+  }
+
+  function pressKey(midi, velocity = 0.85) {
+    const el = cellMap.get(midi);
+    if (el) el.classList.add("active");
+    window.AudioEngine.noteOn(midi, velocity);
+    onNoteDown?.(midi, velocity);
+  }
+
+  function releaseKey(midi) {
+    const el = cellMap.get(midi);
+    if (el) el.classList.remove("active");
+    window.AudioEngine.noteOff(midi);
+    onNoteUp?.(midi);
+  }
+
   return {
     init,
     buildKeys,
@@ -1855,6 +2034,10 @@ const Violin = (() => {
     setAutoFit,
     getKeySize,
     refreshLabels,
+    highlightMidi,
+    flash,
+    pressKey,
+    releaseKey,
     getWrap: () => wrapEl,
   };
 })();
@@ -1863,15 +2046,19 @@ window.Violin = Violin;
 
 
 /* === string-touch.js === */
-/** Dokunmatik tel — basılı tutup sürükleyerek titreşim (vibrato) */
+/** Dokunmatik tel — basılı tutup sürükleyerek titreşim; midi anlık hesaplanır */
 const StringTouch = (() => {
   const pointers = new Map();
+
+  function resolveMidi(getMidi) {
+    return typeof getMidi === "function" ? getMidi() : getMidi;
+  }
 
   function vibratoSens() {
     return window.AppSettings?.load?.()?.stringVibratoSens ?? 1;
   }
 
-  function bind(el, midi, callbacks = {}) {
+  function bind(el, getMidi, callbacks = {}) {
     const lineEl =
       el.querySelector(".string-line") ||
       el.querySelector(".guitar-string-line") ||
@@ -1883,6 +2070,8 @@ const StringTouch = (() => {
       if (e.pointerType === "touch" && e.button !== 0) return;
       e.preventDefault();
       e.stopPropagation();
+      const midi = resolveMidi(getMidi);
+      if (!midi) return;
       el.setPointerCapture(e.pointerId);
       const vel = window.AudioEngine.velocityFromPointer(e);
       el.classList.add("active", "string-held");
@@ -1893,6 +2082,7 @@ const StringTouch = (() => {
         midi,
         el,
         lineEl,
+        getMidi,
         lastX: e.clientX,
         lastY: e.clientY,
         smooth: 0,
@@ -1901,8 +2091,14 @@ const StringTouch = (() => {
 
     const move = (e) => {
       const st = pointers.get(e.pointerId);
-      if (!st || st.midi !== midi) return;
+      if (!st) return;
       e.preventDefault();
+      const midi = resolveMidi(st.getMidi);
+      if (midi !== st.midi) {
+        window.AudioEngine.noteOff(st.midi);
+        st.midi = midi;
+        window.AudioEngine.noteOn(midi, window.AudioEngine.velocityFromPointer(e));
+      }
       const dx = e.clientX - st.lastX;
       const dy = e.clientY - st.lastY;
       st.lastX = e.clientX;
@@ -1913,19 +2109,17 @@ const StringTouch = (() => {
       const sens = vibratoSens();
       const depth = Math.min(4, 0.25 + st.smooth * 0.1 * sens);
       const hz = 4.5 + Math.min(5, st.smooth * 0.12 * sens);
-      window.AudioEngine.setLiveVibrato?.(midi, depth, hz);
+      window.AudioEngine.setLiveVibrato?.(st.midi, depth, hz);
 
       const intensity = Math.min(1, st.smooth / 14);
-      el.style.setProperty("--vib-intensity", String(intensity));
-      el.classList.toggle("string-vibrating", intensity > 0.06);
-      if (lineEl) {
-        lineEl.style.setProperty("--vib-intensity", String(intensity));
-      }
+      st.el.style.setProperty("--vib-intensity", String(intensity));
+      st.el.classList.toggle("string-vibrating", intensity > 0.06);
+      st.lineEl?.style.setProperty("--vib-intensity", String(intensity));
     };
 
     const end = (e) => {
       const st = pointers.get(e.pointerId);
-      if (!st || st.midi !== midi) return;
+      if (!st) return;
       e.preventDefault();
       pointers.delete(e.pointerId);
       st.el.classList.remove("active", "string-held", "string-vibrating");
@@ -1937,9 +2131,9 @@ const StringTouch = (() => {
       } catch {
         /* */
       }
-      window.AudioEngine.setLiveVibrato?.(midi, 0);
-      window.AudioEngine.noteOff(midi);
-      callbacks.onUp?.(midi, e);
+      window.AudioEngine.setLiveVibrato?.(st.midi, 0);
+      window.AudioEngine.noteOff(st.midi);
+      callbacks.onUp?.(st.midi, e);
     };
 
     el.addEventListener("pointerdown", down);
@@ -2059,6 +2253,20 @@ const PlaySurface = (() => {
     if (mod && typeof mod[name] === "function") return mod[name](...args);
   }
 
+  function flash(midi, type) {
+    const mod = activeModule();
+    if (mod?.flash) return mod.flash(midi, type);
+    if (mod?.highlightMidi) return mod.highlightMidi(midi, type === "good");
+  }
+
+  function pressKey(midi, velocity) {
+    return delegate("pressKey", midi, velocity);
+  }
+
+  function releaseKey(midi) {
+    return delegate("releaseKey", midi);
+  }
+
   return {
     init,
     setMode,
@@ -2076,6 +2284,10 @@ const PlaySurface = (() => {
     setAutoFit: (...a) => delegate("setAutoFit", ...a),
     getKeySize: () => delegate("getKeySize"),
     refreshLabels: () => delegate("refreshLabels"),
+    flash,
+    pressKey,
+    releaseKey,
+    activeModule,
   };
 })();
 
@@ -2089,10 +2301,10 @@ const InstrumentMove = (() => {
   let drag = null;
 
   const PANELS = {
-    guitarFrets: { selector: "#guitarFretsPanel", defaultPos: { x: 2, y: 4 } },
-    guitarStrings: { selector: "#guitarStringsPanel", defaultPos: { x: 3, y: 38 } },
-    violinBoard: { selector: "#violinBoardPanel", defaultPos: { x: 4, y: 8 } },
-    violinStrings: { selector: "#violinStringsPanel", defaultPos: { x: 70, y: 10 } },
+    guitarFrets: { selector: "#guitarFretsPanel", defaultPos: { x: 1, y: 2 } },
+    guitarStrings: { selector: "#guitarStringsPanel", defaultPos: { x: 72, y: 4 } },
+    violinBoard: { selector: "#violinBoardPanel", defaultPos: { x: 1, y: 4 } },
+    violinStrings: { selector: "#violinStringsPanel", defaultPos: { x: 72, y: 6 } },
   };
 
   function layoutKey(id) {
@@ -2744,19 +2956,29 @@ const Game = (() => {
     timingWindowMs = ms;
   }
 
+  function playInstrumentApi() {
+    const mode = window.PlaySurface?.getMode?.() || "piano";
+    if (mode === "guitar") return window.Guitar;
+    if (mode === "violin") return window.Violin;
+    return window.Piano;
+  }
+
   function processAutoPlay(t) {
     if (!autoPlayMode || !playing) return;
+    const inst = playInstrumentApi();
+    const sound = window.PlaySurface?.getModes?.()?.[window.PlaySurface.getMode()]?.sound;
+    if (sound) window.AudioEngine?.setInstrument?.(sound);
     for (const n of notes) {
       if (!n._autoStarted && t >= n.time) {
         n._autoStarted = true;
         const vel = Math.max(0.2, Math.min(1, n.velocity ?? 0.75));
-        window.Piano?.pressKey?.(n.midi, vel);
+        inst?.pressKey?.(n.midi, vel);
         boostKeyAura(n.midi, 1);
         n.hit = true;
       }
       if (n._autoStarted && !n._autoEnded && t >= n.time + n.duration) {
         n._autoEnded = true;
-        window.Piano?.releaseKey?.(n.midi);
+        inst?.releaseKey?.(n.midi);
       }
     }
   }
@@ -2858,7 +3080,7 @@ const Game = (() => {
         n.missed = true;
         combo = 0;
         onFeedback?.("miss");
-        window.Piano?.flash(n.midi, "miss");
+        window.PlaySurface?.flash?.(n.midi, "miss");
         emitScore();
       }
     }
@@ -2897,7 +3119,7 @@ const Game = (() => {
       boostKeyAura(midi, 1);
     }
 
-    window.Piano?.flash(midi, "good");
+    window.PlaySurface?.flash?.(midi, "good");
     emitScore();
     return true;
   }
@@ -3181,6 +3403,9 @@ window.LibraryStore = LibraryStore;
 
 window.mainJsOk = true;
 
+
+window.mainJsOk = true;
+
 /* === app.js === */
 /** Ana uygulama */
 (function () {
@@ -3339,19 +3564,31 @@ window.mainJsOk = true;
     });
   }
 
-  function applyThemeFromSettings(s) {
-    window.AppTheme?.fromSettings?.(s || AppSettings.load());
+  const themeInputs = () => ({
+    effectHue: effectHueInput,
+    keyColorTop: keyColorTopInput,
+    keyColorMid: keyColorMidInput,
+    keyColorBottom: keyColorBottomInput,
+    hitLineColor: hitLineColorInput,
+  });
+
+  function applyThemeFromSettings(s, playMode) {
+    const mode = playMode || s?.playMode || window.PlaySurface?.getMode?.() || "piano";
+    window.AppTheme?.fromSettings?.(s || AppSettings.load(), mode);
+    window.AppTheme?.fillInputs?.(themeInputs(), {
+      ...(window.AppTheme.getPreset(mode)),
+      ...((s || AppSettings.load()).themesByMode?.[mode] || {}),
+    });
+    document.body.dataset.themeMode = mode;
   }
 
   function persistThemeFromInputs() {
-    persistSettings({
-      effectHue: Number(effectHueInput?.value) || 275,
-      keyColorTop: keyColorTopInput?.value,
-      keyColorMid: keyColorMidInput?.value,
-      keyColorBottom: keyColorBottomInput?.value,
-      hitLineColor: hitLineColorInput?.value,
-    });
-    applyThemeFromSettings(AppSettings.load());
+    const mode = window.PlaySurface?.getMode?.() || "piano";
+    const theme = window.AppTheme.readFromInputs(themeInputs(), mode);
+    const s = AppSettings.load();
+    const themesByMode = window.AppTheme.saveForMode(mode, theme, s);
+    persistSettings({ themesByMode });
+    applyThemeFromSettings(AppSettings.load(), mode);
   }
 
   function openLabelAssignModal(midi) {
@@ -3529,6 +3766,7 @@ window.mainJsOk = true;
     persistSettings({ playMode: m, instrumentId: sound, ...(opts.markPrompt ? { instrumentPromptDone: true } : {}) });
     applyPianoLayout(AppSettings.load());
     updateSettingsForPlayMode(m);
+    applyThemeFromSettings(AppSettings.load(), m);
     const s = AppSettings.load();
     applyInstrumentKeySize(s.keyWidth, s.keyHeight);
     setTimeout(() => requireMods().Game.resize(), 100);
@@ -3601,8 +3839,10 @@ window.mainJsOk = true;
 
     AudioEngine.setDynamicPressure(s.dynamicPressure);
     AudioEngine.setSustain(s.sustainEnabled);
-    AudioEngine.setInstrument(s.instrumentId || "piano");
-    if (instrumentSelect) instrumentSelect.value = s.instrumentId || "piano";
+    const playMode = s.playMode || "piano";
+    const modeSound = window.PlaySurface?.getModes?.()?.[playMode]?.sound || s.instrumentId || "piano";
+    AudioEngine.setInstrument(modeSound);
+    if (instrumentSelect) instrumentSelect.value = modeSound;
     Game.setTimingWindow(s.timingWindow);
     Game.setSpeed(s.speed / 100);
     Game.setFlameIntensity(s.flameIntensity || 1);
@@ -3619,7 +3859,6 @@ window.mainJsOk = true;
     setSidebarVisible(s.sidebarVisible !== false, false);
     applyPianoLayout(s);
     populateOctaveSelects(s.octaveStart, s.octaveCount);
-    const playMode = s.playMode || "piano";
     if (playModeSelect) playModeSelect.value = playMode;
     const { PlaySurface } = requireMods();
     PlaySurface.setMode(playMode, { force: true, syncSound: false });

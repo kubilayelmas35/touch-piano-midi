@@ -4,10 +4,10 @@ const InstrumentMove = (() => {
   let drag = null;
 
   const PANELS = {
-    guitarFrets: { selector: "#guitarFretsPanel", defaultPos: { x: 2, y: 4 } },
-    guitarStrings: { selector: "#guitarStringsPanel", defaultPos: { x: 3, y: 38 } },
-    violinBoard: { selector: "#violinBoardPanel", defaultPos: { x: 4, y: 8 } },
-    violinStrings: { selector: "#violinStringsPanel", defaultPos: { x: 70, y: 10 } },
+    guitarFrets: { selector: "#guitarFretsPanel", defaultPos: { x: 1, y: 2 } },
+    guitarStrings: { selector: "#guitarStringsPanel", defaultPos: { x: 72, y: 4 } },
+    violinBoard: { selector: "#violinBoardPanel", defaultPos: { x: 1, y: 4 } },
+    violinStrings: { selector: "#violinStringsPanel", defaultPos: { x: 72, y: 6 } },
   };
 
   function layoutKey(id) {

@@ -24,6 +24,9 @@ if (fs.existsSync(docs)) {
 }
 
 copy(path.join(root, "src", "styles.css"), path.join(docs, "styles.css"));
+if (fs.existsSync(path.join(root, "src", "styles-instruments-extra.css"))) {
+  copy(path.join(root, "src", "styles-instruments-extra.css"), path.join(docs, "styles-instruments-extra.css"));
+}
 copy(path.join(root, "src", "main.js"), path.join(docs, "main.js"));
 copy(path.join(root, "src", "touch-guard.js"), path.join(docs, "touch-guard.js"));
 copy(path.join(root, "web", "index.html"), path.join(docs, "index.html"));

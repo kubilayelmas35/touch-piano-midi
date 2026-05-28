@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Touch Piano MIDI — Web</title>
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles-instruments-extra.css" />
   <style>
     #authBanner {
       grid-area: banner;
@@ -243,6 +244,7 @@
       </div>
 
       <div class="stab-panel" data-panel="look">
+        <p class="hint small-hint settings-theme-hint">Renkler seçili enstrümana özel kaydedilir (piyano / gitar / keman).</p>
         <label class="field">
           Efekt rengi (ton)
           <input type="range" id="effectHue" min="0" max="360" value="275" />
@@ -392,6 +394,6 @@
   <script src="pianoApi-web.js"></script>
   <script src="web-boot.js"></script>
   <script src="touch-guard.js"></script>
-  <script src="main.js?v=web4"></script>
+  <script src="main.js?v=web5"></script>
 </body>
 </html>

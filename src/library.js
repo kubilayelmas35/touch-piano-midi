@@ -159,3 +159,6 @@ const LibraryStore = (() => {
 })();
 
 window.LibraryStore = LibraryStore;
+
+
+window.mainJsOk = true;

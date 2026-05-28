@@ -155,19 +155,31 @@
     });
   }
 
-  function applyThemeFromSettings(s) {
-    window.AppTheme?.fromSettings?.(s || AppSettings.load());
+  const themeInputs = () => ({
+    effectHue: effectHueInput,
+    keyColorTop: keyColorTopInput,
+    keyColorMid: keyColorMidInput,
+    keyColorBottom: keyColorBottomInput,
+    hitLineColor: hitLineColorInput,
+  });
+
+  function applyThemeFromSettings(s, playMode) {
+    const mode = playMode || s?.playMode || window.PlaySurface?.getMode?.() || "piano";
+    window.AppTheme?.fromSettings?.(s || AppSettings.load(), mode);
+    window.AppTheme?.fillInputs?.(themeInputs(), {
+      ...(window.AppTheme.getPreset(mode)),
+      ...((s || AppSettings.load()).themesByMode?.[mode] || {}),
+    });
+    document.body.dataset.themeMode = mode;
   }
 
   function persistThemeFromInputs() {
-    persistSettings({
-      effectHue: Number(effectHueInput?.value) || 275,
-      keyColorTop: keyColorTopInput?.value,
-      keyColorMid: keyColorMidInput?.value,
-      keyColorBottom: keyColorBottomInput?.value,
-      hitLineColor: hitLineColorInput?.value,
-    });
-    applyThemeFromSettings(AppSettings.load());
+    const mode = window.PlaySurface?.getMode?.() || "piano";
+    const theme = window.AppTheme.readFromInputs(themeInputs(), mode);
+    const s = AppSettings.load();
+    const themesByMode = window.AppTheme.saveForMode(mode, theme, s);
+    persistSettings({ themesByMode });
+    applyThemeFromSettings(AppSettings.load(), mode);
   }
 
   function openLabelAssignModal(midi) {
@@ -345,6 +357,7 @@
     persistSettings({ playMode: m, instrumentId: sound, ...(opts.markPrompt ? { instrumentPromptDone: true } : {}) });
     applyPianoLayout(AppSettings.load());
     updateSettingsForPlayMode(m);
+    applyThemeFromSettings(AppSettings.load(), m);
     const s = AppSettings.load();
     applyInstrumentKeySize(s.keyWidth, s.keyHeight);
     setTimeout(() => requireMods().Game.resize(), 100);
@@ -417,8 +430,10 @@
 
     AudioEngine.setDynamicPressure(s.dynamicPressure);
     AudioEngine.setSustain(s.sustainEnabled);
-    AudioEngine.setInstrument(s.instrumentId || "piano");
-    if (instrumentSelect) instrumentSelect.value = s.instrumentId || "piano";
+    const playMode = s.playMode || "piano";
+    const modeSound = window.PlaySurface?.getModes?.()?.[playMode]?.sound || s.instrumentId || "piano";
+    AudioEngine.setInstrument(modeSound);
+    if (instrumentSelect) instrumentSelect.value = modeSound;
     Game.setTimingWindow(s.timingWindow);
     Game.setSpeed(s.speed / 100);
     Game.setFlameIntensity(s.flameIntensity || 1);
@@ -435,7 +450,6 @@
     setSidebarVisible(s.sidebarVisible !== false, false);
     applyPianoLayout(s);
     populateOctaveSelects(s.octaveStart, s.octaveCount);
-    const playMode = s.playMode || "piano";
     if (playModeSelect) playModeSelect.value = playMode;
     const { PlaySurface } = requireMods();
     PlaySurface.setMode(playMode, { force: true, syncSound: false });
