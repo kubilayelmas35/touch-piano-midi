@@ -379,6 +379,7 @@ const AudioEngine = (() => {
       lfoGain,
       baseFreq: freq,
       maxVibratoDepth: freq * Math.max(vibDepth, 0.018),
+      sustainGain: Math.max(0.0002, vol * cfg.sustain),
       started: t,
       peak: vol,
     };
@@ -449,6 +450,18 @@ const AudioEngine = (() => {
     }
   }
 
+
+  function setLiveGain(midi, multiplier = 1) {
+    const voice = voices.get(midi);
+    if (!voice?.master) return;
+    const ac = ensure();
+    const t = ac.currentTime;
+    const m = Math.max(0.12, Math.min(2, multiplier));
+    const target = Math.max(0.0003, (voice.sustainGain || 0.08) * m);
+    voice.master.gain.cancelScheduledValues(t);
+    voice.master.gain.setTargetAtTime(target, t, 0.028);
+  }
+
   function stopAll() {
     for (const midi of [...voices.keys()]) noteOff(midi, true);
   }
@@ -460,6 +473,7 @@ const AudioEngine = (() => {
     play,
     stopAll,
     setLiveVibrato,
+    setLiveGain,
     setDynamicPressure,
     setSustain,
     setInstrument,
@@ -2713,8 +2727,8 @@ const Game = (() => {
     if (!range) return;
     const mode = surface.getMode();
     let selector = ".piano-keys .key";
-    if (mode === "guitar") selector = ".guitar-cell, .guitar-string.string-touch-target";
-    if (mode === "violin") selector = ".violin-cell, .violin-string.string-touch-target";
+    if (mode === "guitar") selector = ".guitar-string-stripe.string-touch-target";
+    if (mode === "violin") selector = ".violin-string-stripe.string-touch-target";
 
     const area = canvas.parentElement;
     const areaRect = area.getBoundingClientRect();
@@ -3399,6 +3413,9 @@ const LibraryStore = (() => {
 })();
 
 window.LibraryStore = LibraryStore;
+
+
+window.mainJsOk = true;
 
 
 window.mainJsOk = true;

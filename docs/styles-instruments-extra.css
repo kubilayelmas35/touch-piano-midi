@@ -1,5 +1,5 @@
 
-/* —— Üst bar: geniş ekran düzeni —— */
+/* —— Üst bar —— */
 .top-bar {
   display: grid;
   grid-template-columns: auto minmax(120px, 1fr) minmax(160px, 280px) auto;
@@ -68,82 +68,162 @@
   }
 }
 
-/* —— Gitar / keman: sol perdeler, sağ teller —— */
+/* —— Gitar / keman düzeni: sol tek akor, sağ tek tel kutusu —— */
 body[data-play-mode="guitar"] .guitar-wrap,
 body[data-play-mode="violin"] .violin-wrap {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(200px, 30%);
-  gap: 0.65rem;
-  padding: 0.5rem 0.65rem 0.75rem;
+  grid-template-columns: minmax(0, 1.05fr) minmax(220px, 0.95fr);
+  gap: 0.75rem;
+  padding: 0.55rem 0.75rem 0.85rem;
   align-items: stretch;
-  min-height: 220px;
+  min-height: 240px;
 }
 
-body[data-play-mode="guitar"] .guitar-frets-panel,
-body[data-play-mode="guitar"] .guitar-strings-panel,
-body[data-play-mode="violin"] .violin-board-panel,
-body[data-play-mode="violin"] .violin-strings-panel {
-  position: relative !important;
-  left: auto !important;
-  top: auto !important;
-  width: auto !important;
-  max-width: none;
-}
-
-body[data-play-mode="guitar"] .guitar-strings-panel,
-body[data-play-mode="violin"] .violin-strings-panel {
-  grid-column: 2;
-  grid-row: 1;
-  align-self: stretch;
+.inst-card {
+  border: 1px solid rgba(212, 196, 168, 0.22);
+  border-radius: 12px;
+  background: rgba(12, 14, 20, 0.92);
+  padding: 0.5rem 0.6rem 0.65rem;
   display: flex;
   flex-direction: column;
-  min-width: 200px;
-  border-left: 1px solid rgba(212, 196, 168, 0.2);
-  padding-left: 0.5rem;
+  min-height: 0;
+  min-width: 0;
 }
 
-body[data-play-mode="guitar"] .guitar-frets-panel,
-body[data-play-mode="violin"] .violin-board-panel {
-  grid-column: 1;
-  grid-row: 1;
+.inst-card-title {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(232, 212, 168, 0.9);
+  margin-bottom: 0.4rem;
 }
 
-body.instrument-move-mode[data-play-mode="guitar"] .guitar-wrap,
-body.instrument-move-mode[data-play-mode="violin"] .violin-wrap {
-  display: block;
+.guitar-chord-hint,
+.strings-bundle-title {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  line-height: 1.35;
+  margin: 0 0 0.45rem;
 }
 
-body.instrument-move-mode .guitar-frets-panel,
-body.instrument-move-mode .guitar-strings-panel,
-body.instrument-move-mode .violin-board-panel,
-body.instrument-move-mode .violin-strings-panel {
-  position: absolute !important;
+.guitar-fret-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
 }
 
-.guitar-cell.fret-held,
-.violin-cell.fret-held {
-  background: linear-gradient(180deg, rgba(201, 162, 39, 0.55), rgba(92, 74, 30, 0.75));
-  border-color: #c9a227;
-  box-shadow: inset 0 0 0 1px rgba(255, 230, 160, 0.35);
+.guitar-fret-btn {
+  min-width: 2.1rem;
+  padding: 0.45rem 0.35rem;
+  border-radius: 8px;
+  border: 1px solid rgba(201, 162, 39, 0.35);
+  background: rgba(30, 34, 44, 0.9);
+  color: #e8e0d0;
+  font-weight: 800;
+  font-size: 0.8rem;
+  cursor: pointer;
+  touch-action: manipulation;
 }
 
-.guitar-cell.open-selected,
-.violin-cell.open-selected {
-  outline: 1px solid rgba(201, 162, 39, 0.45);
+.guitar-fret-btn.fret-held {
+  background: linear-gradient(180deg, rgba(201, 162, 39, 0.75), rgba(92, 74, 30, 0.9));
+  color: #fff;
+  border-color: #e8c468;
+}
+
+.guitar-open-notes {
+  margin-top: 0.45rem;
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  letter-spacing: 0.08em;
+}
+
+.strings-bundle-inner {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(201, 162, 39, 0.28);
+  border-radius: 10px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #141820, #0c0e14);
+  touch-action: none;
+}
+
+.guitar-string-stripe,
+.violin-string-stripe {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0 0.55rem;
+  min-height: var(--inst-string-h, 2.35rem);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  touch-action: none;
+  background: transparent;
+}
+
+.guitar-string-stripe:last-child,
+.violin-string-stripe:last-child {
+  border-bottom: none;
+}
+
+.guitar-string-stripe.active,
+.violin-string-stripe.active,
+.guitar-string-stripe.string-held,
+.violin-string-stripe.string-held {
+  background: rgba(201, 162, 39, 0.14);
+}
+
+.guitar-string-stripe.has-fret,
+.violin-string-stripe.has-fret {
+  box-shadow: inset 3px 0 0 rgba(201, 162, 39, 0.55);
+}
+
+.guitar-string-name,
+.violin-string-name {
+  width: 1.1rem;
+  font-weight: 800;
+  font-size: 0.85rem;
+  color: #f5e6d3;
 }
 
 .guitar-string-fret,
 .violin-string-fret {
-  font-size: 0.65rem;
+  font-size: 0.62rem;
   color: var(--text-dim);
-  min-width: 2.5rem;
+  min-width: 2.4rem;
   text-align: right;
 }
 
-.guitar-string.has-fret,
-.violin-string.has-fret {
-  border-color: #c9a227;
-  background: linear-gradient(90deg, #1a1e28, rgba(201, 162, 39, 0.12));
+.guitar-string-line,
+.violin-string-line {
+  flex: 1;
+  height: 3px;
+  background: linear-gradient(90deg, #6b5344, #d4c4a8, #fff8e8, #d4c4a8, #6b5344);
+  border-radius: 2px;
+  transform-origin: center;
+}
+
+.guitar-string-stripe.hit-target,
+.violin-string-stripe.hit-target {
+  background: rgba(74, 222, 128, 0.18);
+}
+
+.string-vibrating .guitar-string-line,
+.string-vibrating .violin-string-line {
+  animation: string-shake 0.08s ease-in-out infinite alternate;
+  box-shadow: 0 0 calc(4px + var(--vib-intensity, 0) * 10px) rgba(212, 196, 168, 0.7);
+}
+
+@keyframes string-shake {
+  from {
+    transform: translateY(calc(var(--vib-intensity, 0.3) * -3px)) scaleY(calc(1 + var(--vib-intensity, 0) * 0.4));
+  }
+  to {
+    transform: translateY(calc(var(--vib-intensity, 0.3) * 3px)) scaleY(calc(1 + var(--vib-intensity, 0) * 0.4));
+  }
 }
 
 body[data-theme-mode="guitar"] {

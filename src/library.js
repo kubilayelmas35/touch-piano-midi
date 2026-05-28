@@ -162,3 +162,6 @@ window.LibraryStore = LibraryStore;
 
 
 window.mainJsOk = true;
+
+
+window.mainJsOk = true;

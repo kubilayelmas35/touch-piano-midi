@@ -316,23 +316,23 @@
       <div id="pianoKeys" class="piano-keys"></div>
     </div>
     <div id="guitarWrap" class="guitar-wrap instrument-panel hidden">
-      <div id="guitarFretsPanel" class="movable-panel guitar-frets-panel" data-move-id="guitarFrets">
-        <div class="move-handle" title="Sürükleyin">⠿ Perdeler</div>
-        <div id="guitarFrets" class="guitar-frets"></div>
+      <div class="inst-card guitar-chord-card">
+        <div class="inst-card-title">Akor / Perde</div>
+        <div id="guitarFrets"></div>
       </div>
-      <div id="guitarStringsPanel" class="movable-panel guitar-strings-panel" data-move-id="guitarStrings">
-        <div class="move-handle" title="Sürükleyin">⠿ Teller</div>
-        <div id="guitarStrings" class="guitar-strings"></div>
+      <div class="inst-card guitar-strings-card">
+        <div class="inst-card-title">Teller</div>
+        <div id="guitarStrings"></div>
       </div>
     </div>
     <div id="violinWrap" class="violin-wrap instrument-panel hidden">
-      <div id="violinBoardPanel" class="movable-panel violin-board-panel" data-move-id="violinBoard">
-        <div class="move-handle" title="Sürükleyin">⠿ Keman klavyesi</div>
-        <div id="violinBoard" class="violin-board"></div>
+      <div class="inst-card violin-chord-card">
+        <div class="inst-card-title">Pozisyon</div>
+        <div id="violinBoard"></div>
       </div>
-      <div id="violinStringsPanel" class="movable-panel violin-strings-panel" data-move-id="violinStrings">
-        <div class="move-handle" title="Sürükleyin">⠿ Teller</div>
-        <div id="violinStrings" class="violin-strings"></div>
+      <div class="inst-card violin-strings-card">
+        <div class="inst-card-title">Teller</div>
+        <div id="violinStrings"></div>
       </div>
     </div>
   </footer>
@@ -394,6 +394,6 @@
   <script src="pianoApi-web.js"></script>
   <script src="web-boot.js"></script>
   <script src="touch-guard.js"></script>
-  <script src="main.js?v=web5"></script>
+  <script src="main.js?v=web6"></script>
 </body>
 </html>
