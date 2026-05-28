@@ -30,6 +30,7 @@ const AppSettings = (() => {
     pianoAlign: "stretch",
     instrumentId: "piano",
     playMode: "piano",
+    themesByMode: {},
     instrumentPromptDone: false,
     panelLayout: {},
     stringVibratoSens: 1,

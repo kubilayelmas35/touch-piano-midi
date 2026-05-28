@@ -3,12 +3,66 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Touch Piano MIDI</title>
+  <title>Touch Piano MIDI — Web</title>
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles-instruments-extra.css" />
+  <style>
+    #authBanner {
+      grid-area: banner;
+      padding: 0.45rem 1rem;
+      font-size: 0.85rem;
+      background: #2a3048;
+      border-bottom: 1px solid #3a4050;
+      color: #c4cad8;
+    }
+    #authBanner.ok { background: #1a3d2e; color: #bbf7d0; }
+    #authBanner.warn { background: #4a3520; color: #fde68a; }
+    body.has-auth-banner {
+      grid-template-rows: auto auto minmax(0, 1fr) auto;
+      grid-template-areas:
+        "banner banner"
+        "header header"
+        "sidebar main"
+        "sidebar piano";
+    }
+    body.has-auth-banner.piano-dock-top {
+      grid-template-areas:
+        "banner banner"
+        "header header"
+        "sidebar piano"
+        "sidebar main";
+    }
+    body.has-auth-banner.piano-dock-middle .game-area,
+    body.has-auth-banner.piano-dock-middle .instrument-footer,
+    body.has-auth-banner.piano-dock-middle .piano-wrap {
+      grid-area: main;
+    }
+    body.has-auth-banner.piano-dock-middle .instrument-footer,
+    body.has-auth-banner.piano-dock-middle .piano-wrap {
+      align-self: end;
+      z-index: 8;
+    }
+    body.has-auth-banner .top-bar {
+      grid-area: header;
+    }
+    body.has-auth-banner .view-controls {
+      margin-left: auto;
+    }
+    @media (max-width: 900px) {
+      body.has-auth-banner .view-controls {
+        margin-left: 0;
+      }
+      body.has-auth-banner .top-bar h1 {
+        display: none;
+      }
+    }
+  </style>
 </head>
-<body>
+<body class="has-auth-banner">
+  <div id="authBanner" class="warn">Wix hesabına bağlanılıyor… Siteye giriş yaptığınızdan emin olun.</div>
+
   <div id="apiError" class="api-error hidden">
-    Uygulama köprüsü yüklenemedi. Lütfen <code>npm start</code> ile Electron içinde açın (tarayıcıda değil).
+    Oynatıcı yüklenemedi. Wix sitenizdeki <strong>Piyano</strong> sayfasından açın veya yapılandırmayı kontrol edin.
   </div>
 
   <header class="top-bar">
@@ -39,7 +93,7 @@
         </select>
       </label>
       <button type="button" id="btnToggleSidebar" class="btn small" title="Sol menü">☰ Menü</button>
-      <button type="button" id="btnFullscreen" class="btn small" title="Tam ekran (F11)">⛶ Tam ekran</button>
+      <button type="button" id="btnFullscreen" class="btn small" title="Tam ekran">⛶ Tam ekran</button>
     </div>
     <div class="transport">
       <button id="btnPlay" class="btn primary" disabled>▶ Oynat (sen çal)</button>
@@ -64,16 +118,15 @@
         <button type="submit" class="btn small primary">Ekle</button>
       </form>
       <ul id="libraryList" class="list"></ul>
-      <p id="libraryHint" class="hint">Kütüphane seçin veya yukarıdan ekleyin.</p>
+      <p id="libraryHint" class="hint">Kütüphane seçin veya yukarıdan ekleyin. Dosyalar Wix hesabınıza kaydedilir.</p>
     </section>
 
     <section class="panel" id="songsPanel">
       <div class="panel-head">
         <h2>Şarkılar</h2>
         <button type="button" id="btnImportMidi" class="btn small" disabled title="MIDI ekle">+ MIDI</button>
-        <button type="button" id="btnImportAudio" class="btn small" disabled title="MP3/ses → MIDI">♫ MP3→MIDI</button>
       </div>
-      <p class="hint small-hint">MP3→MIDI: Spotify Basic Pitch ile nota çıkarımı. Tek enstrüman / vokal en iyi sonucu verir.</p>
+      <p class="hint small-hint">Web: MIDI parça başına ~15 MB. MP3→MIDI için masaüstü (<code>npm start</code>). Şarkı seçince <strong>▶ Oynat</strong>.</p>
       <ul id="songList" class="list"></ul>
       <p id="songHint" class="hint">Önce bir kütüphane seçin.</p>
     </section>
@@ -246,7 +299,7 @@
           Zaman toleransı: <span id="timingLabel">200 ms</span>
           <input type="range" id="timingWindow" min="80" max="400" value="200" />
         </label>
-        <p class="hint small-hint">Dokunmatik: çok parmaklı jestler kapatıldı. Windows’ta “Tablet modu” kapalı olsun.</p>
+        <p class="hint small-hint">Dokunmatik: çok parmaklı jestler kapatıldı.</p>
       </div>
     </section>
   </aside>
@@ -335,16 +388,7 @@
     </div>
   </div>
 
-  <div id="audioImportOverlay" class="audio-import-overlay hidden" aria-live="polite">
-    <div class="audio-import-card">
-      <h3>Ses → MIDI dönüştürülüyor</h3>
-      <p id="audioImportFile" class="audio-import-file"></p>
-      <div class="audio-import-bar"><div id="audioImportBarFill"></div></div>
-      <p id="audioImportStatus" class="audio-import-status">Hazırlanıyor…</p>
-    </div>
-  </div>
-
-  <script src="touch-guard.js"></script>
-  <script src="main.js?v=16"></script>
+    <script src="touch-guard.js"></script>
+  <script src="main.js"></script>
 </body>
 </html>

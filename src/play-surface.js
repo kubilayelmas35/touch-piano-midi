@@ -102,6 +102,20 @@ const PlaySurface = (() => {
     if (mod && typeof mod[name] === "function") return mod[name](...args);
   }
 
+  function flash(midi, type) {
+    const mod = activeModule();
+    if (mod?.flash) return mod.flash(midi, type);
+    if (mod?.highlightMidi) return mod.highlightMidi(midi, type === "good");
+  }
+
+  function pressKey(midi, velocity) {
+    return delegate("pressKey", midi, velocity);
+  }
+
+  function releaseKey(midi) {
+    return delegate("releaseKey", midi);
+  }
+
   return {
     init,
     setMode,
@@ -119,6 +133,10 @@ const PlaySurface = (() => {
     setAutoFit: (...a) => delegate("setAutoFit", ...a),
     getKeySize: () => delegate("getKeySize"),
     refreshLabels: () => delegate("refreshLabels"),
+    flash,
+    pressKey,
+    releaseKey,
+    activeModule,
   };
 })();
 
