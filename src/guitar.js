@@ -26,7 +26,7 @@ const Guitar = (() => {
 
   function applySizeVars() {
     if (!wrapEl) return;
-    wrapEl.style.setProperty("--inst-string-h", `${Math.max(2rem, boardH / 7)}rem`);
+    wrapEl.style.setProperty("--inst-string-h", `${Math.max(2, boardH / 7)}rem`);
   }
 
   function applySize() {

@@ -1526,7 +1526,7 @@ const Guitar = (() => {
 
   function applySizeVars() {
     if (!wrapEl) return;
-    wrapEl.style.setProperty("--inst-string-h", `${Math.max(2rem, boardH / 7)}rem`);
+    wrapEl.style.setProperty("--inst-string-h", `${Math.max(2, boardH / 7)}rem`);
   }
 
   function applySize() {
@@ -1701,11 +1701,10 @@ window.Guitar = Guitar;
 
 
 /* === violin.js === */
-/** Dokunmatik keman — sol: parmak pozisyonu, sağ: teller. Ses sadece tel vurulunca. */
+/** Keman — sol: tek pozisyon şeridi, sağ: tüm teller tek kutuda */
 const Violin = (() => {
   const STRING_OPEN = [55, 62, 69, 76];
-  const STRING_NAMES = ["G", "D", "A", "E"];
-  /** Üstten alta ince E → kalın G */
+  const STRING_NAMES = ["E", "A", "D", "G"];
   const DISPLAY_STRINGS = [3, 2, 1, 0];
   const POSITIONS = 13;
 
@@ -1715,10 +1714,8 @@ const Violin = (() => {
   let range = { startMidi: 55, endMidi: 88 };
   let onNoteDown = null;
   let onNoteUp = null;
-  let cellMap = new Map();
-  let fretCellsByString = [[], [], [], []];
-  let fretted = [0, 0, 0, 0];
-  let fretPointers = new Map();
+  let globalPos = 0;
+  let posButtons = [];
   let cellW = 40;
   let boardH = 160;
 
@@ -1727,14 +1724,13 @@ const Violin = (() => {
   }
 
   function currentMidiForString(stringIdx) {
-    return midiAt(stringIdx, fretted[stringIdx] || 0);
+    return midiAt(stringIdx, globalPos);
   }
 
   function applySizeVars() {
     if (!wrapEl) return;
-    wrapEl.style.setProperty("--inst-cell-w", `${Math.max(1.15, cellW * 0.032)}rem`);
-    wrapEl.style.setProperty("--inst-row-h", `${Math.max(1.6, boardH / 5)}rem`);
-    wrapEl.style.setProperty("--inst-string-h", `${Math.max(2.4, boardH / 6.5)}rem`);
+    wrapEl.style.setProperty("--inst-cell-w", `${Math.max(1.1, cellW * 0.03)}rem`);
+    wrapEl.style.setProperty("--inst-string-h", `${Math.max(2, boardH / 5.5)}rem`);
   }
 
   function applySize() {
@@ -1762,161 +1758,98 @@ const Violin = (() => {
 
   function refreshLabels() {}
 
-  function updateStringHighlights() {
-    if (!stringsRoot) return;
-    stringsRoot.querySelectorAll(".violin-string").forEach((row) => {
-      const s = Number(row.dataset.string);
-      const pos = fretted[s] || 0;
-      row.classList.toggle("has-fret", pos > 0);
+  function setGlobalPos(pos) {
+    globalPos = Math.max(0, Math.min(POSITIONS, pos));
+    posButtons.forEach((btn) => {
+      const p = Number(btn.dataset.pos);
+      btn.classList.toggle("fret-held", p === globalPos);
+    });
+    stringsRoot?.querySelectorAll(".violin-string-stripe").forEach((row) => {
       const label = row.querySelector(".violin-string-fret");
-      if (label) label.textContent = pos > 0 ? `pos ${pos}` : "açık";
+      if (label) label.textContent = globalPos > 0 ? `pos ${globalPos}` : "açık";
+      row.classList.toggle("has-fret", globalPos > 0);
     });
-  }
-
-  function setFretForString(stringIdx, pos) {
-    fretted[stringIdx] = pos;
-    fretCellsByString[stringIdx]?.forEach((cell) => {
-      const p = Number(cell.dataset.pos);
-      cell.classList.toggle("fret-held", p === pos && pos > 0);
-      cell.classList.toggle("open-selected", p === 0 && pos === 0);
-    });
-    updateStringHighlights();
   }
 
   function releaseAll() {
-    fretPointers.clear();
-    fretted = [0, 0, 0, 0];
+    globalPos = 0;
     window.AudioEngine?.stopAll?.();
-    boardRoot?.querySelectorAll(".violin-cell").forEach((el) => {
-      el.classList.remove("active", "fret-held", "open-selected");
-    });
-    stringsRoot?.querySelectorAll(".violin-string").forEach((el) => {
+    posButtons.forEach((btn) => btn.classList.remove("fret-held"));
+    stringsRoot?.querySelectorAll(".violin-string-stripe").forEach((el) => {
       el.classList.remove("active", "string-held", "string-vibrating", "has-fret");
     });
   }
 
-  function bindFretCell(el, stringIdx, pos) {
-    const down = (e) => {
-      if (e.pointerType === "mouse" && e.button !== 0) return;
-      if (e.pointerType === "touch" && e.button !== 0) return;
-      e.preventDefault();
-      el.setPointerCapture(e.pointerId);
-      fretPointers.set(e.pointerId, { stringIdx, pos });
-      setFretForString(stringIdx, pos);
-    };
-    const up = (e) => {
-      const st = fretPointers.get(e.pointerId);
-      if (!st || st.stringIdx !== stringIdx) return;
-      e.preventDefault();
-      fretPointers.delete(e.pointerId);
-      try {
-        el.releasePointerCapture(e.pointerId);
-      } catch {
-        /* */
-      }
-      if (fretted[stringIdx] === pos) setFretForString(stringIdx, 0);
-    };
-    el.addEventListener("pointerdown", down);
-    el.addEventListener("pointerup", up);
-    el.addEventListener("pointercancel", up);
-  }
-
-  function buildBoard() {
+  function buildPositionStrip() {
     if (!boardRoot) return;
     boardRoot.innerHTML = "";
-    cellMap.clear();
-    fretCellsByString = [[], [], [], []];
+    boardRoot.className = "violin-chord-strip";
+    posButtons = [];
 
-    const header = document.createElement("div");
-    header.className = "violin-pos-header";
-    header.innerHTML =
-      '<span class="violin-corner"></span><div class="violin-fret-cells violin-pos-header-cells"></div>';
-    const nums = header.querySelector(".violin-pos-header-cells");
+    const head = document.createElement("p");
+    head.className = "guitar-chord-hint";
+    head.textContent = "Tek pozisyon — seçin, sonra tellere vurun";
+    boardRoot.appendChild(head);
+
+    const row = document.createElement("div");
+    row.className = "guitar-fret-picker";
     for (let p = 0; p <= POSITIONS; p++) {
-      const h = document.createElement("span");
-      h.className = "violin-pos-num";
-      h.textContent = p === 0 ? "∅" : String(p);
-      nums.appendChild(h);
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "guitar-fret-btn";
+      btn.dataset.pos = String(p);
+      btn.textContent = p === 0 ? "∅" : String(p);
+      btn.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        setGlobalPos(p);
+      });
+      row.appendChild(btn);
+      posButtons.push(btn);
     }
-    boardRoot.appendChild(header);
-
-    for (const s of DISPLAY_STRINGS) {
-      const row = document.createElement("div");
-      row.className = "violin-string-row";
-      row.dataset.string = String(s);
-
-      const label = document.createElement("span");
-      label.className = "violin-string-label";
-      label.textContent = STRING_NAMES[s];
-      row.appendChild(label);
-
-      const lane = document.createElement("div");
-      lane.className = "violin-string-lane";
-      const wire = document.createElement("div");
-      wire.className = "violin-row-wire";
-      wire.setAttribute("aria-hidden", "true");
-      lane.appendChild(wire);
-
-      const cells = document.createElement("div");
-      cells.className = "violin-fret-cells";
-
-      for (let p = 0; p <= POSITIONS; p++) {
-        const midi = midiAt(s, p);
-        const cell = document.createElement("button");
-        cell.type = "button";
-        cell.className = "violin-cell";
-        cell.dataset.midi = String(midi);
-        cell.dataset.string = String(s);
-        cell.dataset.pos = String(p);
-        bindFretCell(cell, s, p);
-        cellMap.set(midi, cell);
-        fretCellsByString[s].push(cell);
-        cells.appendChild(cell);
-      }
-
-      lane.appendChild(cells);
-      row.appendChild(lane);
-      boardRoot.appendChild(row);
-    }
-
+    boardRoot.appendChild(row);
+    setGlobalPos(0);
     range = {
       startMidi: STRING_OPEN[0],
       endMidi: STRING_OPEN[3] + POSITIONS,
     };
   }
 
-  function buildStringPlucks() {
+  function buildStringBundle() {
     if (!stringsRoot) return;
     stringsRoot.innerHTML = "";
+    stringsRoot.className = "violin-strings-bundle";
+
     const title = document.createElement("div");
-    title.className = "violin-strings-title";
-    title.textContent = "Teller (ince → kalın) — önce pozisyon, sonra tel";
+    title.className = "strings-bundle-title";
+    title.textContent = "Teller — çoklu dokunma";
     stringsRoot.appendChild(title);
 
+    const bundle = document.createElement("div");
+    bundle.className = "strings-bundle-inner";
+
     for (const s of DISPLAY_STRINGS) {
-      const row = document.createElement("button");
-      row.type = "button";
-      row.className = "violin-string string-touch-target";
-      row.dataset.string = String(s);
-      row.dataset.midi = String(STRING_OPEN[s]);
-      row.innerHTML = `<span class="violin-string-name">${STRING_NAMES[s]}</span><span class="violin-string-fret">açık</span><span class="violin-string-line string-line"></span>`;
+      const stripe = document.createElement("div");
+      stripe.className = "violin-string-stripe string-touch-target";
+      stripe.dataset.string = String(s);
+      stripe.innerHTML = `<span class="violin-string-name">${STRING_NAMES[s]}</span><span class="violin-string-fret">açık</span><span class="violin-string-line string-line"></span>`;
 
       window.StringTouch?.bind(
-        row,
+        stripe,
         () => currentMidiForString(s),
         {
           onDown: (m, vel, e) => onNoteDown?.(m, vel, e),
           onUp: (m, e) => onNoteUp?.(m, e),
         }
       );
-      stringsRoot.appendChild(row);
+      bundle.appendChild(stripe);
     }
-    updateStringHighlights();
+    stringsRoot.appendChild(bundle);
+    setGlobalPos(globalPos);
   }
 
   function buildKeys() {
-    buildBoard();
-    buildStringPlucks();
+    buildPositionStrip();
+    buildStringBundle();
     applySize();
   }
 
@@ -1930,9 +1863,7 @@ const Violin = (() => {
   }
 
   function highlightMidi(midi, on) {
-    const cell = cellMap.get(midi);
-    if (cell) cell.classList.toggle("hit-target", on);
-    stringsRoot?.querySelectorAll(".violin-string").forEach((row) => {
+    stringsRoot?.querySelectorAll(".violin-string-stripe").forEach((row) => {
       const s = Number(row.dataset.string);
       if (currentMidiForString(s) === midi) row.classList.toggle("hit-target", on);
     });
@@ -1944,17 +1875,15 @@ const Violin = (() => {
   }
 
   function pressKey(midi, velocity = 0.85) {
-    const el = cellMap.get(midi);
-    if (el) el.classList.add("active");
     window.AudioEngine.noteOn(midi, velocity);
     onNoteDown?.(midi, velocity);
+    highlightMidi(midi, true);
   }
 
   function releaseKey(midi) {
-    const el = cellMap.get(midi);
-    if (el) el.classList.remove("active");
     window.AudioEngine.noteOff(midi);
     onNoteUp?.(midi);
+    highlightMidi(midi, false);
   }
 
   return {
