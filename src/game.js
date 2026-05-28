@@ -159,9 +159,11 @@ const Game = (() => {
         const fret = Number(key.dataset.fret || 0);
         const stringIdx = Number(key.dataset.string || 0);
         const label = `${stringLabelForMode(mode, stringIdx)}${fret}`;
+        const laneColor =
+          getComputedStyle(key).getPropertyValue("--str-color")?.trim() || null;
         const prev = keyPositions.get(midi);
         if (!prev || fret < prev.fret) {
-          keyPositions.set(midi, { x: centerX, w: r.width, fret, label });
+          keyPositions.set(midi, { x: centerX, w: r.width, fret, label, laneColor });
         }
       } else {
         keyPositions.set(midi, { x: centerX, w: r.width });
@@ -591,7 +593,7 @@ const Game = (() => {
       const pos = keyPositions.get(n.midi);
       if (!pos || seenLanes.has(n.midi)) continue;
       seenLanes.add(n.midi);
-      NR?.drawLane(ctx, pos.x, pos.w, h, hitY, n.midi, t);
+      NR?.drawLane(ctx, pos.x, pos.w, h, hitY, n.midi, t, pos.laneColor);
     }
 
     for (const n of notes) {
@@ -618,6 +620,7 @@ const Game = (() => {
           styleId: flameStyleId,
           intensity: flameIntensity,
           time: t,
+          laneColor: pos.laneColor,
         });
       }
       if ((mode === "guitar" || mode === "violin") && pos.label) {

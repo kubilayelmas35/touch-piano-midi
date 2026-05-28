@@ -30,7 +30,6 @@ function createFrettedInstrument(config) {
     let pluckRows = [];
     let fretted = {};
     let fretPointers = new Map();
-    let lockedFrets = {};
     let midiTargets = new Map();
 
     function gripAllStrings() {
@@ -152,7 +151,7 @@ function createFrettedInstrument(config) {
 
     function recomputeFrettedFromPointers() {
       const next = {};
-      for (const s of DISPLAY_STRINGS) next[s] = lockedFrets[s] || 0;
+      for (const s of DISPLAY_STRINGS) next[s] = 0;
 
       for (const st of fretPointers.values()) {
         if (st.gripAll) {
@@ -165,22 +164,9 @@ function createFrettedInstrument(config) {
       repaintFretCells();
     }
 
-    function setLockedFret(stringIdx, fret) {
-      if (gripAllStrings()) {
-        const same = DISPLAY_STRINGS.every((s) => (lockedFrets[s] || 0) === fret);
-        const nextFret = same ? 0 : fret;
-        for (const s of DISPLAY_STRINGS) lockedFrets[s] = nextFret;
-      } else {
-        const cur = lockedFrets[stringIdx] || 0;
-        lockedFrets[stringIdx] = cur === fret ? 0 : fret;
-      }
-      recomputeFrettedFromPointers();
-    }
-
     function releaseAll() {
       fretPointers.clear();
       fretted = {};
-      lockedFrets = {};
       window.AudioEngine?.stopAll?.();
       fretsRoot?.querySelectorAll(".guitar-cell").forEach((el) => {
         el.classList.remove("active", "fret-held", "open-selected");
@@ -196,10 +182,6 @@ function createFrettedInstrument(config) {
         if (e.pointerType === "mouse" && e.button !== 0) return;
         e.preventDefault();
         e.stopPropagation();
-        if (e.pointerType === "mouse") {
-          setLockedFret(stringIdx, fret);
-          return;
-        }
         try {
           el.setPointerCapture(e.pointerId);
         } catch {
@@ -231,7 +213,6 @@ function createFrettedInstrument(config) {
       cellMap.clear();
       fretCellsByString = {};
       fretted = {};
-      lockedFrets = {};
       midiTargets = new Map();
 
       const header = document.createElement("div");
@@ -369,7 +350,14 @@ function createFrettedInstrument(config) {
       if (el) el.classList.add("active");
       window.AudioEngine.noteOn(midi, velocity);
       onNoteDown?.(midi, velocity);
-      if (target?.stringIdx != null) setNeckVibrato(target.stringIdx, 0.35);
+      if (target?.stringIdx != null) {
+        setNeckVibrato(target.stringIdx, 0.35);
+        const row = pluckRows.find((r) => r.stringIdx === target.stringIdx)?.el;
+        if (row) {
+          row.classList.add("active", "string-held", "string-vibrating");
+          row.style.setProperty("--vib-intensity", "0.35");
+        }
+      }
       highlightMidi(midi, true);
     }
 
@@ -379,7 +367,14 @@ function createFrettedInstrument(config) {
       if (el) el.classList.remove("active");
       window.AudioEngine.noteOff(midi);
       onNoteUp?.(midi);
-      if (target?.stringIdx != null) clearNeckVibrato(target.stringIdx);
+      if (target?.stringIdx != null) {
+        clearNeckVibrato(target.stringIdx);
+        const row = pluckRows.find((r) => r.stringIdx === target.stringIdx)?.el;
+        if (row) {
+          row.classList.remove("active", "string-held", "string-vibrating");
+          row.style.removeProperty("--vib-intensity");
+        }
+      }
       highlightMidi(midi, false);
     }
 

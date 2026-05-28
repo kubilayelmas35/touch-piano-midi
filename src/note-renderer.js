@@ -21,20 +21,25 @@ const NoteRenderer = (() => {
     }
   }
 
-  function drawLane(ctx, x, w, h, hitY, midi, t) {
+  function drawLane(ctx, x, w, h, hitY, midi, t, laneColor = null) {
     const hu = hue(midi);
     const pulse = 0.04 + Math.sin(t * 2.5 + midi * 0.08) * 0.02;
     const g = ctx.createLinearGradient(x - w, 0, x + w, 0);
     g.addColorStop(0, "rgba(0,0,0,0)");
-    g.addColorStop(0.45, `hsla(${hu}, 80%, 55%, ${pulse})`);
-    g.addColorStop(0.55, `hsla(${hu}, 90%, 65%, ${pulse * 1.2})`);
+    if (laneColor) {
+      g.addColorStop(0.45, `color-mix(in srgb, ${laneColor} 75%, transparent)`);
+      g.addColorStop(0.55, `color-mix(in srgb, ${laneColor} 95%, white 5%)`);
+    } else {
+      g.addColorStop(0.45, `hsla(${hu}, 80%, 55%, ${pulse})`);
+      g.addColorStop(0.55, `hsla(${hu}, 90%, 65%, ${pulse * 1.2})`);
+    }
     g.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = g;
     ctx.fillRect(x - w * 0.6, 0, w * 1.2, hitY + 8);
   }
 
   function drawNote(ctx, opts) {
-    const { x, y, w, h, midi, vel, state, styleId, intensity, time } = opts;
+    const { x, y, w, h, midi, vel, state, styleId, intensity, time, laneColor } = opts;
     if (h < 2) return;
 
     const style = window.FlameStyles?.styles?.[styleId];
@@ -72,10 +77,17 @@ const NoteRenderer = (() => {
     ctx.shadowColor = `hsla(${hu}, 100%, 65%, 0.9)`;
     ctx.shadowBlur = (14 + v * 8) * intensity;
     const body = ctx.createLinearGradient(x, y, x, y + h);
-    body.addColorStop(0, `hsla(${hu}, 70%, 78%, 0.95)`);
-    body.addColorStop(0.35, `hsla(${hu}, 95%, 62%, 1)`);
-    body.addColorStop(0.75, `hsla(${hu}, 100%, 52%, 1)`);
-    body.addColorStop(1, `hsla(${hu}, 100%, 42%, 1)`);
+    if (laneColor) {
+      body.addColorStop(0, `color-mix(in srgb, ${laneColor} 40%, white 60%)`);
+      body.addColorStop(0.35, `color-mix(in srgb, ${laneColor} 85%, white 15%)`);
+      body.addColorStop(0.75, laneColor);
+      body.addColorStop(1, `color-mix(in srgb, ${laneColor} 72%, black 28%)`);
+    } else {
+      body.addColorStop(0, `hsla(${hu}, 70%, 78%, 0.95)`);
+      body.addColorStop(0.35, `hsla(${hu}, 95%, 62%, 1)`);
+      body.addColorStop(0.75, `hsla(${hu}, 100%, 52%, 1)`);
+      body.addColorStop(1, `hsla(${hu}, 100%, 42%, 1)`);
+    }
     ctx.fillStyle = body;
     roundRect(ctx, x, y, w, h, r);
     ctx.fill();

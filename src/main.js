@@ -1039,20 +1039,25 @@ const NoteRenderer = (() => {
     }
   }
 
-  function drawLane(ctx, x, w, h, hitY, midi, t) {
+  function drawLane(ctx, x, w, h, hitY, midi, t, laneColor = null) {
     const hu = hue(midi);
     const pulse = 0.04 + Math.sin(t * 2.5 + midi * 0.08) * 0.02;
     const g = ctx.createLinearGradient(x - w, 0, x + w, 0);
     g.addColorStop(0, "rgba(0,0,0,0)");
-    g.addColorStop(0.45, `hsla(${hu}, 80%, 55%, ${pulse})`);
-    g.addColorStop(0.55, `hsla(${hu}, 90%, 65%, ${pulse * 1.2})`);
+    if (laneColor) {
+      g.addColorStop(0.45, `color-mix(in srgb, ${laneColor} 75%, transparent)`);
+      g.addColorStop(0.55, `color-mix(in srgb, ${laneColor} 95%, white 5%)`);
+    } else {
+      g.addColorStop(0.45, `hsla(${hu}, 80%, 55%, ${pulse})`);
+      g.addColorStop(0.55, `hsla(${hu}, 90%, 65%, ${pulse * 1.2})`);
+    }
     g.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = g;
     ctx.fillRect(x - w * 0.6, 0, w * 1.2, hitY + 8);
   }
 
   function drawNote(ctx, opts) {
-    const { x, y, w, h, midi, vel, state, styleId, intensity, time } = opts;
+    const { x, y, w, h, midi, vel, state, styleId, intensity, time, laneColor } = opts;
     if (h < 2) return;
 
     const style = window.FlameStyles?.styles?.[styleId];
@@ -1090,10 +1095,17 @@ const NoteRenderer = (() => {
     ctx.shadowColor = `hsla(${hu}, 100%, 65%, 0.9)`;
     ctx.shadowBlur = (14 + v * 8) * intensity;
     const body = ctx.createLinearGradient(x, y, x, y + h);
-    body.addColorStop(0, `hsla(${hu}, 70%, 78%, 0.95)`);
-    body.addColorStop(0.35, `hsla(${hu}, 95%, 62%, 1)`);
-    body.addColorStop(0.75, `hsla(${hu}, 100%, 52%, 1)`);
-    body.addColorStop(1, `hsla(${hu}, 100%, 42%, 1)`);
+    if (laneColor) {
+      body.addColorStop(0, `color-mix(in srgb, ${laneColor} 40%, white 60%)`);
+      body.addColorStop(0.35, `color-mix(in srgb, ${laneColor} 85%, white 15%)`);
+      body.addColorStop(0.75, laneColor);
+      body.addColorStop(1, `color-mix(in srgb, ${laneColor} 72%, black 28%)`);
+    } else {
+      body.addColorStop(0, `hsla(${hu}, 70%, 78%, 0.95)`);
+      body.addColorStop(0.35, `hsla(${hu}, 95%, 62%, 1)`);
+      body.addColorStop(0.75, `hsla(${hu}, 100%, 52%, 1)`);
+      body.addColorStop(1, `hsla(${hu}, 100%, 42%, 1)`);
+    }
     ctx.fillStyle = body;
     roundRect(ctx, x, y, w, h, r);
     ctx.fill();
@@ -1589,7 +1601,6 @@ function createFrettedInstrument(config) {
     let pluckRows = [];
     let fretted = {};
     let fretPointers = new Map();
-    let lockedFrets = {};
     let midiTargets = new Map();
 
     function gripAllStrings() {
@@ -1711,7 +1722,7 @@ function createFrettedInstrument(config) {
 
     function recomputeFrettedFromPointers() {
       const next = {};
-      for (const s of DISPLAY_STRINGS) next[s] = lockedFrets[s] || 0;
+      for (const s of DISPLAY_STRINGS) next[s] = 0;
 
       for (const st of fretPointers.values()) {
         if (st.gripAll) {
@@ -1724,22 +1735,9 @@ function createFrettedInstrument(config) {
       repaintFretCells();
     }
 
-    function setLockedFret(stringIdx, fret) {
-      if (gripAllStrings()) {
-        const same = DISPLAY_STRINGS.every((s) => (lockedFrets[s] || 0) === fret);
-        const nextFret = same ? 0 : fret;
-        for (const s of DISPLAY_STRINGS) lockedFrets[s] = nextFret;
-      } else {
-        const cur = lockedFrets[stringIdx] || 0;
-        lockedFrets[stringIdx] = cur === fret ? 0 : fret;
-      }
-      recomputeFrettedFromPointers();
-    }
-
     function releaseAll() {
       fretPointers.clear();
       fretted = {};
-      lockedFrets = {};
       window.AudioEngine?.stopAll?.();
       fretsRoot?.querySelectorAll(".guitar-cell").forEach((el) => {
         el.classList.remove("active", "fret-held", "open-selected");
@@ -1755,10 +1753,6 @@ function createFrettedInstrument(config) {
         if (e.pointerType === "mouse" && e.button !== 0) return;
         e.preventDefault();
         e.stopPropagation();
-        if (e.pointerType === "mouse") {
-          setLockedFret(stringIdx, fret);
-          return;
-        }
         try {
           el.setPointerCapture(e.pointerId);
         } catch {
@@ -1790,7 +1784,6 @@ function createFrettedInstrument(config) {
       cellMap.clear();
       fretCellsByString = {};
       fretted = {};
-      lockedFrets = {};
       midiTargets = new Map();
 
       const header = document.createElement("div");
@@ -1928,7 +1921,14 @@ function createFrettedInstrument(config) {
       if (el) el.classList.add("active");
       window.AudioEngine.noteOn(midi, velocity);
       onNoteDown?.(midi, velocity);
-      if (target?.stringIdx != null) setNeckVibrato(target.stringIdx, 0.35);
+      if (target?.stringIdx != null) {
+        setNeckVibrato(target.stringIdx, 0.35);
+        const row = pluckRows.find((r) => r.stringIdx === target.stringIdx)?.el;
+        if (row) {
+          row.classList.add("active", "string-held", "string-vibrating");
+          row.style.setProperty("--vib-intensity", "0.35");
+        }
+      }
       highlightMidi(midi, true);
     }
 
@@ -1938,7 +1938,14 @@ function createFrettedInstrument(config) {
       if (el) el.classList.remove("active");
       window.AudioEngine.noteOff(midi);
       onNoteUp?.(midi);
-      if (target?.stringIdx != null) clearNeckVibrato(target.stringIdx);
+      if (target?.stringIdx != null) {
+        clearNeckVibrato(target.stringIdx);
+        const row = pluckRows.find((r) => r.stringIdx === target.stringIdx)?.el;
+        if (row) {
+          row.classList.remove("active", "string-held", "string-vibrating");
+          row.style.removeProperty("--vib-intensity");
+        }
+      }
       highlightMidi(midi, false);
     }
 
@@ -2789,9 +2796,11 @@ const Game = (() => {
         const fret = Number(key.dataset.fret || 0);
         const stringIdx = Number(key.dataset.string || 0);
         const label = `${stringLabelForMode(mode, stringIdx)}${fret}`;
+        const laneColor =
+          getComputedStyle(key).getPropertyValue("--str-color")?.trim() || null;
         const prev = keyPositions.get(midi);
         if (!prev || fret < prev.fret) {
-          keyPositions.set(midi, { x: centerX, w: r.width, fret, label });
+          keyPositions.set(midi, { x: centerX, w: r.width, fret, label, laneColor });
         }
       } else {
         keyPositions.set(midi, { x: centerX, w: r.width });
@@ -3221,7 +3230,7 @@ const Game = (() => {
       const pos = keyPositions.get(n.midi);
       if (!pos || seenLanes.has(n.midi)) continue;
       seenLanes.add(n.midi);
-      NR?.drawLane(ctx, pos.x, pos.w, h, hitY, n.midi, t);
+      NR?.drawLane(ctx, pos.x, pos.w, h, hitY, n.midi, t, pos.laneColor);
     }
 
     for (const n of notes) {
@@ -3248,6 +3257,7 @@ const Game = (() => {
           styleId: flameStyleId,
           intensity: flameIntensity,
           time: t,
+          laneColor: pos.laneColor,
         });
       }
       if ((mode === "guitar" || mode === "violin") && pos.label) {
@@ -3492,7 +3502,7 @@ window.mainJsOk = true;
 /* === app.js === */
 /** Ana uygulama */
 (function () {
-  const APP_VERSION = "v0.9.4";
+  const APP_VERSION = "v0.9.5";
   const $ = (sel) => document.querySelector(sel);
 
   function mods() {
