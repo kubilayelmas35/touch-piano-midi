@@ -186,19 +186,19 @@
         <div class="settings-scope settings-scope-fretted">
         <label class="field">
           Kol tel yüksekliği: <span id="guitarNeckHeightLabel">30 px</span>
-          <input type="range" id="guitarNeckHeight" min="10" max="100" value="30" />
+          <input type="range" id="guitarNeckHeight" min="10" max="220" value="30" />
         </label>
         <label class="field">
           Sağ tel yüksekliği: <span id="guitarStringHeightLabel">30 px</span>
-          <input type="range" id="guitarStringHeight" min="10" max="100" value="30" />
+          <input type="range" id="guitarStringHeight" min="10" max="220" value="30" />
         </label>
         <label class="field">
           Kol / perde genişliği: <span id="guitarNeckWidthLabel">42 px</span>
-          <input type="range" id="guitarNeckWidth" min="12" max="110" value="42" />
+          <input type="range" id="guitarNeckWidth" min="10" max="240" value="42" />
         </label>
         <label class="field">
           Teller paneli genişliği: <span id="guitarPluckWidthLabel">220 px</span>
-          <input type="range" id="guitarPluckWidth" min="80" max="520" value="220" />
+          <input type="range" id="guitarPluckWidth" min="80" max="900" value="220" />
         </label>
         <label class="field settings-scope-guitar-only">
           <input type="checkbox" id="guitarGripAllStrings" />
@@ -332,6 +332,7 @@
         <p class="hint small-hint">Dokunmatik: çok parmaklı jestler kapatıldı.</p>
       </div>
     </section>
+    <div id="appVersion" class="sidebar-version"></div>
   </aside>
 
   <main class="game-area">
@@ -435,6 +436,6 @@
   <script src="pianoApi-web.js"></script>
   <script src="web-boot.js"></script>
   <script src="touch-guard.js"></script>
-  <script src="main.js?v=web13"></script>
+  <script src="main.js?v=web15"></script>
 </body>
 </html>

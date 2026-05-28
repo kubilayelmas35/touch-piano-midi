@@ -38,7 +38,7 @@
 }
 
 .guitar-neck {
-  touch-action: pan-x;
+  touch-action: none;
 }
 
 html, body {
@@ -243,6 +243,14 @@ body.sidebar-hidden #btnToggleSidebar {
   flex-direction: column;
   gap: 0.5rem;
   min-height: 0;
+}
+
+.sidebar-version {
+  margin-top: auto;
+  padding: 0.35rem 0.25rem 0.2rem;
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .panel {

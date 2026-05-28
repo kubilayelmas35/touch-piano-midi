@@ -310,7 +310,7 @@ const AudioEngine = (() => {
 
   function noteOffPluck(voiceId) {
     const rel =
-      instrumentId === "guitar" ? 1.45 : instrumentId === "violin" ? 1.1 : 0.62;
+      instrumentId === "guitar" ? 2.35 : instrumentId === "violin" ? 2.05 : 1.2;
     noteOffVoice(voiceId, false, rel);
   }
 

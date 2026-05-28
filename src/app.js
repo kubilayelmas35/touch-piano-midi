@@ -1,5 +1,6 @@
 /** Ana uygulama */
 (function () {
+  const APP_VERSION = "v0.9.4";
   const $ = (sel) => document.querySelector(sel);
 
   function mods() {
@@ -99,6 +100,7 @@
   const guitarStringHeightLabel = $("#guitarStringHeightLabel");
   const guitarNeckWidthLabel = $("#guitarNeckWidthLabel");
   const guitarPluckWidthLabel = $("#guitarPluckWidthLabel");
+  const appVersion = $("#appVersion");
   const dynamicPressure = $("#dynamicPressure");
   const sustainEnabled = $("#sustainEnabled");
   const speedRange = $("#speedRange");
@@ -1232,6 +1234,8 @@
   applyThemeFromSettings(AppSettings.load());
 
   (async function boot() {
+    if (appVersion) appVersion.textContent = `Surum ${APP_VERSION}`;
+    window.__appVersion = APP_VERSION;
     window.__bootStatus = "başlıyor";
     try {
       await requireStore().load();

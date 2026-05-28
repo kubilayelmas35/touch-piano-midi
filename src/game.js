@@ -30,6 +30,18 @@ const Game = (() => {
   let lastFrameT = 0;
   let autoPlayMode = false;
 
+  function stringLabelForMode(mode, stringIdx) {
+    if (mode === "guitar") {
+      const names = ["E", "A", "D", "G", "B", "e"];
+      return names[stringIdx] ?? String(stringIdx);
+    }
+    if (mode === "violin") {
+      const names = ["G", "D", "A", "E"];
+      return names[stringIdx] ?? String(stringIdx);
+    }
+    return "";
+  }
+
   function init(canvasEl, callbacks) {
     canvas = canvasEl;
     ctx = canvas.getContext("2d");
@@ -133,8 +145,7 @@ const Game = (() => {
     if (!range) return;
     const mode = surface.getMode();
     let selector = ".piano-keys .key";
-    if (mode === "guitar") selector = ".guitar-string.string-touch-target";
-    if (mode === "violin") selector = ".guitar-string.string-touch-target";
+    if (mode === "guitar" || mode === "violin") selector = ".guitar-neck .guitar-cell";
 
     const area = canvas.parentElement;
     const areaRect = area.getBoundingClientRect();
@@ -144,7 +155,17 @@ const Game = (() => {
       if (!midi || midi < range.startMidi || midi > range.endMidi) return;
       const r = key.getBoundingClientRect();
       const centerX = r.left + r.width / 2 - areaRect.left;
-      keyPositions.set(midi, { x: centerX, w: r.width });
+      if (mode === "guitar" || mode === "violin") {
+        const fret = Number(key.dataset.fret || 0);
+        const stringIdx = Number(key.dataset.string || 0);
+        const label = `${stringLabelForMode(mode, stringIdx)}${fret}`;
+        const prev = keyPositions.get(midi);
+        if (!prev || fret < prev.fret) {
+          keyPositions.set(midi, { x: centerX, w: r.width, fret, label });
+        }
+      } else {
+        keyPositions.set(midi, { x: centerX, w: r.width });
+      }
     });
   }
 
@@ -564,6 +585,7 @@ const Game = (() => {
     NR?.drawKeyAuroras?.(ctx, keyAuras, hitY, w, t);
 
     const seenLanes = new Set();
+    const mode = window.PlaySurface?.getMode?.() || "piano";
     for (const n of notes) {
       if (n.time > t + LOOKAHEAD_SEC || n.time + n.duration < t - 0.2) continue;
       const pos = keyPositions.get(n.midi);
@@ -597,6 +619,14 @@ const Game = (() => {
           intensity: flameIntensity,
           time: t,
         });
+      }
+      if ((mode === "guitar" || mode === "violin") && pos.label) {
+        ctx.save();
+        ctx.font = "10px Segoe UI";
+        ctx.fillStyle = "rgba(255,255,255,0.85)";
+        ctx.textAlign = "center";
+        ctx.fillText(pos.label, x + width / 2, y + Math.min(12, noteH - 2));
+        ctx.restore();
       }
 
     }
