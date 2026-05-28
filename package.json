@@ -5,6 +5,7 @@
   "main": "electron/main.js",
   "scripts": {
     "bundle": "node scripts/bundle-renderer.js",
+    "build:pages": "node scripts/build-pages.js",
     "prestart": "node scripts/bundle-renderer.js",
     "start": "electron .",
     "pack": "electron-builder --win portable"
