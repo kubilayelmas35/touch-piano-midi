@@ -173,6 +173,7 @@
         </label>
         <p class="hint small-hint">Şarkı seçilince otomatik (tam genişlik).</p>
         </div>
+        <div class="settings-scope settings-scope-piano-only">
         <label class="field">
           <span id="keyWidthDesc">Tuş genişliği</span>: <span id="keyWidthLabel">48 px</span>
           <input type="range" id="keyWidthRange" min="28" max="90" value="48" />
@@ -181,12 +182,31 @@
           <span id="keyHeightDesc">Klavye yüksekliği</span>: <span id="keyHeightLabel">160 px</span>
           <input type="range" id="keyHeightRange" min="90" max="420" value="160" />
         </label>
-        <div class="settings-scope settings-scope-strings">
-        <label class="field settings-scope-guitar-only">
-          <input type="checkbox" id="guitarGripAllStrings" />
-          Tüm telleri sık (sol kolde bir perde → 5 tel birden)
+        </div>
+        <div class="settings-scope settings-scope-guitar-only">
+        <label class="field">
+          Kol tel yüksekliği: <span id="guitarNeckHeightLabel">30 px</span>
+          <input type="range" id="guitarNeckHeight" min="10" max="100" value="30" />
         </label>
-        <p class="hint small-hint settings-scope-guitar-only">Kapalıyken doğru tele/perdeye basmanız gerekir; sağda farklı tel titreşirse açık tel sesi gelir.</p>
+        <label class="field">
+          Sağ tel yüksekliği: <span id="guitarStringHeightLabel">30 px</span>
+          <input type="range" id="guitarStringHeight" min="10" max="100" value="30" />
+        </label>
+        <label class="field">
+          Kol / perde genişliği: <span id="guitarNeckWidthLabel">42 px</span>
+          <input type="range" id="guitarNeckWidth" min="12" max="110" value="42" />
+        </label>
+        <label class="field">
+          Teller paneli genişliği: <span id="guitarPluckWidthLabel">220 px</span>
+          <input type="range" id="guitarPluckWidth" min="80" max="520" value="220" />
+        </label>
+        <label class="field">
+          <input type="checkbox" id="guitarGripAllStrings" />
+          Tüm telleri sık (sol kolde bir perde → 6 tel birden)
+        </label>
+        <p class="hint small-hint">Kapalıyken doğru tele basın; sağda başka tel titreşirse açık tel sesi gelir.</p>
+        </div>
+        <div class="settings-scope settings-scope-strings">
         <label class="field">
           Tel titreşim hassasiyeti: <span id="vibratoSensLabel">Normal</span>
           <input type="range" id="stringVibratoSens" min="50" max="200" value="100" />
@@ -399,6 +419,6 @@
   <script src="pianoApi-web.js"></script>
   <script src="web-boot.js"></script>
   <script src="touch-guard.js"></script>
-  <script src="main.js?v=web9"></script>
+  <script src="main.js?v=web10"></script>
 </body>
 </html>

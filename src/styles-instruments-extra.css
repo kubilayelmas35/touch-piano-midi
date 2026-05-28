@@ -204,7 +204,9 @@ body[data-play-mode="guitar"] .guitar-strings-bundle .guitar-string,
 
 .guitar-pluck-bundle .guitar-string-line {
   flex: 1;
-  height: 4px;
+  height: var(--str-thick, 2px);
+  min-height: 1px;
+  max-height: 5px;
   background: linear-gradient(
     90deg,
     color-mix(in srgb, var(--str-color) 30%, #4a3828),
@@ -257,12 +259,46 @@ body[data-play-mode="guitar"] .guitar-strings-bundle .guitar-string,
   box-shadow: 0 0 calc(4px + var(--vib-intensity, 0) * 10px) color-mix(in srgb, var(--str-color, #d4c4a8) 70%, transparent);
 }
 
+.settings-scope-piano-only {
+  display: block;
+}
+
+body[data-play-mode="guitar"] .settings-scope-piano-only,
+body[data-play-mode="violin"] .settings-scope-piano-only {
+  display: none !important;
+}
+
 .settings-scope-guitar-only {
   display: none;
 }
 
 body[data-play-mode="guitar"] .settings-scope-guitar-only {
   display: block;
+}
+
+body[data-play-mode="guitar"] .guitar-chord-card,
+body[data-play-mode="guitar"] .guitar-strings-card {
+  align-self: start;
+}
+
+body[data-play-mode="guitar"] .guitar-strings-card {
+  min-width: var(--guitar-pluck-min-w, 220px);
+  flex: 0 1 auto;
+}
+
+body[data-play-mode="guitar"] .guitar-string-row {
+  height: var(--inst-row-h, 1.65rem);
+  min-height: var(--inst-row-h, 1.65rem);
+  max-height: var(--inst-row-h, 1.65rem);
+}
+
+body[data-play-mode="guitar"] .guitar-fret-lane {
+  min-height: 0;
+}
+
+body[data-play-mode="guitar"] .guitar-row-wire {
+  height: var(--str-thick, 2px);
+  margin-top: calc(var(--inst-row-h, 1.65rem) / 2 - var(--str-thick, 2px) / 2);
 }
 
 @keyframes string-shake {

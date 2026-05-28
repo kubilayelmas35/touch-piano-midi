@@ -239,7 +239,7 @@ const AudioEngine = (() => {
     voices.set(midi, voice);
   }
 
-  function noteOff(midi, silent = false) {
+  function noteOff(midi, silent = false, releaseOverride = null) {
     const voice = voices.get(midi);
     if (!voice) return;
     voices.delete(midi);
@@ -248,7 +248,10 @@ const AudioEngine = (() => {
     const t = ac.currentTime;
     const scale = INSTRUMENTS[instrumentId]?.sustainScale ?? 1;
     const base = silent ? 0.001 : sustainEnabled ? RELEASE_SLOW : RELEASE_FAST;
-    const release = Math.min(1.2, base * scale);
+    const release =
+      releaseOverride != null
+        ? releaseOverride
+        : Math.min(1.2, base * scale);
 
     try {
       voice.master.gain.cancelScheduledValues(t);
@@ -309,10 +312,17 @@ const AudioEngine = (() => {
     for (const midi of [...voices.keys()]) noteOff(midi, true);
   }
 
+  /** Tel bırakınca — gitar/keman doğal sönüm */
+  function noteOffPluck(midi) {
+    const pluckRelease = instrumentId === "guitar" ? 0.78 : instrumentId === "violin" ? 0.65 : 0.5;
+    noteOff(midi, false, pluckRelease);
+  }
+
   return {
     ensure,
     noteOn,
     noteOff,
+    noteOffPluck,
     play,
     stopAll,
     setLiveVibrato,

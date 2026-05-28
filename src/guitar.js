@@ -1,27 +1,39 @@
-/** Gitar — sol: tek kol (5 tel × perdeler), sağ: renkli teller; ses sadece sağda titreşince */
+/** Gitar — sol kol (6 tel), sağ teller; sol sık + sağ titreşim */
 const Guitar = (() => {
   const STRING_OPEN = [40, 45, 50, 55, 59, 64];
-  const STRING_NAMES = ["e", "B", "G", "D", "A"];
-  /** İnce → kalın (5 tel, alt E yok) */
-  const DISPLAY_STRINGS = [5, 4, 3, 2, 1];
-  const STRING_COLORS = ["#ef4444", "#eab308", "#22c55e", "#3b82f6", "#a855f7"];
+  const STRING_NAMES = ["E", "A", "D", "G", "B", "e"];
+  const DISPLAY_STRINGS = [5, 4, 3, 2, 1, 0];
+  const STRING_COLORS = ["#ef4444", "#f97316", "#eab308", "#22c55e", "#3b82f6", "#a855f7"];
+  /** İnce → kalın tel kalınlığı (px) */
+  const STRING_THICK = [1.2, 1.5, 1.85, 2.2, 2.65, 3.2];
   const FRET_COUNT = 14;
 
   let fretsRoot = null;
   let stringsRoot = null;
+  let pluckBundle = null;
   let wrapEl = null;
   let range = { startMidi: 40, endMidi: 78 };
   let onNoteDown = null;
   let onNoteUp = null;
   let cellMap = new Map();
   let fretCellsByString = {};
+  let pluckRows = [];
   let fretted = {};
   let fretPointers = new Map();
-  let cellW = 48;
-  let boardH = 140;
 
   function gripAllStrings() {
     return !!window.AppSettings?.load?.()?.guitarGripAllStrings;
+  }
+
+  function layoutFromSettings() {
+    const s = window.AppSettings?.load?.() || {};
+    const stringH = s.guitarStringHeight ?? 30;
+    return {
+      neckH: s.guitarNeckHeight ?? stringH,
+      stringH,
+      neckW: s.guitarNeckWidth ?? s.keyWidth ?? 42,
+      pluckW: s.guitarPluckWidth ?? 220,
+    };
   }
 
   function midiAt(stringIdx, fret) {
@@ -29,16 +41,21 @@ const Guitar = (() => {
   }
 
   function currentMidiForString(stringIdx) {
-    const fret = fretted[stringIdx] || 0;
-    return midiAt(stringIdx, fret);
+    return midiAt(stringIdx, fretted[stringIdx] || 0);
   }
 
   function applySizeVars() {
     if (!wrapEl) return;
-    const rowH = Math.max(1.15, boardH / (DISPLAY_STRINGS.length + 1.2));
-    wrapEl.style.setProperty("--inst-cell-w", `${Math.max(1.1, cellW * 0.032)}rem`);
-    wrapEl.style.setProperty("--inst-row-h", `${rowH}rem`);
-    wrapEl.style.setProperty("--inst-string-h", `${Math.min(2.75, rowH)}rem`);
+    const { neckH, stringH, neckW, pluckW } = layoutFromSettings();
+    const rowRem = Math.max(0.65, neckH / 16);
+    const strRem = Math.max(0.65, stringH / 16);
+    wrapEl.style.setProperty("--inst-cell-w", `${Math.max(0.75, neckW / 16)}rem`);
+    wrapEl.style.setProperty("--inst-row-h", `${rowRem}rem`);
+    wrapEl.style.setProperty("--inst-string-h", `${strRem}rem`);
+    wrapEl.style.setProperty("--guitar-pluck-min-w", `${Math.max(80, pluckW)}px`);
+    DISPLAY_STRINGS.forEach((s, i) => {
+      wrapEl.style.setProperty(`--str-thick-${i}`, `${STRING_THICK[i]}px`);
+    });
   }
 
   function applySize() {
@@ -46,9 +63,18 @@ const Guitar = (() => {
     if (window.Game?.isReady?.()) window.Game.resize();
   }
 
+  function applyLayout() {
+    applySize();
+  }
+
   function setKeySize(width, height) {
-    cellW = Math.max(28, Math.min(90, width));
-    boardH = Math.max(90, Math.min(420, height));
+    const s = window.AppSettings?.load?.() || {};
+    window.AppSettings?.save?.({
+      guitarNeckWidth: width ?? s.guitarNeckWidth,
+      guitarNeckHeight: height ?? s.guitarNeckHeight,
+      keyWidth: width ?? s.keyWidth,
+      keyHeight: height ?? s.keyHeight,
+    });
     applySize();
   }
 
@@ -57,7 +83,8 @@ const Guitar = (() => {
   }
 
   function getKeySize() {
-    return { keyWidth: cellW, keyHeight: boardH };
+    const L = layoutFromSettings();
+    return { keyWidth: L.neckW, keyHeight: L.neckH };
   }
 
   function getRange() {
@@ -72,12 +99,12 @@ const Guitar = (() => {
   }
 
   function updateStringHighlights() {
-    if (!stringsRoot) return;
-    stringsRoot.querySelectorAll(".guitar-string").forEach((row) => {
-      const s = Number(row.dataset.string);
-      const fret = fretted[s] || 0;
-      row.classList.toggle("has-fret", fret > 0);
-      const label = row.querySelector(".guitar-string-fret");
+    pluckRows.forEach(({ el, stringIdx }) => {
+      const fret = fretted[stringIdx] || 0;
+      const midi = currentMidiForString(stringIdx);
+      el.dataset.midi = String(midi);
+      el.classList.toggle("has-fret", fret > 0);
+      const label = el.querySelector(".guitar-string-fret");
       if (label) label.textContent = fret > 0 ? `perde ${fret}` : "açık";
     });
   }
@@ -106,7 +133,7 @@ const Guitar = (() => {
     fretsRoot?.querySelectorAll(".guitar-cell").forEach((el) => {
       el.classList.remove("active", "fret-held", "open-selected");
     });
-    stringsRoot?.querySelectorAll(".guitar-string").forEach((el) => {
+    pluckRows.forEach(({ el }) => {
       el.classList.remove("active", "string-held", "string-vibrating", "has-fret");
     });
   }
@@ -164,8 +191,8 @@ const Guitar = (() => {
     const hint = document.createElement("p");
     hint.className = "guitar-neck-hint";
     hint.textContent = gripAllStrings()
-      ? "Kol — bir perdeye basınca tüm teller sıkılır; sesi sağda titreterek çalın"
-      : "Kol — sıkmak istediğiniz tele/perdeye basın; sesi sağdaki aynı renkteki telden verin";
+      ? "Kol — perdeye basınca 6 tel sıkılır; sağda titreştirin"
+      : "Kol — tele/perdeye basın; sağda aynı renkteki teli titreştirin";
     fretsRoot.appendChild(hint);
 
     const header = document.createElement("div");
@@ -187,6 +214,7 @@ const Guitar = (() => {
       row.className = `guitar-string-row ${colorClass(s)}`;
       row.dataset.string = String(s);
       row.style.setProperty("--str-color", STRING_COLORS[colorIdx]);
+      row.style.setProperty("--str-thick", STRING_THICK[colorIdx] + "px");
 
       const label = document.createElement("span");
       label.className = "guitar-string-label";
@@ -223,39 +251,49 @@ const Guitar = (() => {
       fretsRoot.appendChild(row);
     });
 
-    const minMidi = Math.min(...DISPLAY_STRINGS.map((s) => STRING_OPEN[s]));
-    const maxMidi = Math.max(...DISPLAY_STRINGS.map((s) => STRING_OPEN[s] + FRET_COUNT));
-    range = { startMidi: minMidi, endMidi: maxMidi };
+    range = {
+      startMidi: STRING_OPEN[0],
+      endMidi: STRING_OPEN[5] + FRET_COUNT,
+    };
   }
 
   function buildStringPlucks() {
     if (!stringsRoot) return;
     stringsRoot.innerHTML = "";
     stringsRoot.className = "guitar-strings-bundle";
+    pluckRows = [];
 
     const title = document.createElement("div");
     title.className = "strings-bundle-title";
-    title.textContent = "Teller — basılı perdeye göre ses (aynı renk = aynı tel)";
+    title.textContent = "Teller — parmağı kaydırarak tel seçin";
     stringsRoot.appendChild(title);
 
-    const bundle = document.createElement("div");
-    bundle.className = "strings-bundle-inner guitar-pluck-bundle";
+    pluckBundle = document.createElement("div");
+    pluckBundle.className = "strings-bundle-inner guitar-pluck-bundle";
 
     DISPLAY_STRINGS.forEach((s, colorIdx) => {
-      const row = document.createElement("button");
-      row.type = "button";
+      const row = document.createElement("div");
       row.className = `guitar-string string-touch-target ${colorClass(s)}`;
       row.dataset.string = String(s);
+      row.dataset.midi = String(STRING_OPEN[s]);
       row.style.setProperty("--str-color", STRING_COLORS[colorIdx]);
+      row.style.setProperty("--str-thick", STRING_THICK[colorIdx] + "px");
       row.innerHTML = `<span class="guitar-string-name">${STRING_NAMES[colorIdx]}</span><span class="guitar-string-fret">açık</span><span class="guitar-string-line string-line"></span>`;
 
-      window.StringTouch?.bind(row, () => currentMidiForString(s), {
+      const entry = {
+        el: row,
+        stringIdx: s,
+        getMidi: () => currentMidiForString(s),
         onDown: (m, vel, e) => onNoteDown?.(m, vel, e),
         onUp: (m, e) => onNoteUp?.(m, e),
-      });
-      bundle.appendChild(row);
+      };
+      pluckRows.push(entry);
+      pluckBundle.appendChild(row);
     });
-    stringsRoot.appendChild(bundle);
+
+    stringsRoot.appendChild(pluckBundle);
+
+    window.StringTouch?.bindPluckBundle(pluckBundle, () => pluckRows);
     updateStringHighlights();
   }
 
@@ -277,9 +315,8 @@ const Guitar = (() => {
   function highlightMidi(midi, on) {
     const cell = cellMap.get(midi);
     if (cell) cell.classList.toggle("hit-target", on);
-    stringsRoot?.querySelectorAll(".guitar-string").forEach((row) => {
-      const s = Number(row.dataset.string);
-      if (currentMidiForString(s) === midi) row.classList.toggle("hit-target", on);
+    pluckRows.forEach(({ el, stringIdx }) => {
+      if (currentMidiForString(stringIdx) === midi) el.classList.toggle("hit-target", on);
     });
   }
 
@@ -307,6 +344,7 @@ const Guitar = (() => {
   return {
     init,
     buildKeys,
+    applyLayout,
     getRange,
     releaseAll,
     setKeySize,

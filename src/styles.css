@@ -26,12 +26,19 @@
 .piano-wrap,
 .piano-keys,
 .guitar-wrap,
+.guitar-neck,
+.guitar-pluck-bundle,
 .guitar-cell,
 .guitar-string,
 .violin-wrap,
-.violin-cell {
+.violin-cell,
+.inst-card {
   touch-action: none;
   -ms-touch-action: none;
+}
+
+.guitar-neck {
+  touch-action: pan-x;
 }
 
 html, body {
