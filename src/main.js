@@ -1601,6 +1601,7 @@ function createFrettedInstrument(config) {
     let pluckRows = [];
     let fretted = {};
     let fretPointers = new Map();
+    let lockedFrets = {};
     let midiTargets = new Map();
 
     function gripAllStrings() {
@@ -1722,7 +1723,7 @@ function createFrettedInstrument(config) {
 
     function recomputeFrettedFromPointers() {
       const next = {};
-      for (const s of DISPLAY_STRINGS) next[s] = 0;
+      for (const s of DISPLAY_STRINGS) next[s] = lockedFrets[s] || 0;
 
       for (const st of fretPointers.values()) {
         if (st.gripAll) {
@@ -1738,6 +1739,7 @@ function createFrettedInstrument(config) {
     function releaseAll() {
       fretPointers.clear();
       fretted = {};
+      lockedFrets = {};
       window.AudioEngine?.stopAll?.();
       fretsRoot?.querySelectorAll(".guitar-cell").forEach((el) => {
         el.classList.remove("active", "fret-held", "open-selected");
@@ -1748,11 +1750,27 @@ function createFrettedInstrument(config) {
       });
     }
 
+    function setLockedFret(stringIdx, fret) {
+      if (gripAllStrings()) {
+        const same = DISPLAY_STRINGS.every((s) => (lockedFrets[s] || 0) === fret);
+        const nextFret = same ? 0 : fret;
+        for (const s of DISPLAY_STRINGS) lockedFrets[s] = nextFret;
+      } else {
+        const cur = lockedFrets[stringIdx] || 0;
+        lockedFrets[stringIdx] = cur === fret ? 0 : fret;
+      }
+      recomputeFrettedFromPointers();
+    }
+
     function bindFretCell(el, stringIdx, fret) {
       const down = (e) => {
         if (e.pointerType === "mouse" && e.button !== 0) return;
         e.preventDefault();
         e.stopPropagation();
+        if (e.pointerType === "mouse") {
+          setLockedFret(stringIdx, fret);
+          return;
+        }
         try {
           el.setPointerCapture(e.pointerId);
         } catch {
@@ -1784,6 +1802,7 @@ function createFrettedInstrument(config) {
       cellMap.clear();
       fretCellsByString = {};
       fretted = {};
+      lockedFrets = {};
       midiTargets = new Map();
 
       const header = document.createElement("div");
@@ -3502,7 +3521,7 @@ window.mainJsOk = true;
 /* === app.js === */
 /** Ana uygulama */
 (function () {
-  const APP_VERSION = "v0.9.5";
+  const APP_VERSION = "v0.9.6";
   const $ = (sel) => document.querySelector(sel);
 
   function mods() {

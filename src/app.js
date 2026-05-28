@@ -1,6 +1,6 @@
 /** Ana uygulama */
 (function () {
-  const APP_VERSION = "v0.9.5";
+  const APP_VERSION = "v0.9.6";
   const $ = (sel) => document.querySelector(sel);
 
   function mods() {
