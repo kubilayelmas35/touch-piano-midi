@@ -36,6 +36,7 @@ const AppSettings = (() => {
     stringVibratoSens: 1,
     /** Gitar: sol kolde bir perde → tüm teller sıkılır */
     guitarGripAllStrings: false,
+    violinGripAllStrings: false,
     guitarNeckHeight: 30,
     guitarStringHeight: 30,
     guitarNeckWidth: 42,

@@ -134,7 +134,7 @@ const Game = (() => {
     const mode = surface.getMode();
     let selector = ".piano-keys .key";
     if (mode === "guitar") selector = ".guitar-string.string-touch-target";
-    if (mode === "violin") selector = ".violin-string-stripe.string-touch-target";
+    if (mode === "violin") selector = ".guitar-string.string-touch-target";
 
     const area = canvas.parentElement;
     const areaRect = area.getBoundingClientRect();

@@ -90,6 +90,7 @@
   const stringVibratoSens = $("#stringVibratoSens");
   const vibratoSensLabel = $("#vibratoSensLabel");
   const guitarGripAllStrings = $("#guitarGripAllStrings");
+  const violinGripAllStrings = $("#violinGripAllStrings");
   const guitarNeckHeight = $("#guitarNeckHeight");
   const guitarStringHeight = $("#guitarStringHeight");
   const guitarNeckWidth = $("#guitarNeckWidth");
@@ -306,8 +307,8 @@
     const mode = window.PlaySurface?.getMode?.() || "piano";
     if (mode === "piano") {
       requireMods().Piano.setKeySize(w, h);
-    } else if (mode === "guitar" && window.Guitar?.applyLayout) {
-      window.Guitar.applyLayout();
+    } else if ((mode === "guitar" || mode === "violin") && window.PlaySurface?.activeModule?.()?.applyLayout) {
+      window.PlaySurface.activeModule().applyLayout();
     } else {
       window.PlaySurface?.setKeySize?.(w, h);
     }
@@ -386,7 +387,7 @@
     updateSettingsForPlayMode(m);
     applyThemeFromSettings(AppSettings.load(), m);
     const s = AppSettings.load();
-    if (m === "guitar") window.Guitar?.applyLayout?.();
+    if (m === "guitar" || m === "violin") window.PlaySurface?.activeModule?.()?.applyLayout?.();
     else applyInstrumentKeySize(s.keyWidth, s.keyHeight);
     setTimeout(() => requireMods().Game.resize(), 100);
     return m;
@@ -489,6 +490,7 @@
       if (vibratoSensLabel) vibratoSensLabel.textContent = vibratoSensLabelText(vib);
     }
     if (guitarGripAllStrings) guitarGripAllStrings.checked = !!s.guitarGripAllStrings;
+    if (violinGripAllStrings) violinGripAllStrings.checked = !!s.violinGripAllStrings;
     if (guitarNeckHeight) guitarNeckHeight.value = String(s.guitarNeckHeight ?? 30);
     if (guitarStringHeight) guitarStringHeight.value = String(s.guitarStringHeight ?? 30);
     if (guitarNeckWidth) guitarNeckWidth.value = String(s.guitarNeckWidth ?? 42);
@@ -497,7 +499,9 @@
     if (guitarStringHeightLabel) guitarStringHeightLabel.textContent = `${s.guitarStringHeight ?? 30} px`;
     if (guitarNeckWidthLabel) guitarNeckWidthLabel.textContent = `${s.guitarNeckWidth ?? 42} px`;
     if (guitarPluckWidthLabel) guitarPluckWidthLabel.textContent = `${s.guitarPluckWidth ?? 220} px`;
-    if ((s.playMode || "piano") === "guitar") window.Guitar?.applyLayout?.();
+    if ((s.playMode || "piano") === "guitar" || s.playMode === "violin") {
+      window.PlaySurface?.activeModule?.()?.applyLayout?.();
+    }
     if (playMode === "piano") {
       Piano.setAutoFit((s.pianoAlign || "stretch") === "stretch");
       Piano.setKeySize(s.keyWidth, s.keyHeight);
@@ -990,6 +994,11 @@
   guitarGripAllStrings?.addEventListener("change", () => {
     persistSettings({ guitarGripAllStrings: guitarGripAllStrings.checked });
     if (window.Guitar?.buildKeys) window.Guitar.buildKeys();
+  });
+
+  violinGripAllStrings?.addEventListener("change", () => {
+    persistSettings({ violinGripAllStrings: violinGripAllStrings.checked });
+    if (window.Violin?.buildKeys) window.Violin.buildKeys();
   });
 
   [guitarNeckHeight, guitarStringHeight, guitarNeckWidth, guitarPluckWidth].forEach((el) => {

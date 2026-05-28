@@ -12,6 +12,7 @@ const coreFiles = [
   "note-renderer.js",
   "piano-range.js",
   "piano.js",
+  "fretted-instrument.js",
   "guitar.js",
   "violin.js",
   "string-touch.js",

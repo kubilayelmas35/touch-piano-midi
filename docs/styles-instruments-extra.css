@@ -68,7 +68,7 @@
   }
 }
 
-/* —— Gitar / keman düzeni: sol tek akor, sağ tek tel kutusu —— */
+/* —— Gitar / keman: sol kol + sağ teller —— */
 body[data-play-mode="guitar"] .guitar-wrap,
 body[data-play-mode="violin"] .violin-wrap {
   display: grid;
@@ -88,6 +88,15 @@ body[data-play-mode="violin"] .violin-wrap {
   flex-direction: column;
   min-height: 0;
   min-width: 0;
+  align-self: start;
+}
+
+.inst-card-head {
+  min-height: 2.35rem;
+  margin-bottom: 0.35rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
 }
 
 .inst-card-title {
@@ -96,24 +105,24 @@ body[data-play-mode="violin"] .violin-wrap {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: rgba(232, 212, 168, 0.9);
-  margin-bottom: 0.4rem;
+  margin-bottom: 0.12rem;
 }
 
-.guitar-neck-hint,
-.strings-bundle-title {
-  font-size: 0.7rem;
+.inst-card-sub {
+  font-size: 0.65rem;
   color: var(--text-dim);
-  line-height: 1.35;
-  margin: 0 0 0.4rem;
+  line-height: 1.25;
+  margin: 0;
 }
 
 .guitar-neck {
   overflow-x: auto;
   overflow-y: hidden;
-  touch-action: pan-x;
+  touch-action: none;
 }
 
-.guitar-chord-card .guitar-neck {
+.guitar-chord-card .guitar-neck,
+.violin-chord-card .guitar-neck {
   border: 1px solid rgba(201, 162, 39, 0.25);
   border-radius: 8px;
   padding: 0.25rem 0.15rem 0.35rem;
@@ -121,6 +130,9 @@ body[data-play-mode="violin"] .violin-wrap {
 }
 
 .guitar-string-row .guitar-row-wire {
+  top: 50%;
+  transform: translateY(-50%);
+  height: var(--str-thick, 2px);
   background: linear-gradient(
     90deg,
     color-mix(in srgb, var(--str-color) 40%, #6b5344),
@@ -132,9 +144,21 @@ body[data-play-mode="violin"] .violin-wrap {
   box-shadow: 0 0 8px color-mix(in srgb, var(--str-color) 50%, transparent);
 }
 
+.guitar-string-row.string-vibrating .guitar-row-wire {
+  animation: string-shake 0.08s ease-in-out infinite alternate;
+  box-shadow: 0 0 calc(3px + var(--vib-intensity, 0) * 8px)
+    color-mix(in srgb, var(--str-color) 70%, transparent);
+}
+
 .guitar-string-row .guitar-string-label {
   color: var(--str-color);
   font-weight: 800;
+}
+
+.guitar-cell {
+  position: relative;
+  z-index: 3;
+  touch-action: none;
 }
 
 .guitar-cell.fret-held {
@@ -149,7 +173,6 @@ body[data-play-mode="violin"] .violin-wrap {
   gap: 3px;
   flex: 0 0 auto;
   align-self: stretch;
-  max-height: none;
   border: 1px solid rgba(201, 162, 39, 0.28);
   border-radius: 10px;
   overflow: hidden;
@@ -158,12 +181,28 @@ body[data-play-mode="violin"] .violin-wrap {
   padding: 0.2rem 0;
 }
 
-body[data-play-mode="guitar"] .guitar-strings-card {
-  align-self: start;
+body[data-play-mode="guitar"] .guitar-strings-card,
+body[data-play-mode="violin"] .violin-strings-card {
+  min-width: var(--guitar-pluck-min-w, 220px);
+  flex: 0 1 auto;
 }
 
-body[data-play-mode="guitar"] .guitar-strings-bundle .guitar-string,
-.guitar-pluck-bundle .guitar-string {
+body[data-play-mode="guitar"] .guitar-string-row,
+body[data-play-mode="violin"] .guitar-string-row {
+  height: var(--inst-row-h, 1.65rem);
+  min-height: var(--inst-row-h, 1.65rem);
+  max-height: var(--inst-row-h, 1.65rem);
+}
+
+body[data-play-mode="guitar"] .guitar-fret-lane,
+body[data-play-mode="violin"] .guitar-fret-lane {
+  min-height: 0;
+  display: flex;
+  align-items: center;
+}
+
+body[data-play-mode="guitar"] .guitar-pluck-bundle .guitar-string,
+body[data-play-mode="violin"] .guitar-pluck-bundle .guitar-string {
   flex: 0 0 var(--inst-string-h, 1.65rem);
   height: var(--inst-string-h, 1.65rem);
   max-height: 2.85rem;
@@ -206,7 +245,7 @@ body[data-play-mode="guitar"] .guitar-strings-bundle .guitar-string,
   flex: 1;
   height: var(--str-thick, 2px);
   min-height: 1px;
-  max-height: 5px;
+  max-height: 6px;
   background: linear-gradient(
     90deg,
     color-mix(in srgb, var(--str-color) 30%, #4a3828),
@@ -222,41 +261,10 @@ body[data-play-mode="guitar"] .guitar-strings-bundle .guitar-string,
   background: rgba(74, 222, 128, 0.2);
 }
 
-.violin-string-stripe {
-  flex: 0 0 var(--inst-string-h, 1.65rem);
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  padding: 0 0.55rem;
-  min-height: var(--inst-string-h, 1.65rem);
-  max-height: 2.85rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  cursor: pointer;
-  touch-action: none;
-}
-
-.violin-string-stripe:last-child {
-  border-bottom: none;
-}
-
-.violin-string-name {
-  width: 1.1rem;
-  font-weight: 800;
-  font-size: 0.85rem;
-  color: #f5e6d3;
-}
-
-.violin-string-line {
-  flex: 1;
-  height: 3px;
-  background: linear-gradient(90deg, #6b5344, #d4c4a8, #fff8e8, #d4c4a8, #6b5344);
-  border-radius: 2px;
-}
-
-.string-vibrating .guitar-string-line,
-.string-vibrating .violin-string-line {
+.string-vibrating .guitar-string-line {
   animation: string-shake 0.08s ease-in-out infinite alternate;
-  box-shadow: 0 0 calc(4px + var(--vib-intensity, 0) * 10px) color-mix(in srgb, var(--str-color, #d4c4a8) 70%, transparent);
+  box-shadow: 0 0 calc(4px + var(--vib-intensity, 0) * 10px)
+    color-mix(in srgb, var(--str-color, #d4c4a8) 70%, transparent);
 }
 
 .settings-scope-piano-only {
@@ -268,6 +276,15 @@ body[data-play-mode="violin"] .settings-scope-piano-only {
   display: none !important;
 }
 
+.settings-scope-fretted {
+  display: none;
+}
+
+body[data-play-mode="guitar"] .settings-scope-fretted,
+body[data-play-mode="violin"] .settings-scope-fretted {
+  display: block;
+}
+
 .settings-scope-guitar-only {
   display: none;
 }
@@ -276,29 +293,12 @@ body[data-play-mode="guitar"] .settings-scope-guitar-only {
   display: block;
 }
 
-body[data-play-mode="guitar"] .guitar-chord-card,
-body[data-play-mode="guitar"] .guitar-strings-card {
-  align-self: start;
+.settings-scope-violin-only {
+  display: none;
 }
 
-body[data-play-mode="guitar"] .guitar-strings-card {
-  min-width: var(--guitar-pluck-min-w, 220px);
-  flex: 0 1 auto;
-}
-
-body[data-play-mode="guitar"] .guitar-string-row {
-  height: var(--inst-row-h, 1.65rem);
-  min-height: var(--inst-row-h, 1.65rem);
-  max-height: var(--inst-row-h, 1.65rem);
-}
-
-body[data-play-mode="guitar"] .guitar-fret-lane {
-  min-height: 0;
-}
-
-body[data-play-mode="guitar"] .guitar-row-wire {
-  height: var(--str-thick, 2px);
-  margin-top: calc(var(--inst-row-h, 1.65rem) / 2 - var(--str-thick, 2px) / 2);
+body[data-play-mode="violin"] .settings-scope-violin-only {
+  display: block;
 }
 
 @keyframes string-shake {

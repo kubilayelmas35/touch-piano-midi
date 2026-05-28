@@ -183,7 +183,7 @@
           <input type="range" id="keyHeightRange" min="90" max="420" value="160" />
         </label>
         </div>
-        <div class="settings-scope settings-scope-guitar-only">
+        <div class="settings-scope settings-scope-fretted">
         <label class="field">
           Kol tel yüksekliği: <span id="guitarNeckHeightLabel">30 px</span>
           <input type="range" id="guitarNeckHeight" min="10" max="100" value="30" />
@@ -200,11 +200,15 @@
           Teller paneli genişliği: <span id="guitarPluckWidthLabel">220 px</span>
           <input type="range" id="guitarPluckWidth" min="80" max="520" value="220" />
         </label>
-        <label class="field">
+        <label class="field settings-scope-guitar-only">
           <input type="checkbox" id="guitarGripAllStrings" />
-          Tüm telleri sık (sol kolde bir perde → 6 tel birden)
+          Tüm telleri sık (gitar — bir perde → 6 tel)
         </label>
-        <p class="hint small-hint">Kapalıyken her tele ayrı perde (ör. 1. ve 2. perdeye aynı anda). Açıkken bir perde tüm tellere uygulanır.</p>
+        <label class="field settings-scope-violin-only">
+          <input type="checkbox" id="violinGripAllStrings" />
+          Tüm telleri sık (keman — bir pozisyon → 4 tel)
+        </label>
+        <p class="hint small-hint">Kapalıyken her tele ayrı perde. Açıkken bir perde tüm tellere uygulanır.</p>
         </div>
         <div class="settings-scope settings-scope-strings">
         <label class="field">
@@ -342,21 +346,33 @@
     </div>
     <div id="guitarWrap" class="guitar-wrap instrument-panel hidden">
       <div class="inst-card guitar-chord-card">
-        <div class="inst-card-title">Gitar kolu</div>
+        <div class="inst-card-head">
+          <div class="inst-card-title">Gitar kolu</div>
+          <p class="inst-card-sub">Perdeye basılı tutun — ses sağdan</p>
+        </div>
         <div id="guitarFrets"></div>
       </div>
       <div class="inst-card guitar-strings-card">
-        <div class="inst-card-title">Teller (titreştir)</div>
+        <div class="inst-card-head">
+          <div class="inst-card-title">Teller (titreştir)</div>
+          <p class="inst-card-sub">Aynı renk = aynı tel</p>
+        </div>
         <div id="guitarStrings"></div>
       </div>
     </div>
     <div id="violinWrap" class="violin-wrap instrument-panel hidden">
       <div class="inst-card violin-chord-card">
-        <div class="inst-card-title">Pozisyon</div>
+        <div class="inst-card-head">
+          <div class="inst-card-title">Keman kolu</div>
+          <p class="inst-card-sub">Perdeye basılı tutun — ses sağdan</p>
+        </div>
         <div id="violinBoard"></div>
       </div>
       <div class="inst-card violin-strings-card">
-        <div class="inst-card-title">Teller</div>
+        <div class="inst-card-head">
+          <div class="inst-card-title">Teller (titreştir)</div>
+          <p class="inst-card-sub">Aynı renk = aynı tel</p>
+        </div>
         <div id="violinStrings"></div>
       </div>
     </div>
@@ -419,6 +435,6 @@
   <script src="pianoApi-web.js"></script>
   <script src="web-boot.js"></script>
   <script src="touch-guard.js"></script>
-  <script src="main.js?v=web11"></script>
+  <script src="main.js?v=web12"></script>
 </body>
 </html>

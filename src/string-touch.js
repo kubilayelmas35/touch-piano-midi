@@ -10,15 +10,16 @@ const StringTouch = (() => {
     return window.AppSettings?.load?.()?.stringVibratoSens ?? 1;
   }
 
-  function releaseNote(midi) {
-    if (window.AudioEngine.noteOffPluck) window.AudioEngine.noteOffPluck(midi);
-    else window.AudioEngine.noteOff(midi);
+  function releaseVoice(voiceId) {
+    if (voiceId == null) return;
+    if (window.AudioEngine.noteOffPluck) window.AudioEngine.noteOffPluck(voiceId);
+    else window.AudioEngine.noteOffVoice?.(voiceId);
   }
 
   function hitRow(rows, clientY) {
     for (const row of rows) {
       const r = row.el.getBoundingClientRect();
-      if (clientY >= r.top - 2 && clientY <= r.bottom + 2) return row;
+      if (clientY >= r.top - 4 && clientY <= r.bottom + 4) return row;
     }
     return null;
   }
@@ -29,6 +30,7 @@ const StringTouch = (() => {
     st.el.style.removeProperty("--vib-intensity");
     st.lineEl?.classList.remove("string-line-active");
     st.lineEl?.style.removeProperty("--vib-intensity");
+    st.row?.onVibrateEnd?.();
   }
 
   function startRow(st, row, e) {
@@ -55,8 +57,8 @@ const StringTouch = (() => {
 
     row.el.classList.add("active", "string-held");
     st.lineEl?.classList.add("string-line-active");
-    window.AudioEngine.noteOn(midi, vel);
-    window.AudioEngine.setLiveGain?.(midi, vel);
+    st.voiceId = window.AudioEngine.noteOn(midi, vel, { poly: true });
+    window.AudioEngine.setLiveGain?.(st.voiceId, vel);
     row.onDown?.(midi, vel, e);
   }
 
@@ -67,10 +69,11 @@ const StringTouch = (() => {
 
     const midi = resolveMidi(st.getMidi);
     if (midi !== st.midi) {
-      releaseNote(st.midi);
+      window.AudioEngine.setLiveVibrato?.(st.voiceId, 0);
+      releaseVoice(st.voiceId);
       st.midi = midi;
       const v = window.AudioEngine.velocityFromPointer(e, st.baseVel);
-      window.AudioEngine.noteOn(midi, v);
+      st.voiceId = window.AudioEngine.noteOn(midi, v, { poly: true });
       st.baseVel = v;
       st.pluck = v;
     }
@@ -87,29 +90,32 @@ const StringTouch = (() => {
     const sens = vibratoSens();
     const depth = Math.min(4, 0.2 + st.smooth * 0.12 * sens);
     const hz = 4.5 + Math.min(6, st.smooth * 0.14 * sens);
-    window.AudioEngine.setLiveVibrato?.(st.midi, depth, hz);
+    window.AudioEngine.setLiveVibrato?.(st.voiceId, depth, hz);
 
     const pluckBoost = Math.min(1.85, 0.35 + vSpeed * 0.022 * sens + st.smooth * 0.04);
     st.pluck = Math.max(st.pluck, pluckBoost);
-    window.AudioEngine.setLiveGain?.(st.midi, st.pluck);
+    window.AudioEngine.setLiveGain?.(st.voiceId, st.pluck);
 
     const intensity = Math.min(1, st.pluck / 1.2);
     st.el.style.setProperty("--vib-intensity", String(intensity));
     st.el.classList.toggle("string-vibrating", intensity > 0.05);
     st.lineEl?.style.setProperty("--vib-intensity", String(intensity));
+    st.row?.onVibrate?.(intensity);
   }
 
-  /** Sağ panel: parmak kaydırınca doğru tel seçilir */
   function bindPluckBundle(bundleEl, getRows) {
     const down = (e) => {
-      if (e.pointerType === "mouse" && e.button !== 0) return;
-      if (e.pointerType === "touch" && e.button !== 0) return;
+      if (e.button !== 0) return;
       const rows = getRows();
       const row = hitRow(rows, e.clientY);
       if (!row) return;
       e.preventDefault();
       e.stopPropagation();
-      bundleEl.setPointerCapture(e.pointerId);
+      try {
+        bundleEl.setPointerCapture(e.pointerId);
+      } catch {
+        /* */
+      }
       const st = { bundleEl, getRows };
       pointers.set(e.pointerId, st);
       startRow(st, row, e);
@@ -122,11 +128,12 @@ const StringTouch = (() => {
       const rows = st.getRows();
       const row = hitRow(rows, e.clientY);
       if (row && row !== st.row) {
-        if (st.midi) {
-          window.AudioEngine.setLiveVibrato?.(st.midi, 0);
-          releaseNote(st.midi);
+        if (st.voiceId != null) {
+          window.AudioEngine.setLiveVibrato?.(st.voiceId, 0);
+          releaseVoice(st.voiceId);
           st.row?.onUp?.(st.midi, e);
         }
+        clearRowVisual(st);
         startRow(st, row, e);
       }
       if (st.row) moveRow(st, e);
@@ -137,9 +144,9 @@ const StringTouch = (() => {
       if (!st) return;
       e.preventDefault();
       pointers.delete(e.pointerId);
-      if (st.midi) {
-        window.AudioEngine.setLiveVibrato?.(st.midi, 0);
-        releaseNote(st.midi);
+      if (st.voiceId != null) {
+        window.AudioEngine.setLiveVibrato?.(st.voiceId, 0);
+        releaseVoice(st.voiceId);
         st.row?.onUp?.(st.midi, e);
       }
       clearRowVisual(st);
@@ -150,14 +157,23 @@ const StringTouch = (() => {
       }
     };
 
-    bundleEl.addEventListener("pointerdown", down);
-    bundleEl.addEventListener("pointermove", move);
-    bundleEl.addEventListener("pointerup", end);
-    bundleEl.addEventListener("pointercancel", end);
+    bundleEl.addEventListener("pointerdown", down, { passive: false });
+    bundleEl.addEventListener("pointermove", move, { passive: false });
+    bundleEl.addEventListener("pointerup", end, { passive: false });
+    bundleEl.addEventListener("pointercancel", end, { passive: false });
   }
 
   function bind(el, getMidi, callbacks = {}) {
-    bindPluckBundle(el, () => [{ el, getMidi, onDown: callbacks.onDown, onUp: callbacks.onUp }]);
+    bindPluckBundle(el, () => [
+      {
+        el,
+        getMidi,
+        onDown: callbacks.onDown,
+        onUp: callbacks.onUp,
+        onVibrate: callbacks.onVibrate,
+        onVibrateEnd: callbacks.onVibrateEnd,
+      },
+    ]);
   }
 
   return { bind, bindPluckBundle };

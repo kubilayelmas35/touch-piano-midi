@@ -1,7 +1,9 @@
-/** Sentez enstrüman sesleri — Web Audio */
+/** Sentez enstrüman sesleri — Web Audio (çoklu ses / tel) */
 const AudioEngine = (() => {
   let ctx = null;
+  /** id → { midi, voice } */
   const voices = new Map();
+  let nextVoiceId = 1;
 
   let dynamicPressure = true;
   let sustainEnabled = true;
@@ -83,17 +85,17 @@ const AudioEngine = (() => {
           oscs: [{ type: "triangle", gain: 0.55 }, { type: "sine", ratio: 2, gain: 0.08 }],
           peak: 0.48,
           attack: 0.004,
-          sustain: 0.12,
-          decay1: 0.08,
-          decay2: 0.55,
-          tail: 0.02,
+          sustain: 0.14,
+          decay1: 0.12,
+          decay2: 0.85,
+          tail: 0.04,
           filterType: "bandpass",
           filterStart: 1800,
           filterEnd: 600,
           filterVel: 800,
           filterQ: 1.2,
           vibratoHz: 5.5,
-          vibratoDepth: 0.003,
+          vibratoDepth: 0.004,
         };
       case "flute":
         return {
@@ -228,38 +230,21 @@ const AudioEngine = (() => {
     };
   }
 
-  function noteOn(midi, velocity = 0.75) {
-    const ac = ensure();
-    noteOff(midi, true);
-
-    const freq = midiToFreq(midi);
-    const vol = velocity * 0.38;
-    const cfg = voiceConfig(instrumentId);
-    const voice = buildVoice(ac, freq, vol, velocity, cfg);
-    voices.set(midi, voice);
-  }
-
-  function noteOff(midi, silent = false, releaseOverride = null) {
-    const voice = voices.get(midi);
-    if (!voice) return;
-    voices.delete(midi);
-
+  function releaseVoiceEntry(entry, silent, releaseOverride) {
+    const voice = entry.voice;
     const ac = ensure();
     const t = ac.currentTime;
     const scale = INSTRUMENTS[instrumentId]?.sustainScale ?? 1;
     const base = silent ? 0.001 : sustainEnabled ? RELEASE_SLOW : RELEASE_FAST;
     const release =
-      releaseOverride != null
-        ? releaseOverride
-        : Math.min(1.2, base * scale);
+      releaseOverride != null ? releaseOverride : Math.min(1.2, base * scale);
 
     try {
       voice.master.gain.cancelScheduledValues(t);
       const now = Math.max(0.0001, voice.master.gain.value);
       voice.master.gain.setValueAtTime(now, t);
       voice.master.gain.exponentialRampToValueAtTime(0.0001, t + release);
-
-      const stopAt = t + release + 0.06;
+      const stopAt = t + release + 0.08;
       for (const osc of voice.oscs) {
         try {
           osc.stop(stopAt);
@@ -278,50 +263,93 @@ const AudioEngine = (() => {
     }
   }
 
-  function play(midi, velocity = 0.75, duration = 0.35) {
-    noteOn(midi, velocity);
-    const ms = Math.max(80, duration * 1000);
-    setTimeout(() => noteOff(midi), ms);
+  function noteOffVoice(voiceId, silent = false, releaseOverride = null) {
+    const entry = voices.get(voiceId);
+    if (!entry) return;
+    voices.delete(voiceId);
+    releaseVoiceEntry(entry, silent, releaseOverride);
   }
 
-  function setLiveVibrato(midi, depthMultiplier = 0, hz = null) {
-    const voice = voices.get(midi);
-    if (!voice?.lfoGain) return;
-    const ac = ensure();
-    const t = ac.currentTime;
-    const depth = Math.max(0, depthMultiplier) * (voice.maxVibratoDepth || 0);
-    voice.lfoGain.gain.setTargetAtTime(depth, t, 0.025);
-    if (hz != null && voice.lfo) {
-      voice.lfo.frequency.setTargetAtTime(hz, t, 0.025);
+  function noteOffMidi(midi, silent = false, releaseOverride = null) {
+    for (const [id, entry] of [...voices.entries()]) {
+      if (entry.midi === midi) noteOffVoice(id, silent, releaseOverride);
     }
   }
 
+  /** @returns {number} voiceId */
+  function noteOn(midi, velocity = 0.75, opts = {}) {
+    const ac = ensure();
+    if (!opts.poly) noteOffMidi(midi, true);
 
-  function setLiveGain(midi, multiplier = 1) {
-    const voice = voices.get(midi);
-    if (!voice?.master) return;
+    const freq = midiToFreq(midi);
+    const vol = velocity * 0.38;
+    const cfg = voiceConfig(instrumentId);
+    const voice = buildVoice(ac, freq, vol, velocity, cfg);
+    const id = nextVoiceId++;
+    voices.set(id, { midi, voice });
+    return id;
+  }
+
+  function noteOff(midi, silent = false, releaseOverride = null) {
+    noteOffMidi(midi, silent, releaseOverride);
+  }
+
+  function noteOffPluck(voiceId) {
+    const rel =
+      instrumentId === "guitar" ? 0.95 : instrumentId === "violin" ? 0.82 : 0.55;
+    noteOffVoice(voiceId, false, rel);
+  }
+
+  function play(midi, velocity = 0.75, duration = 0.35) {
+    const id = noteOn(midi, velocity);
+    const ms = Math.max(80, duration * 1000);
+    setTimeout(() => noteOffVoice(id), ms);
+  }
+
+  function entryForVoiceId(voiceId) {
+    return voices.get(voiceId);
+  }
+
+  function setLiveVibrato(voiceIdOrMidi, depthMultiplier = 0, hz = null) {
+    let entry = entryForVoiceId(voiceIdOrMidi);
+    if (!entry) {
+      for (const [, e] of voices) {
+        if (e.midi === voiceIdOrMidi) {
+          entry = e;
+          break;
+        }
+      }
+    }
+    if (!entry?.voice?.lfoGain) return;
+    const ac = ensure();
+    const t = ac.currentTime;
+    const depth = Math.max(0, depthMultiplier) * (entry.voice.maxVibratoDepth || 0);
+    entry.voice.lfoGain.gain.setTargetAtTime(depth, t, 0.025);
+    if (hz != null && entry.voice.lfo) {
+      entry.voice.lfo.frequency.setTargetAtTime(hz, t, 0.025);
+    }
+  }
+
+  function setLiveGain(voiceId, multiplier = 1) {
+    const entry = entryForVoiceId(voiceId);
+    if (!entry?.voice?.master) return;
     const ac = ensure();
     const t = ac.currentTime;
     const m = Math.max(0.12, Math.min(2, multiplier));
-    const target = Math.max(0.0003, (voice.sustainGain || 0.08) * m);
-    voice.master.gain.cancelScheduledValues(t);
-    voice.master.gain.setTargetAtTime(target, t, 0.028);
+    const target = Math.max(0.0003, (entry.voice.sustainGain || 0.08) * m);
+    entry.voice.master.gain.cancelScheduledValues(t);
+    entry.voice.master.gain.setTargetAtTime(target, t, 0.028);
   }
 
   function stopAll() {
-    for (const midi of [...voices.keys()]) noteOff(midi, true);
-  }
-
-  /** Tel bırakınca — gitar/keman doğal sönüm */
-  function noteOffPluck(midi) {
-    const pluckRelease = instrumentId === "guitar" ? 0.78 : instrumentId === "violin" ? 0.65 : 0.5;
-    noteOff(midi, false, pluckRelease);
+    for (const id of [...voices.keys()]) noteOffVoice(id, true);
   }
 
   return {
     ensure,
     noteOn,
     noteOff,
+    noteOffVoice,
     noteOffPluck,
     play,
     stopAll,
