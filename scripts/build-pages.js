@@ -34,6 +34,10 @@ copy(path.join(root, "web", "pianoApi-web.js"), path.join(docs, "pianoApi-web.js
 copy(path.join(root, "web", "web-boot.js"), path.join(docs, "web-boot.js"));
 copy(path.join(root, "web", "wix-config.example.js"), path.join(docs, "wix-config.example.js"));
 copy(path.join(root, "wix", "VERIFICATION.md"), path.join(docs, "VERIFICATION.md"));
+const webVsDesktop = path.join(root, "docs", "WEB_VS_DESKTOP.md");
+if (fs.existsSync(webVsDesktop)) {
+  copy(webVsDesktop, path.join(docs, "WEB_VS_DESKTOP.md"));
+}
 
 fs.writeFileSync(path.join(docs, ".nojekyll"), "");
 
