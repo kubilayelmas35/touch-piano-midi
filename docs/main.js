@@ -1625,12 +1625,21 @@ const Guitar = (() => {
     });
   }
 
-  function setFretForString(stringIdx, fret) {
-    if (gripAllStrings()) {
-      for (const s of DISPLAY_STRINGS) fretted[s] = fret;
-    } else {
-      fretted[stringIdx] = fret;
+  /** Tüm aktif parmaklardan tellerin perdesini hesapla (çoklu dokunma) */
+  function recomputeFrettedFromPointers() {
+    const next = {};
+    for (const s of DISPLAY_STRINGS) next[s] = 0;
+
+    for (const st of fretPointers.values()) {
+      if (st.gripAll) {
+        for (const s of DISPLAY_STRINGS) {
+          next[s] = Math.max(next[s], st.fret);
+        }
+      } else {
+        next[s] = Math.max(next[s] || 0, st.fret);
+      }
     }
+    fretted = next;
     for (const s of DISPLAY_STRINGS) {
       fretCellsByString[s]?.forEach((cell) => {
         const f = Number(cell.dataset.fret);
@@ -1659,14 +1668,13 @@ const Guitar = (() => {
       if (e.pointerType === "mouse" && e.button !== 0) return;
       if (e.pointerType === "touch" && e.button !== 0) return;
       e.preventDefault();
+      e.stopPropagation();
       el.setPointerCapture(e.pointerId);
       fretPointers.set(e.pointerId, { stringIdx, fret, gripAll: gripAllStrings() });
-      setFretForString(stringIdx, fret);
+      recomputeFrettedFromPointers();
     };
     const up = (e) => {
-      const st = fretPointers.get(e.pointerId);
-      if (!st) return;
-      if (!st.gripAll && st.stringIdx !== stringIdx) return;
+      if (!fretPointers.has(e.pointerId)) return;
       e.preventDefault();
       fretPointers.delete(e.pointerId);
       try {
@@ -1674,26 +1682,11 @@ const Guitar = (() => {
       } catch {
         /* */
       }
-      if (st.gripAll) {
-        if (DISPLAY_STRINGS.every((s) => (fretted[s] || 0) === st.fret)) {
-          for (const s of DISPLAY_STRINGS) fretted[s] = 0;
-          fretsRoot?.querySelectorAll(".guitar-cell").forEach((c) => {
-            c.classList.remove("fret-held", "open-selected");
-          });
-          updateStringHighlights();
-        }
-      } else if ((fretted[stringIdx] || 0) === st.fret) {
-        setFretForString(stringIdx, 0);
-      }
+      recomputeFrettedFromPointers();
     };
     el.addEventListener("pointerdown", down);
     el.addEventListener("pointerup", up);
     el.addEventListener("pointercancel", up);
-    el.addEventListener("pointerleave", (e) => {
-      const st = fretPointers.get(e.pointerId);
-      if (!st) return;
-      if (st.gripAll || st.stringIdx === stringIdx) up(e);
-    });
   }
 
   function buildFretGrid() {
@@ -1707,8 +1700,8 @@ const Guitar = (() => {
     const hint = document.createElement("p");
     hint.className = "guitar-neck-hint";
     hint.textContent = gripAllStrings()
-      ? "Kol — perdeye basınca 6 tel sıkılır; sağda titreştirin"
-      : "Kol — tele/perdeye basın; sağda aynı renkteki teli titreştirin";
+      ? "Kol — birden fazla perdeye aynı anda basabilirsiniz (çok parmak)"
+      : "Kol — her tele ayrı perde; aynı anda birden fazla hücreye basın";
     fretsRoot.appendChild(hint);
 
     const header = document.createElement("div");
