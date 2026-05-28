@@ -89,6 +89,7 @@
   const alignDesc = $("#alignDesc");
   const stringVibratoSens = $("#stringVibratoSens");
   const vibratoSensLabel = $("#vibratoSensLabel");
+  const guitarGripAllStrings = $("#guitarGripAllStrings");
   const dynamicPressure = $("#dynamicPressure");
   const sustainEnabled = $("#sustainEnabled");
   const speedRange = $("#speedRange");
@@ -460,6 +461,7 @@
       stringVibratoSens.value = String(vib);
       if (vibratoSensLabel) vibratoSensLabel.textContent = vibratoSensLabelText(vib);
     }
+    if (guitarGripAllStrings) guitarGripAllStrings.checked = !!s.guitarGripAllStrings;
     if (playMode === "piano") {
       Piano.setAutoFit((s.pianoAlign || "stretch") === "stretch");
       Piano.setKeySize(s.keyWidth, s.keyHeight);
@@ -947,6 +949,11 @@
     const v = Number(stringVibratoSens.value);
     if (vibratoSensLabel) vibratoSensLabel.textContent = vibratoSensLabelText(v);
     persistSettings({ stringVibratoSens: v / 100 });
+  });
+
+  guitarGripAllStrings?.addEventListener("change", () => {
+    persistSettings({ guitarGripAllStrings: guitarGripAllStrings.checked });
+    if (window.Guitar?.buildKeys) window.Guitar.buildKeys();
   });
 
   window.addEventListener("touch-piano:play-mode", (e) => {

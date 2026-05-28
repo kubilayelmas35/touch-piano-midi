@@ -34,6 +34,8 @@ const AppSettings = (() => {
     instrumentPromptDone: false,
     panelLayout: {},
     stringVibratoSens: 1,
+    /** Gitar: sol kolde bir perde → tüm teller sıkılır */
+    guitarGripAllStrings: false,
   };
 
   function load() {

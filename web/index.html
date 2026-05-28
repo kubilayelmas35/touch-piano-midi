@@ -182,6 +182,11 @@
           <input type="range" id="keyHeightRange" min="90" max="420" value="160" />
         </label>
         <div class="settings-scope settings-scope-strings">
+        <label class="field settings-scope-guitar-only">
+          <input type="checkbox" id="guitarGripAllStrings" />
+          Tüm telleri sık (sol kolde bir perde → 5 tel birden)
+        </label>
+        <p class="hint small-hint settings-scope-guitar-only">Kapalıyken doğru tele/perdeye basmanız gerekir; sağda farklı tel titreşirse açık tel sesi gelir.</p>
         <label class="field">
           Tel titreşim hassasiyeti: <span id="vibratoSensLabel">Normal</span>
           <input type="range" id="stringVibratoSens" min="50" max="200" value="100" />
@@ -317,11 +322,11 @@
     </div>
     <div id="guitarWrap" class="guitar-wrap instrument-panel hidden">
       <div class="inst-card guitar-chord-card">
-        <div class="inst-card-title">Akor / Perde</div>
+        <div class="inst-card-title">Gitar kolu</div>
         <div id="guitarFrets"></div>
       </div>
       <div class="inst-card guitar-strings-card">
-        <div class="inst-card-title">Teller</div>
+        <div class="inst-card-title">Teller (titreştir)</div>
         <div id="guitarStrings"></div>
       </div>
     </div>
@@ -394,6 +399,6 @@
   <script src="pianoApi-web.js"></script>
   <script src="web-boot.js"></script>
   <script src="touch-guard.js"></script>
-  <script src="main.js?v=web8"></script>
+  <script src="main.js?v=web9"></script>
 </body>
 </html>

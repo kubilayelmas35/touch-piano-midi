@@ -1,4 +1,4 @@
-/** Dokunmatik tel — basılı tutup sürükleyerek titreşim; midi anlık hesaplanır */
+/** Tel vuruşu — çoklu parmak; dikey hareket = ses şiddeti + titreşim */
 const StringTouch = (() => {
   const pointers = new Map();
 
@@ -25,18 +25,22 @@ const StringTouch = (() => {
       const midi = resolveMidi(getMidi);
       if (!midi) return;
       el.setPointerCapture(e.pointerId);
-      const vel = window.AudioEngine.velocityFromPointer(e);
+      const vel = window.AudioEngine.velocityFromPointer(e, 0.55);
       el.classList.add("active", "string-held");
       lineEl?.classList.add("string-line-active");
       window.AudioEngine.noteOn(midi, vel);
+      window.AudioEngine.setLiveGain?.(midi, vel);
       callbacks.onDown?.(midi, vel, e);
       pointers.set(e.pointerId, {
         midi,
         el,
         lineEl,
         getMidi,
+        baseVel: vel,
+        pluck: vel,
         lastX: e.clientX,
         lastY: e.clientY,
+        lastT: performance.now(),
         smooth: 0,
       });
     };
@@ -45,27 +49,41 @@ const StringTouch = (() => {
       const st = pointers.get(e.pointerId);
       if (!st) return;
       e.preventDefault();
+      const now = performance.now();
+      const dt = Math.max(1, now - st.lastT);
+      st.lastT = now;
+
       const midi = resolveMidi(st.getMidi);
       if (midi !== st.midi) {
         window.AudioEngine.noteOff(st.midi);
         st.midi = midi;
-        window.AudioEngine.noteOn(midi, window.AudioEngine.velocityFromPointer(e));
+        const v = window.AudioEngine.velocityFromPointer(e, st.baseVel);
+        window.AudioEngine.noteOn(midi, v);
+        st.baseVel = v;
+        st.pluck = v;
       }
+
       const dx = e.clientX - st.lastX;
       const dy = e.clientY - st.lastY;
       st.lastX = e.clientX;
       st.lastY = e.clientY;
+
       const speed = Math.hypot(dx, dy);
-      st.smooth = st.smooth * 0.65 + speed * 0.35;
+      const vSpeed = Math.abs(dy) / dt;
+      st.smooth = st.smooth * 0.55 + speed * 0.45;
 
       const sens = vibratoSens();
-      const depth = Math.min(4, 0.25 + st.smooth * 0.1 * sens);
-      const hz = 4.5 + Math.min(5, st.smooth * 0.12 * sens);
+      const depth = Math.min(4, 0.2 + st.smooth * 0.12 * sens);
+      const hz = 4.5 + Math.min(6, st.smooth * 0.14 * sens);
       window.AudioEngine.setLiveVibrato?.(st.midi, depth, hz);
 
-      const intensity = Math.min(1, st.smooth / 14);
+      const pluckBoost = Math.min(1.85, 0.35 + vSpeed * 0.022 * sens + st.smooth * 0.04);
+      st.pluck = Math.max(st.pluck, pluckBoost);
+      window.AudioEngine.setLiveGain?.(st.midi, st.pluck);
+
+      const intensity = Math.min(1, st.pluck / 1.2);
       st.el.style.setProperty("--vib-intensity", String(intensity));
-      st.el.classList.toggle("string-vibrating", intensity > 0.06);
+      st.el.classList.toggle("string-vibrating", intensity > 0.05);
       st.lineEl?.style.setProperty("--vib-intensity", String(intensity));
     };
 

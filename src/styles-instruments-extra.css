@@ -72,11 +72,11 @@
 body[data-play-mode="guitar"] .guitar-wrap,
 body[data-play-mode="violin"] .violin-wrap {
   display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(220px, 0.95fr);
+  grid-template-columns: minmax(0, 1.15fr) minmax(200px, 0.85fr);
   gap: 0.75rem;
   padding: 0.55rem 0.75rem 0.85rem;
-  align-items: stretch;
-  min-height: 240px;
+  align-items: start;
+  min-height: 0;
 }
 
 .inst-card {
@@ -99,89 +99,144 @@ body[data-play-mode="violin"] .violin-wrap {
   margin-bottom: 0.4rem;
 }
 
-.guitar-chord-hint,
+.guitar-neck-hint,
 .strings-bundle-title {
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   color: var(--text-dim);
   line-height: 1.35;
-  margin: 0 0 0.45rem;
+  margin: 0 0 0.4rem;
 }
 
-.guitar-fret-picker {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
+.guitar-neck {
+  overflow-x: auto;
+  overflow-y: hidden;
+  touch-action: pan-x;
 }
 
-.guitar-fret-btn {
-  min-width: 2.1rem;
-  padding: 0.45rem 0.35rem;
+.guitar-chord-card .guitar-neck {
+  border: 1px solid rgba(201, 162, 39, 0.25);
   border-radius: 8px;
-  border: 1px solid rgba(201, 162, 39, 0.35);
-  background: rgba(30, 34, 44, 0.9);
-  color: #e8e0d0;
+  padding: 0.25rem 0.15rem 0.35rem;
+  background: linear-gradient(180deg, #1a1410, #0e0c10);
+}
+
+.guitar-string-row .guitar-row-wire {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--str-color) 40%, #6b5344),
+    var(--str-color),
+    #fff8e8,
+    var(--str-color),
+    color-mix(in srgb, var(--str-color) 40%, #6b5344)
+  );
+  box-shadow: 0 0 8px color-mix(in srgb, var(--str-color) 50%, transparent);
+}
+
+.guitar-string-row .guitar-string-label {
+  color: var(--str-color);
   font-weight: 800;
-  font-size: 0.8rem;
-  cursor: pointer;
-  touch-action: manipulation;
 }
 
-.guitar-fret-btn.fret-held {
-  background: linear-gradient(180deg, rgba(201, 162, 39, 0.75), rgba(92, 74, 30, 0.9));
-  color: #fff;
-  border-color: #e8c468;
+.guitar-cell.fret-held {
+  background: color-mix(in srgb, var(--str-color, #d4a017) 55%, #3a3018);
+  border-color: var(--str-color, #e8c468);
 }
 
-.guitar-open-notes {
-  margin-top: 0.45rem;
-  font-size: 0.68rem;
-  color: var(--text-dim);
-  letter-spacing: 0.08em;
-}
-
-.strings-bundle-inner {
-  flex: 1;
+.strings-bundle-inner,
+.guitar-pluck-bundle {
   display: flex;
   flex-direction: column;
+  gap: 3px;
+  flex: 0 0 auto;
+  align-self: stretch;
+  max-height: none;
   border: 1px solid rgba(201, 162, 39, 0.28);
   border-radius: 10px;
   overflow: hidden;
   background: linear-gradient(180deg, #141820, #0c0e14);
   touch-action: none;
+  padding: 0.2rem 0;
 }
 
-.guitar-string-stripe,
-.violin-string-stripe {
-  flex: 1;
+body[data-play-mode="guitar"] .guitar-strings-card {
+  align-self: start;
+}
+
+body[data-play-mode="guitar"] .guitar-strings-bundle .guitar-string,
+.guitar-pluck-bundle .guitar-string {
+  flex: 0 0 var(--inst-string-h, 1.65rem);
+  height: var(--inst-string-h, 1.65rem);
+  max-height: 2.85rem;
+  min-height: 1.25rem;
+  width: 100%;
   display: flex;
   align-items: center;
   gap: 0.45rem;
   padding: 0 0.55rem;
-  min-height: var(--inst-string-h, 2.35rem);
+  margin: 0;
+  border: none;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   cursor: pointer;
   touch-action: none;
   background: transparent;
+  box-shadow: inset 4px 0 0 var(--str-color, #d4a017);
 }
 
-.guitar-string-stripe:last-child,
+.guitar-pluck-bundle .guitar-string:last-child {
+  border-bottom: none;
+}
+
+.guitar-pluck-bundle .guitar-string.active,
+.guitar-pluck-bundle .guitar-string.string-held {
+  background: color-mix(in srgb, var(--str-color) 18%, transparent);
+}
+
+.guitar-pluck-bundle .guitar-string.has-fret {
+  box-shadow: inset 4px 0 0 var(--str-color), inset 0 0 0 1px color-mix(in srgb, var(--str-color) 35%, transparent);
+}
+
+.guitar-pluck-bundle .guitar-string-name {
+  width: 1.1rem;
+  font-weight: 800;
+  font-size: 0.85rem;
+  color: var(--str-color, #f5e6d3);
+}
+
+.guitar-pluck-bundle .guitar-string-line {
+  flex: 1;
+  height: 4px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--str-color) 30%, #4a3828),
+    var(--str-color),
+    #fff,
+    var(--str-color),
+    color-mix(in srgb, var(--str-color) 30%, #4a3828)
+  );
+  border-radius: 2px;
+}
+
+.guitar-pluck-bundle .guitar-string.hit-target {
+  background: rgba(74, 222, 128, 0.2);
+}
+
+.violin-string-stripe {
+  flex: 0 0 var(--inst-string-h, 1.65rem);
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0 0.55rem;
+  min-height: var(--inst-string-h, 1.65rem);
+  max-height: 2.85rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  touch-action: none;
+}
+
 .violin-string-stripe:last-child {
   border-bottom: none;
 }
 
-.guitar-string-stripe.active,
-.violin-string-stripe.active,
-.guitar-string-stripe.string-held,
-.violin-string-stripe.string-held {
-  background: rgba(201, 162, 39, 0.14);
-}
-
-.guitar-string-stripe.has-fret,
-.violin-string-stripe.has-fret {
-  box-shadow: inset 3px 0 0 rgba(201, 162, 39, 0.55);
-}
-
-.guitar-string-name,
 .violin-string-name {
   width: 1.1rem;
   font-weight: 800;
@@ -189,32 +244,25 @@ body[data-play-mode="violin"] .violin-wrap {
   color: #f5e6d3;
 }
 
-.guitar-string-fret,
-.violin-string-fret {
-  font-size: 0.62rem;
-  color: var(--text-dim);
-  min-width: 2.4rem;
-  text-align: right;
-}
-
-.guitar-string-line,
 .violin-string-line {
   flex: 1;
   height: 3px;
   background: linear-gradient(90deg, #6b5344, #d4c4a8, #fff8e8, #d4c4a8, #6b5344);
   border-radius: 2px;
-  transform-origin: center;
-}
-
-.guitar-string-stripe.hit-target,
-.violin-string-stripe.hit-target {
-  background: rgba(74, 222, 128, 0.18);
 }
 
 .string-vibrating .guitar-string-line,
 .string-vibrating .violin-string-line {
   animation: string-shake 0.08s ease-in-out infinite alternate;
-  box-shadow: 0 0 calc(4px + var(--vib-intensity, 0) * 10px) rgba(212, 196, 168, 0.7);
+  box-shadow: 0 0 calc(4px + var(--vib-intensity, 0) * 10px) color-mix(in srgb, var(--str-color, #d4c4a8) 70%, transparent);
+}
+
+.settings-scope-guitar-only {
+  display: none;
+}
+
+body[data-play-mode="guitar"] .settings-scope-guitar-only {
+  display: block;
 }
 
 @keyframes string-shake {
