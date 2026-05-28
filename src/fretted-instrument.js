@@ -174,7 +174,7 @@ function createFrettedInstrument(config) {
 
     function bindFretCell(el, stringIdx, fret) {
       const down = (e) => {
-        if (e.button !== 0) return;
+        if (e.pointerType === "mouse" && e.button !== 0) return;
         e.preventDefault();
         e.stopPropagation();
         try {

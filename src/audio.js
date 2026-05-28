@@ -61,6 +61,20 @@ const AudioEngine = (() => {
     return Math.max(0.15, Math.min(1, v));
   }
 
+  /**
+   * İnsan kulağı düşük frekansları daha zayıf algılar;
+   * özellikle kalın teller/sol tuşlar için hafif telafi uygular.
+   */
+  function loudnessCompensation(freq) {
+    if (!Number.isFinite(freq) || freq <= 0) return 1;
+    if (freq >= 440) return 1;
+    if (freq <= 80) return 1.65;
+    if (freq <= 160) return 1.48;
+    if (freq <= 240) return 1.32;
+    if (freq <= 320) return 1.18;
+    return 1.08;
+  }
+
   function voiceConfig(id) {
     switch (id) {
       case "violin":
@@ -68,7 +82,7 @@ const AudioEngine = (() => {
           oscs: [{ type: "sawtooth", gain: 0.42 }, { type: "sine", ratio: 2, gain: 0.12 }],
           peak: 0.42,
           attack: 0.07,
-          sustain: 0.32,
+          sustain: 0.34,
           decay1: 0.45,
           decay2: 2.6,
           tail: 0.06,
@@ -85,10 +99,10 @@ const AudioEngine = (() => {
           oscs: [{ type: "triangle", gain: 0.55 }, { type: "sine", ratio: 2, gain: 0.08 }],
           peak: 0.48,
           attack: 0.004,
-          sustain: 0.14,
-          decay1: 0.12,
-          decay2: 0.85,
-          tail: 0.04,
+          sustain: 0.2,
+          decay1: 0.18,
+          decay2: 1.35,
+          tail: 0.08,
           filterType: "bandpass",
           filterStart: 1800,
           filterEnd: 600,
@@ -153,7 +167,7 @@ const AudioEngine = (() => {
           ],
           peak: 0.38,
           attack: 0.012,
-          sustain: 0.45,
+          sustain: 0.5,
           decay1: 0.35,
           decay2: 2.8,
           tail: 0.08,
@@ -282,7 +296,7 @@ const AudioEngine = (() => {
     if (!opts.poly) noteOffMidi(midi, true);
 
     const freq = midiToFreq(midi);
-    const vol = velocity * 0.38;
+    const vol = Math.min(0.92, velocity * 0.38 * loudnessCompensation(freq));
     const cfg = voiceConfig(instrumentId);
     const voice = buildVoice(ac, freq, vol, velocity, cfg);
     const id = nextVoiceId++;
@@ -296,7 +310,7 @@ const AudioEngine = (() => {
 
   function noteOffPluck(voiceId) {
     const rel =
-      instrumentId === "guitar" ? 0.95 : instrumentId === "violin" ? 0.82 : 0.55;
+      instrumentId === "guitar" ? 1.45 : instrumentId === "violin" ? 1.1 : 0.62;
     noteOffVoice(voiceId, false, rel);
   }
 

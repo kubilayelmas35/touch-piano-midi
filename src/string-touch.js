@@ -105,7 +105,7 @@ const StringTouch = (() => {
 
   function bindPluckBundle(bundleEl, getRows) {
     const down = (e) => {
-      if (e.button !== 0) return;
+      if (e.pointerType === "mouse" && e.button !== 0) return;
       const rows = getRows();
       const row = hitRow(rows, e.clientY);
       if (!row) return;
