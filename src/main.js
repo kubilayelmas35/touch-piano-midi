@@ -1589,6 +1589,8 @@ function createFrettedInstrument(config) {
     let pluckRows = [];
     let fretted = {};
     let fretPointers = new Map();
+    let lockedFrets = {};
+    let midiTargets = new Map();
 
     function gripAllStrings() {
       return !!window.AppSettings?.load?.()?.[gripSettingKey];
@@ -1695,18 +1697,7 @@ function createFrettedInstrument(config) {
       });
     }
 
-    function recomputeFrettedFromPointers() {
-      const next = {};
-      for (const s of DISPLAY_STRINGS) next[s] = 0;
-
-      for (const st of fretPointers.values()) {
-        if (st.gripAll) {
-          for (const s of DISPLAY_STRINGS) next[s] = Math.max(next[s], st.fret);
-        } else {
-          next[s] = Math.max(next[s] || 0, st.fret);
-        }
-      }
-      fretted = next;
+    function repaintFretCells() {
       for (const s of DISPLAY_STRINGS) {
         fretCellsByString[s]?.forEach((cell) => {
           const f = Number(cell.dataset.fret);
@@ -1718,9 +1709,37 @@ function createFrettedInstrument(config) {
       updateStringHighlights();
     }
 
+    function recomputeFrettedFromPointers() {
+      const next = {};
+      for (const s of DISPLAY_STRINGS) next[s] = lockedFrets[s] || 0;
+
+      for (const st of fretPointers.values()) {
+        if (st.gripAll) {
+          for (const s of DISPLAY_STRINGS) next[s] = Math.max(next[s], st.fret);
+        } else {
+          next[s] = Math.max(next[s] || 0, st.fret);
+        }
+      }
+      fretted = next;
+      repaintFretCells();
+    }
+
+    function setLockedFret(stringIdx, fret) {
+      if (gripAllStrings()) {
+        const same = DISPLAY_STRINGS.every((s) => (lockedFrets[s] || 0) === fret);
+        const nextFret = same ? 0 : fret;
+        for (const s of DISPLAY_STRINGS) lockedFrets[s] = nextFret;
+      } else {
+        const cur = lockedFrets[stringIdx] || 0;
+        lockedFrets[stringIdx] = cur === fret ? 0 : fret;
+      }
+      recomputeFrettedFromPointers();
+    }
+
     function releaseAll() {
       fretPointers.clear();
       fretted = {};
+      lockedFrets = {};
       window.AudioEngine?.stopAll?.();
       fretsRoot?.querySelectorAll(".guitar-cell").forEach((el) => {
         el.classList.remove("active", "fret-held", "open-selected");
@@ -1736,6 +1755,10 @@ function createFrettedInstrument(config) {
         if (e.pointerType === "mouse" && e.button !== 0) return;
         e.preventDefault();
         e.stopPropagation();
+        if (e.pointerType === "mouse") {
+          setLockedFret(stringIdx, fret);
+          return;
+        }
         try {
           el.setPointerCapture(e.pointerId);
         } catch {
@@ -1767,6 +1790,8 @@ function createFrettedInstrument(config) {
       cellMap.clear();
       fretCellsByString = {};
       fretted = {};
+      lockedFrets = {};
+      midiTargets = new Map();
 
       const header = document.createElement("div");
       header.className = "guitar-fret-header";
@@ -1815,6 +1840,8 @@ function createFrettedInstrument(config) {
           if (f === 0) cell.classList.add("open-fret");
           bindFretCell(cell, s, f);
           cellMap.set(midi, cell);
+          const prev = midiTargets.get(midi);
+          if (!prev || f < prev.fret) midiTargets.set(midi, { cell, stringIdx: s, fret: f });
           fretCellsByString[s].push(cell);
           cells.appendChild(cell);
         }
@@ -1882,11 +1909,12 @@ function createFrettedInstrument(config) {
     }
 
     function highlightMidi(midi, on) {
-      const cell = cellMap.get(midi);
-      if (cell) cell.classList.toggle("hit-target", on);
-      pluckRows.forEach(({ el, stringIdx }) => {
-        if (currentMidiForString(stringIdx) === midi) el.classList.toggle("hit-target", on);
-      });
+      const target = midiTargets.get(midi);
+      if (target?.cell) target.cell.classList.toggle("hit-target", on);
+      if (target?.stringIdx != null) {
+        const row = pluckRows.find((r) => r.stringIdx === target.stringIdx);
+        if (row) row.el.classList.toggle("hit-target", on);
+      }
     }
 
     function flash(midi, type) {
@@ -1895,18 +1923,22 @@ function createFrettedInstrument(config) {
     }
 
     function pressKey(midi, velocity = 0.85) {
-      const el = cellMap.get(midi);
+      const target = midiTargets.get(midi);
+      const el = target?.cell || cellMap.get(midi);
       if (el) el.classList.add("active");
       window.AudioEngine.noteOn(midi, velocity);
       onNoteDown?.(midi, velocity);
+      if (target?.stringIdx != null) setNeckVibrato(target.stringIdx, 0.35);
       highlightMidi(midi, true);
     }
 
     function releaseKey(midi) {
-      const el = cellMap.get(midi);
+      const target = midiTargets.get(midi);
+      const el = target?.cell || cellMap.get(midi);
       if (el) el.classList.remove("active");
       window.AudioEngine.noteOff(midi);
       onNoteUp?.(midi);
+      if (target?.stringIdx != null) clearNeckVibrato(target.stringIdx);
       highlightMidi(midi, false);
     }
 
