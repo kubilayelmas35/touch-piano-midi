@@ -40,6 +40,10 @@ const AppSettings = (() => {
     /** Gitar: sol kolde bir perde → tüm teller sıkılır */
     guitarGripAllStrings: false,
     violinGripAllStrings: false,
+    guitarNeckNearbyTouch: true,
+    violinNeckNearbyTouch: true,
+    guitarStringsNearbyTouch: false,
+    violinStringsNearbyTouch: false,
     guitarNeckHeight: 30,
     guitarStringHeight: 30,
     guitarNeckWidth: 42,
@@ -1310,6 +1314,24 @@ const Piano = (() => {
     if (!wrapEl) return;
     wrapEl.style.setProperty("--white-key-width", `${keyWidth}px`);
     wrapEl.style.setProperty("--piano-height", `${keyHeight}px`);
+    let chrome = 0;
+    const banner = document.getElementById("authBanner");
+    if (banner?.offsetHeight) chrome += banner.offsetHeight;
+    const top = document.querySelector(".top-bar");
+    if (top) chrome += top.offsetHeight;
+    const usedH = keyHeight + 20;
+    const maxFooter = Math.max(120, window.innerHeight - chrome);
+    const footerH = Math.min(usedH, maxFooter);
+    document.documentElement.style.setProperty("--footer-row-h", `${footerH}px`);
+    const footerEl = document.getElementById("instrumentFooter");
+    if (footerEl) {
+      footerEl.style.height = `${footerH}px`;
+      footerEl.style.minHeight = `${footerH}px`;
+      footerEl.style.maxHeight = `${footerH}px`;
+    }
+    wrapEl.style.height = "100%";
+    wrapEl.style.minHeight = "0";
+    wrapEl.style.maxHeight = "100%";
     if (window.Game && typeof window.Game.resize === "function") {
       window.Game.resize();
     }
@@ -1395,6 +1417,7 @@ const Piano = (() => {
     if (autoFitWidth) autoSizeKeys();
     else applySize();
     refreshLabels();
+    bindKeyboardSlide();
   }
 
   function createKey(midi, kind) {
@@ -1444,6 +1467,7 @@ const Piano = (() => {
   }
 
   function releaseAll() {
+    slideCtl?.releaseAll?.();
     for (const [, m] of activePointers) {
       window.AudioEngine.noteOff(m);
     }
@@ -1459,37 +1483,37 @@ const Piano = (() => {
   }
 
   function bindPointer(el, midi) {
-    const down = (e) => {
-      if (e.pointerType === "mouse" && e.button !== 0) return;
-      if (e.pointerType === "touch" && e.button !== 0) return;
-      e.preventDefault();
-      el.setPointerCapture(e.pointerId);
-      const vel = window.AudioEngine.velocityFromPointer(e);
-      el.classList.add("active");
-      activePointers.set(e.pointerId, midi);
-      window.AudioEngine.noteOn(midi, vel);
-      onNoteDown?.(midi, vel, e);
-    };
+    /* Oynatma kaydırma bindKeyboardSlide ile — yalnızca sağ tık etiket */
+  }
 
-    const up = (e) => {
-      if (!activePointers.has(e.pointerId)) return;
-      e.preventDefault();
-      activePointers.delete(e.pointerId);
-      el.classList.remove("active");
-      try {
-        el.releasePointerCapture(e.pointerId);
-      } catch {
-        /* ignore */
-      }
-      window.AudioEngine.noteOff(midi);
-      onNoteUp?.(midi, e);
-    };
+  let slideCtl = null;
 
-    el.addEventListener("pointerdown", down);
-    el.addEventListener("pointerup", up);
-    el.addEventListener("pointercancel", up);
-    el.addEventListener("pointerleave", (e) => {
-      if (activePointers.get(e.pointerId) === midi) up(e);
+  function bindKeyboardSlide() {
+    if (!container || !window.PointerSlide || slideCtl) return;
+    slideCtl = window.PointerSlide.bind(container, {
+      hitTest: (x, y) => {
+        const el = document.elementFromPoint(x, y)?.closest?.(".key");
+        if (!el || !container.contains(el)) return null;
+        const midi = Number(el.dataset.midi);
+        if (!midi) return null;
+        return { el, midi };
+      },
+      onEnter: (st, target, e) => {
+        st.el = target.el;
+        st.midi = target.midi;
+        target.el.classList.add("active");
+        const vel = window.AudioEngine.velocityFromPointer(e);
+        window.AudioEngine.noteOn(st.midi, vel, { poly: true });
+        onNoteDown?.(st.midi, vel, e);
+      },
+      onLeave: (st, e) => {
+        if (st.midi == null) return;
+        st.el?.classList.remove("active");
+        window.AudioEngine.noteOff(st.midi);
+        onNoteUp?.(st.midi, e);
+        st.midi = null;
+        st.el = null;
+      },
     });
   }
 
@@ -1537,6 +1561,7 @@ const Piano = (() => {
     wrapEl = wrap;
     onNoteDown = noteDownCb;
     onNoteUp = noteUpCb;
+    bindKeyboardSlide();
     window.addEventListener("resize", () => {
       if (autoFitWidth) autoSizeKeys();
     });
@@ -1566,6 +1591,257 @@ const Piano = (() => {
 })();
 
 window.Piano = Piano;
+
+
+/* === pointer-slide.js === */
+/** Parmak kaydırma — tek hedef veya dokunma alanındaki tüm hedefler */
+const PointerSlide = (() => {
+  function touchRect(e, pad = 14) {
+    let w = e.width > 0 ? e.width : 28;
+    let h = e.height > 0 ? e.height : 28;
+    if (e.radiusX > 0) w = Math.max(w, e.radiusX * 2);
+    if (e.radiusY > 0) h = Math.max(h, e.radiusY * 2);
+    w += pad * 2;
+    h += pad * 2;
+    return {
+      left: e.clientX - w / 2,
+      right: e.clientX + w / 2,
+      top: e.clientY - h / 2,
+      bottom: e.clientY + h / 2,
+    };
+  }
+
+  function rectsIntersect(a, b) {
+    return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+  }
+
+  function samplePath(x0, y0, x1, y1, stepPx = 8) {
+    const dist = Math.hypot(x1 - x0, y1 - y0);
+    const steps = Math.max(1, Math.ceil(dist / stepPx));
+    const pts = [];
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      pts.push({ x: x0 + (x1 - x0) * t, y: y0 + (y1 - y0) * t });
+    }
+    return pts;
+  }
+
+  function targetKey(target) {
+    if (!target) return null;
+    if (target.midi != null) return `m${target.midi}`;
+    if (target.stringIdx != null && target.fret != null) {
+      return `s${target.stringIdx}f${target.fret}`;
+    }
+    if (target.row) return target.row;
+    if (target.el) return target.el;
+    return target;
+  }
+
+  function bindMultiArea(rootEl, opts) {
+    const {
+      collectTargets,
+      onSync,
+      onEnd,
+      shouldHandle = () => true,
+      keyOf = targetKey,
+      sampleOnMove = true,
+    } = opts;
+    const pointers = new Map();
+
+    function mergeTargets(st, e) {
+      const merged = [];
+      const seen = new Set();
+      const add = (list) => {
+        for (const t of list || []) {
+          const k = keyOf(t);
+          if (k == null || seen.has(k)) continue;
+          seen.add(k);
+          merged.push(t);
+        }
+      };
+      add(collectTargets(e, rootEl));
+      if (sampleOnMove && st.lastX != null && st.lastY != null) {
+        const pts = samplePath(st.lastX, st.lastY, e.clientX, e.clientY, 6);
+        for (const p of pts) {
+          add(
+            collectTargets(
+              {
+                ...e,
+                clientX: p.x,
+                clientY: p.y,
+                width: 0,
+                height: 0,
+                radiusX: 0,
+                radiusY: 0,
+              },
+              rootEl
+            )
+          );
+        }
+      }
+      return merged;
+    }
+
+    const sync = (st, e) => {
+      onSync(st, mergeTargets(st, e), e);
+    };
+
+    const down = (e) => {
+      if (!shouldHandle(e)) return;
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      const targets = collectTargets(e, rootEl) || [];
+      if (!targets.length) return;
+      e.preventDefault();
+      e.stopPropagation();
+      try {
+        rootEl.setPointerCapture(e.pointerId);
+      } catch {
+        /* */
+      }
+      const st = { pointerId: e.pointerId, lastX: e.clientX, lastY: e.clientY };
+      pointers.set(e.pointerId, st);
+      onSync(st, targets, e);
+    };
+
+    const move = (e) => {
+      const st = pointers.get(e.pointerId);
+      if (!st) return;
+      e.preventDefault();
+      sync(st, e);
+      st.lastX = e.clientX;
+      st.lastY = e.clientY;
+    };
+
+    const end = (e) => {
+      const st = pointers.get(e.pointerId);
+      if (!st) return;
+      e.preventDefault();
+      onEnd?.(st, e);
+      pointers.delete(e.pointerId);
+      try {
+        rootEl.releasePointerCapture(e.pointerId);
+      } catch {
+        /* */
+      }
+    };
+
+    rootEl.addEventListener("pointerdown", down, { passive: false });
+    rootEl.addEventListener("pointermove", move, { passive: false });
+    rootEl.addEventListener("pointerup", end, { passive: false });
+    rootEl.addEventListener("pointercancel", end, { passive: false });
+
+    return {
+      releaseAll() {
+        for (const [, st] of pointers) onEnd?.(st, {});
+        pointers.clear();
+      },
+    };
+  }
+
+  function bind(rootEl, opts) {
+    const {
+      hitTest,
+      onEnter,
+      onLeave,
+      onMove,
+      shouldHandle = () => true,
+    } = opts;
+    const pointers = new Map();
+
+    function leave(st, e) {
+      if (st.target == null) return;
+      onLeave?.(st, e);
+      st.target = null;
+      st.targetId = null;
+    }
+
+    function enter(st, target, e) {
+      const id = targetKey(target);
+      if (st.targetId === id) return;
+      leave(st, e);
+      st.targetId = id;
+      st.target = target;
+      if (target != null) onEnter?.(st, target, e);
+    }
+
+    function processMove(st, e) {
+      const x0 = st.lastX ?? e.clientX;
+      const y0 = st.lastY ?? e.clientY;
+      const pts = samplePath(x0, y0, e.clientX, e.clientY);
+      let lastHit = null;
+      for (const p of pts) {
+        const hit = hitTest(p.x, p.y);
+        if (hit) {
+          enter(st, hit, e);
+          lastHit = hit;
+          onMove?.(st, hit, e);
+        }
+      }
+      const at = hitTest(e.clientX, e.clientY);
+      if (at) {
+        enter(st, at, e);
+        onMove?.(st, at, e);
+      } else if (!lastHit) {
+        leave(st, e);
+      }
+      st.lastX = e.clientX;
+      st.lastY = e.clientY;
+    }
+
+    const down = (e) => {
+      if (!shouldHandle(e)) return;
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      const hit = hitTest(e.clientX, e.clientY);
+      if (!hit) return;
+      e.preventDefault();
+      e.stopPropagation();
+      try {
+        rootEl.setPointerCapture(e.pointerId);
+      } catch {
+        /* */
+      }
+      const st = { lastX: e.clientX, lastY: e.clientY, target: null };
+      pointers.set(e.pointerId, st);
+      enter(st, hit, e);
+    };
+
+    const move = (e) => {
+      const st = pointers.get(e.pointerId);
+      if (!st) return;
+      e.preventDefault();
+      processMove(st, e);
+    };
+
+    const end = (e) => {
+      const st = pointers.get(e.pointerId);
+      if (!st) return;
+      e.preventDefault();
+      leave(st, e);
+      pointers.delete(e.pointerId);
+      try {
+        rootEl.releasePointerCapture(e.pointerId);
+      } catch {
+        /* */
+      }
+    };
+
+    rootEl.addEventListener("pointerdown", down, { passive: false });
+    rootEl.addEventListener("pointermove", move, { passive: false });
+    rootEl.addEventListener("pointerup", end, { passive: false });
+    rootEl.addEventListener("pointercancel", end, { passive: false });
+
+    return {
+      releaseAll() {
+        for (const [, st] of pointers) leave(st, {});
+        pointers.clear();
+      },
+    };
+  }
+
+  return { bind, bindMultiArea, touchRect, rectsIntersect, samplePath };
+})();
+
+window.PointerSlide = PointerSlide;
 
 
 /* === fretted-instrument.js === */
@@ -1601,11 +1877,23 @@ function createFrettedInstrument(config) {
     let pluckRows = [];
     let fretted = {};
     let fretPointers = new Map();
-    let lockedFrets = {};
+    let autoFrets = {};
     let midiTargets = new Map();
 
     function gripAllStrings() {
       return !!window.AppSettings?.load?.()?.[gripSettingKey];
+    }
+
+    function neckNearbyEnabled() {
+      const s = window.AppSettings?.load?.() || {};
+      const key = id === "violin" ? "violinNeckNearbyTouch" : "guitarNeckNearbyTouch";
+      return s[key] !== false;
+    }
+
+    function stringsNearbyEnabled() {
+      const s = window.AppSettings?.load?.() || {};
+      const key = id === "violin" ? "violinStringsNearbyTouch" : "guitarStringsNearbyTouch";
+      return !!s[key];
     }
 
     function layoutFromSettings() {
@@ -1649,23 +1937,139 @@ function createFrettedInstrument(config) {
       setNeckVibrato(stringIdx, 0);
     }
 
+    function measureLayoutChrome() {
+      let h = 0;
+      const banner = document.getElementById("authBanner");
+      if (banner && banner.offsetHeight > 0) h += banner.offsetHeight;
+      const top = document.querySelector(".top-bar");
+      if (top) h += top.offsetHeight;
+      return h;
+    }
+
     function applySizeVars() {
-      if (!wrapEl) return;
       const { neckH, stringH, neckW, pluckW } = layoutFromSettings();
-      const rowRem = Math.max(0.65, neckH / 16);
-      const strRem = Math.max(0.65, stringH / 16);
-      wrapEl.style.setProperty("--inst-cell-w", `${Math.max(0.75, neckW / 16)}rem`);
-      wrapEl.style.setProperty("--inst-row-h", `${rowRem}rem`);
-      wrapEl.style.setProperty("--inst-string-h", `${strRem}rem`);
-      wrapEl.style.setProperty(pluckMinVar, `${Math.max(80, pluckW)}px`);
-      DISPLAY_STRINGS.forEach((s, i) => {
-        wrapEl.style.setProperty(`--str-thick-${i}`, `${STRING_THICK[i]}px`);
-      });
+      const requestedRow = Math.max(10, neckH);
+      const requestedStr = Math.max(10, stringH);
+      const requestedCell = Math.max(10, neckW);
+      const colCount = FRET_COUNT + 1;
+      const n = DISPLAY_STRINGS.length;
+      const fretHeader = 34;
+      const cardHead = 52;
+      const chromePad = 170;
+      const rowGaps = Math.max(0, n - 1) * 2;
+      const strGaps = Math.max(0, n - 1) * 3 + 18;
+
+      const baseNeckInner = fretHeader + n * requestedRow + rowGaps;
+      const basePluckInner = n * requestedStr + strGaps;
+      const baseUsedH = cardHead + Math.max(baseNeckInner, basePluckInner) + chromePad;
+
+      const chrome = measureLayoutChrome();
+      const maxFooter = Math.max(140, window.innerHeight - chrome);
+      const heightScale = Math.min(1, maxFooter / Math.max(1, baseUsedH));
+      let rowPx = Math.max(6, Math.floor(requestedRow * heightScale));
+      let strPx = Math.max(6, Math.floor(requestedStr * heightScale));
+
+      // Fit only by available footer height; do not lock to previous card size.
+      const contentPad = 108;
+      const availColumnH = Math.max(64, maxFooter - contentPad);
+      const fitRowPx = Math.floor((availColumnH - fretHeader - rowGaps) / Math.max(1, n));
+      const fitStrPx = Math.floor((availColumnH - strGaps) / Math.max(1, n));
+      rowPx = Math.max(6, Math.min(rowPx, fitRowPx));
+      strPx = Math.max(6, Math.min(strPx, fitStrPx));
+
+      const neckInner = fretHeader + n * rowPx + rowGaps;
+      const pluckInner = n * strPx + strGaps;
+      const usedH = cardHead + Math.max(neckInner, pluckInner) + chromePad;
+      const footerH = Math.min(usedH, maxFooter);
+
+      let pluckPx = Math.max(80, pluckW);
+      let cellPx = requestedCell;
+
+      document.documentElement.style.setProperty("--footer-row-h", `${footerH}px`);
+
+      const footerEl = document.getElementById("instrumentFooter");
+      if (footerEl) {
+        footerEl.style.height = `${footerH}px`;
+        footerEl.style.minHeight = `${footerH}px`;
+        footerEl.style.maxHeight = `${footerH}px`;
+      }
+
+      function applyDims(nextRow, nextStr, nextCell, nextPluck) {
+        const cellW = `${nextCell}px`;
+        const rowH = `${nextRow}px`;
+        const strH = `${nextStr}px`;
+        const pluck = `${nextPluck}px`;
+        const gridCols = `repeat(${colCount}, ${cellW})`;
+
+        const varTargets = [wrapEl, fretsRoot, stringsRoot].filter(Boolean);
+        for (const el of varTargets) {
+          el.style.setProperty("--inst-cell-w", cellW);
+          el.style.setProperty("--inst-row-h", rowH);
+          el.style.setProperty("--inst-string-h", strH);
+          el.style.setProperty(pluckMinVar, pluck);
+        }
+        if (wrapEl) {
+          wrapEl.style.height = "100%";
+          wrapEl.style.minHeight = "0";
+          wrapEl.style.maxHeight = "100%";
+          DISPLAY_STRINGS.forEach((s, i) => {
+            wrapEl.style.setProperty(`--str-thick-${i}`, `${STRING_THICK[i]}px`);
+          });
+        }
+
+        fretsRoot
+          ?.querySelectorAll(".guitar-fret-cells, .guitar-fret-header-cells")
+          .forEach((grid) => {
+            grid.style.gridTemplateColumns = gridCols;
+          });
+
+        fretsRoot?.querySelectorAll(".guitar-cell, .violin-cell").forEach((cell) => {
+          cell.style.width = cellW;
+          cell.style.height = rowH;
+          cell.style.minHeight = rowH;
+          cell.style.flexShrink = "0";
+        });
+
+        fretsRoot?.querySelectorAll(".guitar-string-row, .violin-string-row").forEach((row) => {
+          row.style.height = rowH;
+          row.style.minHeight = rowH;
+        });
+
+        const stringsPanel = stringsRoot?.closest(
+          ".guitar-strings-panel, .guitar-strings-card, .violin-strings-card"
+        );
+        if (stringsPanel) {
+          stringsPanel.style.width = pluck;
+          stringsPanel.style.minWidth = pluck;
+        }
+
+        const fretsPanel = fretsRoot?.closest(".guitar-frets-panel");
+        if (fretsPanel) {
+          const panelW = Math.max(120, colCount * (nextCell + 2) + 48);
+          fretsPanel.style.width = `${panelW}px`;
+          fretsPanel.style.maxWidth = "100%";
+        }
+
+        pluckRows.forEach(({ el }) => {
+          el.style.height = strH;
+          el.style.minHeight = strH;
+          el.style.flexBasis = strH;
+        });
+      }
+
+      applyDims(rowPx, strPx, cellPx, pluckPx);
     }
 
     function applySize() {
       applySizeVars();
       if (window.Game?.isReady?.()) window.Game.resize();
+    }
+
+    if (!window.__frettedLayoutResizeBound) {
+      window.__frettedLayoutResizeBound = true;
+      window.addEventListener("resize", () => {
+        if (wrapEl && !wrapEl.closest(".hidden")) applySizeVars();
+      });
     }
 
     function applyLayout() {
@@ -1698,14 +2102,63 @@ function createFrettedInstrument(config) {
 
     function refreshLabels() {}
 
+    function noteLabel(midi) {
+      return window.KeyLabels?.noteNameForMidi?.(midi) || String(midi);
+    }
+
+    function getTouchedFretsByString() {
+      const map = {};
+      for (const st of fretPointers.values()) {
+        if (st.cells?.length) {
+          for (const c of st.cells) {
+            if (!map[c.stringIdx]) map[c.stringIdx] = [];
+            map[c.stringIdx].push(c.fret);
+          }
+        } else if (st.gripAll) {
+          for (const s of DISPLAY_STRINGS) {
+            if (!map[s]) map[s] = [];
+            map[s].push(st.fret);
+          }
+        } else if (st.stringIdx != null) {
+          if (!map[st.stringIdx]) map[st.stringIdx] = [];
+          map[st.stringIdx].push(st.fret);
+        }
+      }
+      return map;
+    }
+
+    function formatActiveString(fret, midi, touchedFrets) {
+      const note = noteLabel(midi);
+      if (touchedFrets.length > 1) {
+        const uniq = [...new Set(touchedFrets)].sort((a, b) => a - b);
+        return `P${fret} · ${note} (${uniq.join("+")}→${fret})`;
+      }
+      if (fret > 0) return `P${fret} · ${note}`;
+      return `açık · ${note}`;
+    }
+
     function updateStringHighlights() {
+      const touched = getTouchedFretsByString();
       pluckRows.forEach(({ el, stringIdx }) => {
         const fret = fretted[stringIdx] || 0;
         const midi = currentMidiForString(stringIdx);
         el.dataset.midi = String(midi);
         el.classList.toggle("has-fret", fret > 0);
         const label = el.querySelector(".guitar-string-fret");
-        if (label) label.textContent = fret > 0 ? `perde ${fret}` : "açık";
+        if (label) label.textContent = formatActiveString(fret, midi, touched[stringIdx] || []);
+      });
+      DISPLAY_STRINGS.forEach((s) => {
+        const row = getNeckRow(s);
+        const activeEl = row?.querySelector(".guitar-neck-active");
+        if (!activeEl) return;
+        const fret = fretted[s] || 0;
+        const midi = currentMidiForString(s);
+        const touches = touched[s] || [];
+        if (touches.length || fret > 0 || autoFrets[s] != null) {
+          activeEl.textContent = formatActiveString(fret, midi, touches);
+        } else {
+          activeEl.textContent = "";
+        }
       });
     }
 
@@ -1713,86 +2166,146 @@ function createFrettedInstrument(config) {
       for (const s of DISPLAY_STRINGS) {
         fretCellsByString[s]?.forEach((cell) => {
           const f = Number(cell.dataset.fret);
-          const held = fretted[s] || 0;
+          const held = fretted[s] ?? 0;
+          cell.classList.remove("active-touch");
           cell.classList.toggle("fret-held", f === held && held > 0);
-          cell.classList.toggle("open-selected", f === 0 && held === 0);
         });
+      }
+      for (const st of fretPointers.values()) {
+        if (st.cells?.length) {
+          for (const c of st.cells) {
+            fretCellsByString[c.stringIdx]?.[c.fret]?.classList.add("active-touch");
+          }
+        } else if (st.gripAll) {
+          for (const s of DISPLAY_STRINGS) {
+            const cell = fretCellsByString[s]?.[st.fret];
+            cell?.classList.add("active-touch");
+          }
+        } else if (st.stringIdx != null) {
+          fretCellsByString[st.stringIdx]?.[st.fret]?.classList.add("active-touch");
+        }
       }
       updateStringHighlights();
     }
 
-    function recomputeFrettedFromPointers() {
+    function mergeFrettedDisplay() {
       const next = {};
-      for (const s of DISPLAY_STRINGS) next[s] = lockedFrets[s] || 0;
-
       for (const st of fretPointers.values()) {
-        if (st.gripAll) {
-          for (const s of DISPLAY_STRINGS) next[s] = Math.max(next[s], st.fret);
-        } else {
-          next[s] = Math.max(next[s] || 0, st.fret);
+        if (st.cells?.length) {
+          for (const c of st.cells) {
+            next[c.stringIdx] = Math.max(next[c.stringIdx] ?? 0, c.fret);
+          }
+        } else if (st.gripAll) {
+          for (const s of DISPLAY_STRINGS) next[s] = Math.max(next[s] ?? 0, st.fret);
+        } else if (st.stringIdx != null) {
+          next[st.stringIdx] = Math.max(next[st.stringIdx] ?? 0, st.fret);
         }
+      }
+      for (const s of DISPLAY_STRINGS) {
+        if (next[s] == null && autoFrets[s] != null) next[s] = autoFrets[s];
       }
       fretted = next;
       repaintFretCells();
     }
 
+    function pickBarreFret(cells, clientX) {
+      const byFret = new Map();
+      for (const c of cells) {
+        const prev = byFret.get(c.fret) || { count: 0, dist: Infinity };
+        const r = c.el.getBoundingClientRect();
+        const cx = (r.left + r.right) / 2;
+        byFret.set(c.fret, {
+          count: prev.count + 1,
+          dist: Math.min(prev.dist, Math.abs(cx - clientX)),
+        });
+      }
+      let best = 0;
+      let bestCount = -1;
+      let bestDist = Infinity;
+      for (const [f, { count, dist }] of byFret) {
+        if (count > bestCount || (count === bestCount && dist < bestDist)) {
+          bestCount = count;
+          bestDist = dist;
+          best = f;
+        }
+      }
+      return best;
+    }
+
+    function pointerStateFromCells(cells, e) {
+      if (gripAllStrings() && cells.length) {
+        return { gripAll: true, fret: pickBarreFret(cells, e.clientX) };
+      }
+      return {
+        multi: true,
+        cells: cells.map((c) => ({ stringIdx: c.stringIdx, fret: c.fret })),
+      };
+    }
+
+    function collectNeckCells(e, root) {
+      if (!neckNearbyEnabled()) {
+        const el = document.elementFromPoint(e.clientX, e.clientY)?.closest?.(".guitar-cell");
+        if (!el || !root.contains(el)) return [];
+        return [
+          {
+            el,
+            stringIdx: Number(el.dataset.string),
+            fret: Number(el.dataset.fret),
+            midi: Number(el.dataset.midi),
+          },
+        ];
+      }
+      const area = window.PointerSlide.touchRect(e, 18);
+      const cells = [];
+      root.querySelectorAll(".guitar-cell").forEach((el) => {
+        const r = el.getBoundingClientRect();
+        if (!window.PointerSlide.rectsIntersect(r, area)) return;
+        cells.push({
+          el,
+          stringIdx: Number(el.dataset.string),
+          fret: Number(el.dataset.fret),
+          midi: Number(el.dataset.midi),
+        });
+      });
+      return cells;
+    }
+
+    let neckSlideCtl = null;
+
     function releaseAll() {
+      neckSlideCtl?.releaseAll?.();
       fretPointers.clear();
+      autoFrets = {};
       fretted = {};
-      lockedFrets = {};
       window.AudioEngine?.stopAll?.();
       fretsRoot?.querySelectorAll(".guitar-cell").forEach((el) => {
-        el.classList.remove("active", "fret-held", "open-selected");
+        el.classList.remove("active", "fret-held", "active-touch", "open-selected");
       });
       pluckRows.forEach(({ el, stringIdx }) => {
-        el.classList.remove("active", "string-held", "string-vibrating", "has-fret");
+        el.classList.remove("active", "string-held", "string-vibrating", "has-fret", "hit-target");
         clearNeckVibrato(stringIdx);
       });
     }
 
-    function setLockedFret(stringIdx, fret) {
-      if (gripAllStrings()) {
-        const same = DISPLAY_STRINGS.every((s) => (lockedFrets[s] || 0) === fret);
-        const nextFret = same ? 0 : fret;
-        for (const s of DISPLAY_STRINGS) lockedFrets[s] = nextFret;
-      } else {
-        const cur = lockedFrets[stringIdx] || 0;
-        lockedFrets[stringIdx] = cur === fret ? 0 : fret;
-      }
-      recomputeFrettedFromPointers();
+    function bindNeckSlide() {
+      if (!fretsRoot || !window.PointerSlide?.bindMultiArea || neckSlideCtl) return;
+      neckSlideCtl = window.PointerSlide.bindMultiArea(fretsRoot, {
+        shouldHandle: (e) => !e.target.closest?.(".move-handle"),
+        collectTargets: collectNeckCells,
+        onSync: (st, cells, e) => {
+          st.pointerId = e.pointerId;
+          fretPointers.set(e.pointerId, pointerStateFromCells(cells, e));
+          mergeFrettedDisplay();
+        },
+        onEnd: (st) => {
+          if (st.pointerId != null) fretPointers.delete(st.pointerId);
+          mergeFrettedDisplay();
+        },
+      });
     }
 
-    function bindFretCell(el, stringIdx, fret) {
-      const down = (e) => {
-        if (e.pointerType === "mouse" && e.button !== 0) return;
-        e.preventDefault();
-        e.stopPropagation();
-        if (e.pointerType === "mouse") {
-          setLockedFret(stringIdx, fret);
-          return;
-        }
-        try {
-          el.setPointerCapture(e.pointerId);
-        } catch {
-          /* */
-        }
-        fretPointers.set(e.pointerId, { stringIdx, fret, gripAll: gripAllStrings() });
-        recomputeFrettedFromPointers();
-      };
-      const up = (e) => {
-        if (!fretPointers.has(e.pointerId)) return;
-        e.preventDefault();
-        fretPointers.delete(e.pointerId);
-        try {
-          el.releasePointerCapture(e.pointerId);
-        } catch {
-          /* */
-        }
-        recomputeFrettedFromPointers();
-      };
-      el.addEventListener("pointerdown", down, { passive: false });
-      el.addEventListener("pointerup", up, { passive: false });
-      el.addEventListener("pointercancel", up, { passive: false });
+    function bindFretCell() {
+      /* Perde kaydırma bindNeckSlide ile */
     }
 
     function buildFretGrid() {
@@ -1802,7 +2315,7 @@ function createFrettedInstrument(config) {
       cellMap.clear();
       fretCellsByString = {};
       fretted = {};
-      lockedFrets = {};
+      autoFrets = {};
       midiTargets = new Map();
 
       const header = document.createElement("div");
@@ -1826,10 +2339,10 @@ function createFrettedInstrument(config) {
         row.style.setProperty("--str-color", STRING_COLORS[colorIdx]);
         row.style.setProperty("--str-thick", `${STRING_THICK[colorIdx]}px`);
 
-        const label = document.createElement("span");
-        label.className = "guitar-string-label";
-        label.textContent = STRING_NAMES[colorIdx];
-        row.appendChild(label);
+        const labelWrap = document.createElement("div");
+        labelWrap.className = "guitar-string-label-wrap";
+        labelWrap.innerHTML = `<span class="guitar-string-label">${STRING_NAMES[colorIdx]}</span><span class="guitar-neck-active" aria-live="polite"></span>`;
+        row.appendChild(labelWrap);
 
         const lane = document.createElement("div");
         lane.className = "guitar-fret-lane";
@@ -1850,7 +2363,6 @@ function createFrettedInstrument(config) {
           cell.dataset.string = String(s);
           cell.dataset.fret = String(f);
           if (f === 0) cell.classList.add("open-fret");
-          bindFretCell(cell, s, f);
           cellMap.set(midi, cell);
           const prev = midiTargets.get(midi);
           if (!prev || f < prev.fret) midiTargets.set(midi, { cell, stringIdx: s, fret: f });
@@ -1867,6 +2379,7 @@ function createFrettedInstrument(config) {
         startMidi: Math.min(...DISPLAY_STRINGS.map((s) => STRING_OPEN[s])),
         endMidi: Math.max(...DISPLAY_STRINGS.map((s) => STRING_OPEN[s] + FRET_COUNT)),
       };
+      bindNeckSlide();
     }
 
     function buildStringPlucks() {
@@ -1901,7 +2414,9 @@ function createFrettedInstrument(config) {
       });
 
       stringsRoot.appendChild(pluckBundle);
-      window.StringTouch?.bindPluckBundle(pluckBundle, () => pluckRows);
+      window.StringTouch?.bindPluckBundle(pluckBundle, () => pluckRows, {
+        useNearbyTouch: () => stringsNearbyEnabled(),
+      });
       updateStringHighlights();
     }
 
@@ -1936,9 +2451,13 @@ function createFrettedInstrument(config) {
 
     function pressKey(midi, velocity = 0.85) {
       const target = midiTargets.get(midi);
+      if (target) {
+        autoFrets[target.stringIdx] = target.fret;
+        mergeFrettedDisplay();
+      }
       const el = target?.cell || cellMap.get(midi);
       if (el) el.classList.add("active");
-      window.AudioEngine.noteOn(midi, velocity);
+      window.AudioEngine.noteOn(midi, velocity, { poly: true });
       onNoteDown?.(midi, velocity);
       if (target?.stringIdx != null) {
         setNeckVibrato(target.stringIdx, 0.35);
@@ -1958,6 +2477,10 @@ function createFrettedInstrument(config) {
       window.AudioEngine.noteOff(midi);
       onNoteUp?.(midi);
       if (target?.stringIdx != null) {
+        if (autoFrets[target.stringIdx] != null) {
+          delete autoFrets[target.stringIdx];
+          mergeFrettedDisplay();
+        }
         clearNeckVibrato(target.stringIdx);
         const row = pluckRows.find((r) => r.stringIdx === target.stringIdx)?.el;
         if (row) {
@@ -1966,6 +2489,10 @@ function createFrettedInstrument(config) {
         }
       }
       highlightMidi(midi, false);
+    }
+
+    function getMidiTarget(midi) {
+      return midiTargets.get(midi);
     }
 
     return {
@@ -1983,6 +2510,7 @@ function createFrettedInstrument(config) {
       flash,
       pressKey,
       releaseKey,
+      getMidiTarget,
       getWrap: () => wrapEl,
       getNeckHint: () => (gripAllStrings() ? neckHintGrip : neckHintSingle),
       cardNeckTitle,
@@ -2007,8 +2535,8 @@ const Guitar = createFrettedInstrument({
   FRET_COUNT: 14,
   gripSettingKey: "guitarGripAllStrings",
   pluckMinVar: "--guitar-pluck-min-w",
-  neckHintGrip: "Çok parmakla birden fazla perdeye basın",
-  neckHintSingle: "Her tele ayrı perde — aynı anda birden fazla hücre",
+  neckHintGrip: "Bir perdeye basınca tüm teller sıkılır (barre)",
+  neckHintSingle: "Her tele ayrı perde — parmak altındaki hücreler",
   pluckTitle: "Parmağı kaydırarak tel seçin",
   cardNeckTitle: "Gitar kolu",
   cardPluckTitle: "Teller (titreştir)",
@@ -2040,9 +2568,9 @@ window.Violin = Violin;
 
 
 /* === string-touch.js === */
-/** Tel vuruşu — çoklu parmak, sürükleyerek tel değiştirme, titreşim + sönüm */
+/** Tel vuruşu — dokunma alanındaki tüm teller çalar, ayrılınca susar */
 const StringTouch = (() => {
-  const pointers = new Map();
+  const bundles = new Map();
 
   function resolveMidi(getMidi) {
     return typeof getMidi === "function" ? getMidi() : getMidi;
@@ -2058,151 +2586,166 @@ const StringTouch = (() => {
     else window.AudioEngine.noteOffVoice?.(voiceId);
   }
 
-  function hitRow(rows, clientY) {
-    for (const row of rows) {
-      const r = row.el.getBoundingClientRect();
-      if (clientY >= r.top - 4 && clientY <= r.bottom + 4) return row;
+  function rowsInTouch(rows, e, useNearbyTouch) {
+    const nearbyOn =
+      typeof useNearbyTouch === "function" ? !!useNearbyTouch(e) : !!useNearbyTouch;
+    if (nearbyOn) {
+      const area = window.PointerSlide?.touchRect?.(e, 16);
+      if (area) {
+        const out = [];
+        for (const row of rows) {
+          const r = row.el.getBoundingClientRect();
+          if (window.PointerSlide.rectsIntersect(r, area)) out.push(row);
+        }
+        return out;
+      }
     }
-    return null;
+    const hit = document.elementFromPoint(e.clientX, e.clientY);
+    const el = hit?.closest?.(".string-touch-target");
+    const found = el ? rows.find((r) => r.el === el) : null;
+    return found ? [found] : [];
   }
 
-  function clearRowVisual(st) {
-    if (!st?.el) return;
-    st.el.classList.remove("active", "string-held", "string-vibrating");
-    st.el.style.removeProperty("--vib-intensity");
-    st.lineEl?.classList.remove("string-line-active");
-    st.lineEl?.style.removeProperty("--vib-intensity");
-    st.row?.onVibrateEnd?.();
+  function clearRowVisual(rowState) {
+    if (!rowState?.el) return;
+    rowState.el.classList.remove("active", "string-held", "string-vibrating");
+    rowState.el.style.removeProperty("--vib-intensity");
+    rowState.lineEl?.classList.remove("string-line-active");
+    rowState.lineEl?.style.removeProperty("--vib-intensity");
+    rowState.row?.onVibrateEnd?.();
   }
 
-  function startRow(st, row, e) {
-    clearRowVisual(st);
-    st.row = row;
-    st.el = row.el;
-    st.getMidi = row.getMidi;
-    st.lineEl =
+  function rowLineEl(row) {
+    return (
       row.el.querySelector(".string-line") ||
       row.el.querySelector(".guitar-string-line") ||
       row.el.querySelector(".violin-string-line") ||
-      row.el;
-
-    const midi = resolveMidi(row.getMidi);
-    if (!midi) return;
-    st.midi = midi;
-    const vel = window.AudioEngine.velocityFromPointer(e, 0.55);
-    st.baseVel = vel;
-    st.pluck = vel;
-    st.lastX = e.clientX;
-    st.lastY = e.clientY;
-    st.lastT = performance.now();
-    st.smooth = 0;
-
-    row.el.classList.add("active", "string-held");
-    st.lineEl?.classList.add("string-line-active");
-    st.voiceId = window.AudioEngine.noteOn(midi, vel, { poly: true });
-    window.AudioEngine.setLiveGain?.(st.voiceId, vel);
-    row.onDown?.(midi, vel, e);
+      row.el
+    );
   }
 
-  function moveRow(st, e) {
-    const now = performance.now();
-    const dt = Math.max(1, now - st.lastT);
-    st.lastT = now;
+  function startRowVoice(st, row, e) {
+    const midi = resolveMidi(row.getMidi);
+    if (!midi) return null;
 
-    const midi = resolveMidi(st.getMidi);
-    if (midi !== st.midi) {
-      window.AudioEngine.setLiveVibrato?.(st.voiceId, 0);
-      releaseVoice(st.voiceId);
-      st.midi = midi;
-      const v = window.AudioEngine.velocityFromPointer(e, st.baseVel);
-      st.voiceId = window.AudioEngine.noteOn(midi, v, { poly: true });
-      st.baseVel = v;
-      st.pluck = v;
+    const vel = window.AudioEngine.velocityFromPointer(e, 0.55);
+    const lineEl = rowLineEl(row);
+    row.el.classList.add("active", "string-held");
+    lineEl?.classList.add("string-line-active");
+
+    const voiceId = window.AudioEngine.noteOn(midi, vel, { poly: true });
+    window.AudioEngine.setLiveGain?.(voiceId, vel);
+    row.onDown?.(midi, vel, e);
+
+    return {
+      row,
+      el: row.el,
+      lineEl,
+      getMidi: row.getMidi,
+      midi,
+      voiceId,
+      baseVel: vel,
+      pluck: vel,
+      lastX: e.clientX,
+      lastY: e.clientY,
+      lastT: performance.now(),
+      smooth: 0,
+    };
+  }
+
+  function moveRowVoice(rowState, e) {
+    const now = performance.now();
+    const dt = Math.max(1, now - rowState.lastT);
+    rowState.lastT = now;
+
+    const midi = resolveMidi(rowState.getMidi);
+    if (midi !== rowState.midi) {
+      window.AudioEngine.setLiveVibrato?.(rowState.voiceId, 0);
+      releaseVoice(rowState.voiceId);
+      rowState.midi = midi;
+      const v = window.AudioEngine.velocityFromPointer(e, rowState.baseVel);
+      rowState.voiceId = window.AudioEngine.noteOn(midi, v, { poly: true });
+      rowState.baseVel = v;
+      rowState.pluck = v;
     }
 
-    const dx = e.clientX - st.lastX;
-    const dy = e.clientY - st.lastY;
-    st.lastX = e.clientX;
-    st.lastY = e.clientY;
+    const dx = e.clientX - rowState.lastX;
+    const dy = e.clientY - rowState.lastY;
+    rowState.lastX = e.clientX;
+    rowState.lastY = e.clientY;
 
     const speed = Math.hypot(dx, dy);
     const vSpeed = Math.abs(dy) / dt;
-    st.smooth = st.smooth * 0.55 + speed * 0.45;
+    rowState.smooth = rowState.smooth * 0.55 + speed * 0.45;
 
     const sens = vibratoSens();
-    const depth = Math.min(4, 0.2 + st.smooth * 0.12 * sens);
-    const hz = 4.5 + Math.min(6, st.smooth * 0.14 * sens);
-    window.AudioEngine.setLiveVibrato?.(st.voiceId, depth, hz);
+    const depth = Math.min(4, 0.2 + rowState.smooth * 0.12 * sens);
+    const hz = 4.5 + Math.min(6, rowState.smooth * 0.14 * sens);
+    window.AudioEngine.setLiveVibrato?.(rowState.voiceId, depth, hz);
 
-    const pluckBoost = Math.min(1.85, 0.35 + vSpeed * 0.022 * sens + st.smooth * 0.04);
-    st.pluck = Math.max(st.pluck, pluckBoost);
-    window.AudioEngine.setLiveGain?.(st.voiceId, st.pluck);
+    const pluckBoost = Math.min(1.85, 0.35 + vSpeed * 0.022 * sens + rowState.smooth * 0.04);
+    rowState.pluck = Math.max(rowState.pluck, pluckBoost);
+    window.AudioEngine.setLiveGain?.(rowState.voiceId, rowState.pluck);
 
-    const intensity = Math.min(1, st.pluck / 1.2);
-    st.el.style.setProperty("--vib-intensity", String(intensity));
-    st.el.classList.toggle("string-vibrating", intensity > 0.05);
-    st.lineEl?.style.setProperty("--vib-intensity", String(intensity));
-    st.row?.onVibrate?.(intensity);
+    const intensity = Math.min(1, rowState.pluck / 1.2);
+    rowState.el.style.setProperty("--vib-intensity", String(intensity));
+    rowState.el.classList.toggle("string-vibrating", intensity > 0.05);
+    rowState.lineEl?.style.setProperty("--vib-intensity", String(intensity));
+    rowState.row?.onVibrate?.(intensity);
   }
 
-  function bindPluckBundle(bundleEl, getRows) {
-    const down = (e) => {
-      if (e.pointerType === "mouse" && e.button !== 0) return;
-      const rows = getRows();
-      const row = hitRow(rows, e.clientY);
-      if (!row) return;
-      e.preventDefault();
-      e.stopPropagation();
-      try {
-        bundleEl.setPointerCapture(e.pointerId);
-      } catch {
-        /* */
-      }
-      const st = { bundleEl, getRows };
-      pointers.set(e.pointerId, st);
-      startRow(st, row, e);
-    };
+  function releaseRowVoice(rowState, e) {
+    if (rowState.voiceId != null) {
+      window.AudioEngine.setLiveVibrato?.(rowState.voiceId, 0);
+      releaseVoice(rowState.voiceId);
+      rowState.row?.onUp?.(rowState.midi, e);
+    }
+    clearRowVisual(rowState);
+  }
 
-    const move = (e) => {
-      const st = pointers.get(e.pointerId);
-      if (!st) return;
-      e.preventDefault();
-      const rows = st.getRows();
-      const row = hitRow(rows, e.clientY);
-      if (row && row !== st.row) {
-        if (st.voiceId != null) {
-          window.AudioEngine.setLiveVibrato?.(st.voiceId, 0);
-          releaseVoice(st.voiceId);
-          st.row?.onUp?.(st.midi, e);
-        }
-        clearRowVisual(st);
-        startRow(st, row, e);
-      }
-      if (st.row) moveRow(st, e);
-    };
+  function syncRows(st, rows, e) {
+    if (!st.activeRows) st.activeRows = new Map();
+    const want = new Set(rows.map((r) => r.el));
 
-    const end = (e) => {
-      const st = pointers.get(e.pointerId);
-      if (!st) return;
-      e.preventDefault();
-      pointers.delete(e.pointerId);
-      if (st.voiceId != null) {
-        window.AudioEngine.setLiveVibrato?.(st.voiceId, 0);
-        releaseVoice(st.voiceId);
-        st.row?.onUp?.(st.midi, e);
-      }
-      clearRowVisual(st);
-      try {
-        bundleEl.releasePointerCapture(e.pointerId);
-      } catch {
-        /* */
-      }
-    };
+    for (const [el, rowState] of [...st.activeRows]) {
+      if (want.has(el)) continue;
+      releaseRowVoice(rowState, e);
+      st.activeRows.delete(el);
+    }
 
-    bundleEl.addEventListener("pointerdown", down, { passive: false });
-    bundleEl.addEventListener("pointermove", move, { passive: false });
-    bundleEl.addEventListener("pointerup", end, { passive: false });
-    bundleEl.addEventListener("pointercancel", end, { passive: false });
+    for (const row of rows) {
+      let rowState = st.activeRows.get(row.el);
+      if (!rowState) {
+        rowState = startRowVoice(st, row, e);
+        if (rowState) st.activeRows.set(row.el, rowState);
+      } else {
+        moveRowVoice(rowState, e);
+      }
+    }
+  }
+
+  function releaseAllRows(st, e) {
+    if (!st.activeRows) return;
+    for (const rowState of st.activeRows.values()) releaseRowVoice(rowState, e);
+    st.activeRows.clear();
+  }
+
+  function bindPluckBundle(bundleEl, getRows, options = {}) {
+    if (!window.PointerSlide?.bindMultiArea) return;
+    const ctl = window.PointerSlide.bindMultiArea(bundleEl, {
+      collectTargets: (e) => rowsInTouch(getRows(), e, options.useNearbyTouch),
+      onSync: (st, rows, e) => syncRows(st, rows, e),
+      onEnd: (st, e) => releaseAllRows(st, e),
+    });
+    if (!bundleEl.__stringTouchGuardBound) {
+      bundleEl.__stringTouchGuardBound = true;
+      window.addEventListener("blur", () => ctl.releaseAll?.(), { passive: true });
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) ctl.releaseAll?.();
+      });
+      bundleEl.addEventListener("pointerleave", () => ctl.releaseAll?.(), { passive: true });
+    }
+    bundles.set(bundleEl, ctl);
   }
 
   function bind(el, getMidi, callbacks = {}) {
@@ -2360,6 +2903,7 @@ const PlaySurface = (() => {
     setAutoFit: (...a) => delegate("setAutoFit", ...a),
     getKeySize: () => delegate("getKeySize"),
     refreshLabels: () => delegate("refreshLabels"),
+    getMidiTarget: (midi) => delegate("getMidiTarget", midi),
     flash,
     pressKey,
     releaseKey,
@@ -2371,16 +2915,16 @@ window.PlaySurface = PlaySurface;
 
 
 /* === instrument-move.js === */
-/** Enstrüman panellerini sürükleyerek konumlandır */
+/** Enstrüman panellerini sürükleyerek konumlandır (alt kenara sabitli — yukarı büyür) */
 const InstrumentMove = (() => {
   let moveMode = false;
   let drag = null;
 
   const PANELS = {
-    guitarFrets: { selector: "#guitarFretsPanel", defaultPos: { x: 1, y: 2 } },
-    guitarStrings: { selector: "#guitarStringsPanel", defaultPos: { x: 72, y: 4 } },
-    violinBoard: { selector: "#violinBoardPanel", defaultPos: { x: 1, y: 4 } },
-    violinStrings: { selector: "#violinStringsPanel", defaultPos: { x: 72, y: 6 } },
+    guitarFrets: { selector: "#guitarFretsPanel", defaultPos: { x: 1, y: 0 } },
+    guitarStrings: { selector: "#guitarStringsPanel", defaultPos: { x: 72, y: 0 } },
+    violinBoard: { selector: "#violinBoardPanel", defaultPos: { x: 1, y: 0 } },
+    violinStrings: { selector: "#violinStringsPanel", defaultPos: { x: 72, y: 0 } },
   };
 
   function layoutKey(id) {
@@ -2390,7 +2934,18 @@ const InstrumentMove = (() => {
   function applyPanelPosition(el, pos) {
     if (!el || !pos) return;
     el.style.left = `${pos.x}%`;
-    el.style.top = `${pos.y}%`;
+    el.style.top = "auto";
+    el.style.bottom = `${pos.y}%`;
+  }
+
+  function readPanelY(panel) {
+    const bottom = parseFloat(panel.style.bottom);
+    if (!Number.isNaN(bottom) && panel.style.bottom) return bottom;
+    const top = parseFloat(panel.style.top);
+    if (!Number.isNaN(top) && panel.style.top) {
+      return Math.max(0, Math.min(92, 100 - top - 14));
+    }
+    return 0;
   }
 
   function applyLayout(settings) {
@@ -2398,8 +2953,15 @@ const InstrumentMove = (() => {
     for (const [id, meta] of Object.entries(PANELS)) {
       const el = document.querySelector(meta.selector);
       if (!el) continue;
-      const pos = layout[layoutKey(id)] || meta.defaultPos;
+      const saved = layout[layoutKey(id)];
+      const pos = saved || meta.defaultPos;
       applyPanelPosition(el, pos);
+      if (saved?.fromTop && !saved?.migrated) {
+        applyPanelPosition(el, {
+          x: saved.x,
+          y: Math.max(0, Math.min(92, 100 - saved.y - 14)),
+        });
+      }
     }
   }
 
@@ -2409,6 +2971,7 @@ const InstrumentMove = (() => {
     layout[layoutKey(id)] = {
       x: Math.max(0, Math.min(92, x)),
       y: Math.max(0, Math.min(92, y)),
+      anchor: "bottom",
     };
     window.AppSettings.save({ panelLayout: layout });
   }
@@ -2438,7 +3001,7 @@ const InstrumentMove = (() => {
     const parent = panel.offsetParent || panel.parentElement;
     const pr = parent.getBoundingClientRect();
     const left = parseFloat(panel.style.left) || 0;
-    const top = parseFloat(panel.style.top) || 0;
+    const bottom = readPanelY(panel);
     drag = {
       panel,
       id: panel.dataset.moveId,
@@ -2447,7 +3010,7 @@ const InstrumentMove = (() => {
       startX: e.clientX,
       startY: e.clientY,
       origX: left,
-      origY: top,
+      origY: bottom,
     };
     panel.setPointerCapture(e.pointerId);
   }
@@ -2458,15 +3021,16 @@ const InstrumentMove = (() => {
     const dx = ((e.clientX - drag.startX) / drag.parentW) * 100;
     const dy = ((e.clientY - drag.startY) / drag.parentH) * 100;
     const x = Math.max(0, Math.min(92, drag.origX + dx));
-    const y = Math.max(0, Math.min(92, drag.origY + dy));
+    const y = Math.max(0, Math.min(92, drag.origY - dy));
     drag.panel.style.left = `${x}%`;
-    drag.panel.style.top = `${y}%`;
+    drag.panel.style.top = "auto";
+    drag.panel.style.bottom = `${y}%`;
   }
 
   function onPointerUp(e) {
     if (!drag) return;
     const x = parseFloat(drag.panel.style.left) || 0;
-    const y = parseFloat(drag.panel.style.top) || 0;
+    const y = readPanelY(drag.panel);
     if (drag.id) savePanelPosition(drag.id, x, y);
     try {
       drag.panel.releasePointerCapture(e.pointerId);
@@ -2781,7 +3345,12 @@ const Game = (() => {
       return area?.clientHeight * HIT_LINE_FALLBACK || 400;
     }
     const ar = area.getBoundingClientRect();
-    const pr = instWrap.getBoundingClientRect();
+    const mode = window.PlaySurface?.getMode?.() || "piano";
+    const footer = document.getElementById("instrumentFooter");
+    const pr =
+      (mode === "guitar" || mode === "violin") && footer
+        ? footer.getBoundingClientRect()
+        : instWrap.getBoundingClientRect();
     return Math.max(48, Math.round(pr.top - ar.top));
   }
 
@@ -2800,30 +3369,39 @@ const Game = (() => {
     const range = surface.getRange();
     if (!range) return;
     const mode = surface.getMode();
-    let selector = ".piano-keys .key";
-    if (mode === "guitar" || mode === "violin") selector = ".guitar-neck .guitar-cell";
-
     const area = canvas.parentElement;
     const areaRect = area.getBoundingClientRect();
 
+    if (mode === "guitar" || mode === "violin") {
+      const mod = surface.activeModule?.();
+      const midis = new Set();
+      document.querySelectorAll(".guitar-neck .guitar-cell").forEach((key) => {
+        const midi = Number(key.dataset.midi);
+        if (midi >= range.startMidi && midi <= range.endMidi) midis.add(midi);
+      });
+      for (const midi of midis) {
+        const target = mod?.getMidiTarget?.(midi);
+        const cell = target?.cell;
+        if (!cell) continue;
+        const r = cell.getBoundingClientRect();
+        const centerX = r.left + r.width / 2 - areaRect.left;
+        const fret = target.fret;
+        const stringIdx = target.stringIdx;
+        const label = `${stringLabelForMode(mode, stringIdx)}${fret}`;
+        const laneColor =
+          getComputedStyle(cell).getPropertyValue("--str-color")?.trim() || null;
+        keyPositions.set(midi, { x: centerX, w: r.width, fret, label, laneColor });
+      }
+      return;
+    }
+
+    let selector = ".piano-keys .key";
     document.querySelectorAll(selector).forEach((key) => {
       const midi = Number(key.dataset.midi);
       if (!midi || midi < range.startMidi || midi > range.endMidi) return;
       const r = key.getBoundingClientRect();
       const centerX = r.left + r.width / 2 - areaRect.left;
-      if (mode === "guitar" || mode === "violin") {
-        const fret = Number(key.dataset.fret || 0);
-        const stringIdx = Number(key.dataset.string || 0);
-        const label = `${stringLabelForMode(mode, stringIdx)}${fret}`;
-        const laneColor =
-          getComputedStyle(key).getPropertyValue("--str-color")?.trim() || null;
-        const prev = keyPositions.get(midi);
-        if (!prev || fret < prev.fret) {
-          keyPositions.set(midi, { x: centerX, w: r.width, fret, label, laneColor });
-        }
-      } else {
-        keyPositions.set(midi, { x: centerX, w: r.width });
-      }
+      keyPositions.set(midi, { x: centerX, w: r.width });
     });
   }
 
@@ -3073,11 +3651,13 @@ const Game = (() => {
         const vel = Math.max(0.2, Math.min(1, n.velocity ?? 0.75));
         inst?.pressKey?.(n.midi, vel);
         boostKeyAura(n.midi, 1);
-        n.hit = true;
       }
       if (n._autoStarted && !n._autoEnded && t >= n.time + n.duration) {
         n._autoEnded = true;
         inst?.releaseKey?.(n.midi);
+      }
+      if (n._autoStarted && t >= n.time && !n.hit) {
+        n.hit = true;
       }
     }
   }
@@ -3527,11 +4107,13 @@ window.mainJsOk = true;
   function mods() {
     return {
       Piano: window.Piano,
+      PianoRange: window.PianoRange,
       PlaySurface: window.PlaySurface,
       Game: window.Game,
       LibraryStore: window.LibraryStore,
       AppSettings: window.AppSettings,
       AudioEngine: window.AudioEngine,
+      KeyLabels: window.KeyLabels,
     };
   }
 
@@ -3613,6 +4195,10 @@ window.mainJsOk = true;
   const vibratoSensLabel = $("#vibratoSensLabel");
   const guitarGripAllStrings = $("#guitarGripAllStrings");
   const violinGripAllStrings = $("#violinGripAllStrings");
+  const guitarNeckNearbyTouch = $("#guitarNeckNearbyTouch");
+  const guitarStringsNearbyTouch = $("#guitarStringsNearbyTouch");
+  const violinNeckNearbyTouch = $("#violinNeckNearbyTouch");
+  const violinStringsNearbyTouch = $("#violinStringsNearbyTouch");
   const guitarNeckHeight = $("#guitarNeckHeight");
   const guitarStringHeight = $("#guitarStringHeight");
   const guitarNeckWidth = $("#guitarNeckWidth");
@@ -3830,14 +4416,28 @@ window.mainJsOk = true;
     const mode = window.PlaySurface?.getMode?.() || "piano";
     if (mode === "piano") {
       requireMods().Piano.setKeySize(w, h);
-    } else if ((mode === "guitar" || mode === "violin") && window.PlaySurface?.activeModule?.()?.applyLayout) {
-      window.PlaySurface.activeModule().applyLayout();
-    } else {
-      window.PlaySurface?.setKeySize?.(w, h);
+      return;
     }
+    if ((mode === "guitar" || mode === "violin") && window.PlaySurface?.activeModule?.()?.setKeySize) {
+      window.PlaySurface.activeModule().setKeySize(w, h);
+      syncFrettedSizeSliders(window.AppSettings.load());
+      return;
+    }
+    window.PlaySurface?.setKeySize?.(w, h);
   }
 
-  function applyGuitarLayoutFromSliders() {
+  function syncFrettedSizeSliders(s) {
+    if (guitarNeckHeight) guitarNeckHeight.value = String(s.guitarNeckHeight ?? 30);
+    if (guitarStringHeight) guitarStringHeight.value = String(s.guitarStringHeight ?? 30);
+    if (guitarNeckWidth) guitarNeckWidth.value = String(s.guitarNeckWidth ?? 42);
+    if (guitarPluckWidth) guitarPluckWidth.value = String(s.guitarPluckWidth ?? 220);
+    if (guitarNeckHeightLabel) guitarNeckHeightLabel.textContent = `${s.guitarNeckHeight ?? 30} px`;
+    if (guitarStringHeightLabel) guitarStringHeightLabel.textContent = `${s.guitarStringHeight ?? 30} px`;
+    if (guitarNeckWidthLabel) guitarNeckWidthLabel.textContent = `${s.guitarNeckWidth ?? 42} px`;
+    if (guitarPluckWidthLabel) guitarPluckWidthLabel.textContent = `${s.guitarPluckWidth ?? 220} px`;
+  }
+
+  function applyFrettedLayoutFromSliders() {
     const partial = {
       guitarNeckHeight: Number(guitarNeckHeight?.value || 30),
       guitarStringHeight: Number(guitarStringHeight?.value || 30),
@@ -3849,7 +4449,9 @@ window.mainJsOk = true;
     if (guitarNeckWidthLabel) guitarNeckWidthLabel.textContent = `${partial.guitarNeckWidth} px`;
     if (guitarPluckWidthLabel) guitarPluckWidthLabel.textContent = `${partial.guitarPluckWidth} px`;
     persistSettings(partial);
+    syncFrettedSizeSliders({ ...window.AppSettings.load(), ...partial });
     window.Guitar?.applyLayout?.();
+    window.Violin?.applyLayout?.();
     setTimeout(() => requireMods().Game.resize(), 60);
   }
 
@@ -3910,9 +4512,24 @@ window.mainJsOk = true;
     updateSettingsForPlayMode(m);
     applyThemeFromSettings(AppSettings.load(), m);
     const s = AppSettings.load();
-    if (m === "guitar" || m === "violin") window.PlaySurface?.activeModule?.()?.applyLayout?.();
-    else applyInstrumentKeySize(s.keyWidth, s.keyHeight);
-    setTimeout(() => requireMods().Game.resize(), 100);
+    if (m === "piano") {
+      const { Piano, PianoRange } = requireMods();
+      if (!PianoRange?.clampRange) {
+        throw new Error("PianoRange modülü yüklenemedi");
+      }
+      Piano.setAutoFit((s.pianoAlign || "stretch") === "stretch");
+      Piano.setKeySize(s.keyWidth, s.keyHeight);
+      const clamped = PianoRange.clampRange(s.octaveStart, s.octaveCount);
+      Piano.buildKeys(clamped.startOctave, clamped.octaveCount);
+      applyLabelSettings(s);
+    } else if (m === "guitar" || m === "violin") {
+      syncFrettedSizeSliders(s);
+      window.PlaySurface?.activeModule?.()?.applyLayout?.();
+    }
+    setTimeout(() => {
+      requireMods().Game.resize();
+      reloadTrackNotes();
+    }, 100);
     return m;
   }
 
@@ -4014,6 +4631,10 @@ window.mainJsOk = true;
     }
     if (guitarGripAllStrings) guitarGripAllStrings.checked = !!s.guitarGripAllStrings;
     if (violinGripAllStrings) violinGripAllStrings.checked = !!s.violinGripAllStrings;
+    if (guitarNeckNearbyTouch) guitarNeckNearbyTouch.checked = s.guitarNeckNearbyTouch !== false;
+    if (violinNeckNearbyTouch) violinNeckNearbyTouch.checked = s.violinNeckNearbyTouch !== false;
+    if (guitarStringsNearbyTouch) guitarStringsNearbyTouch.checked = !!s.guitarStringsNearbyTouch;
+    if (violinStringsNearbyTouch) violinStringsNearbyTouch.checked = !!s.violinStringsNearbyTouch;
     if (guitarNeckHeight) guitarNeckHeight.value = String(s.guitarNeckHeight ?? 30);
     if (guitarStringHeight) guitarStringHeight.value = String(s.guitarStringHeight ?? 30);
     if (guitarNeckWidth) guitarNeckWidth.value = String(s.guitarNeckWidth ?? 42);
@@ -4023,13 +4644,17 @@ window.mainJsOk = true;
     if (guitarNeckWidthLabel) guitarNeckWidthLabel.textContent = `${s.guitarNeckWidth ?? 42} px`;
     if (guitarPluckWidthLabel) guitarPluckWidthLabel.textContent = `${s.guitarPluckWidth ?? 220} px`;
     if ((s.playMode || "piano") === "guitar" || s.playMode === "violin") {
-      window.PlaySurface?.activeModule?.()?.applyLayout?.();
+      window.Guitar?.applyLayout?.();
+      window.Violin?.applyLayout?.();
     }
     if (playMode === "piano") {
+      const { Piano, PianoRange } = requireMods();
       Piano.setAutoFit((s.pianoAlign || "stretch") === "stretch");
       Piano.setKeySize(s.keyWidth, s.keyHeight);
-      const clamped = PianoRange.clampRange(s.octaveStart, s.octaveCount);
-      Piano.buildKeys(clamped.startOctave, clamped.octaveCount);
+      if (PianoRange?.clampRange) {
+        const clamped = PianoRange.clampRange(s.octaveStart, s.octaveCount);
+        Piano.buildKeys(clamped.startOctave, clamped.octaveCount);
+      }
     }
   }
 
@@ -4134,7 +4759,7 @@ window.mainJsOk = true;
     if (s.octaveLockManual || !s.autoKeyboardFromSong || !notes?.length) return null;
     if (!window.PianoRange?.fitRangeToNotes) return null;
 
-    const fit = PianoRange.fitRangeToNotes(notes);
+    const fit = window.PianoRange.fitRangeToNotes(notes);
     populateOctaveSelects(fit.startOctave, fit.octaveCount);
     const { Piano } = requireMods();
     Piano.setAutoFit((s.pianoAlign || "stretch") === "stretch");
@@ -4171,6 +4796,21 @@ window.mainJsOk = true;
     setTimeout(() => Game.resize(), 100);
   }
 
+  function updateImportButtons() {
+    const LibraryStore = requireStore();
+    const activeId = LibraryStore.getActiveLibraryId();
+    const isWebGuest =
+      window.pianoApi?.isWeb && !window.pianoApi.getSession?.()?.memberId;
+    btnImport.disabled = !activeId;
+    if (btnImportAudio) btnImportAudio.disabled = !activeId;
+    if (btnImport && isWebGuest) {
+      btnImport.title =
+        "MIDI kaydetmek için üye olun (tek seferlik 1 USD). Üye olmadan enstrümanı serbest çalabilirsiniz.";
+    } else if (btnImport) {
+      btnImport.title = "";
+    }
+  }
+
   function updateHints() {
     const LibraryStore = requireStore();
     const libId = LibraryStore.getActiveLibraryId();
@@ -4179,7 +4819,9 @@ window.mainJsOk = true;
     libraryHint.textContent = lib
       ? `Seçili: ${lib.name} — MIDI eklemek için + MIDI`
       : isWeb
-        ? "Kütüphane seçin veya yukarıdan ekleyin. Veriler Wix hesabınızda saklanır."
+        ? window.pianoApi.getSession?.()?.memberId
+          ? "Kütüphane seçin veya yukarıdan ekleyin. Veriler Wix hesabınızda saklanır."
+          : "Misafir modu: enstrümanı serbest çalın. MIDI kaydetmek için üye olun (tek seferlik 1 USD)."
         : "Kütüphane seçin veya yukarıdan ekleyin.";
     const activeSong = LibraryStore.getActiveSongId();
     let playReady = false;
@@ -4224,8 +4866,7 @@ window.mainJsOk = true;
       });
       libraryList.appendChild(li);
     }
-    btnImport.disabled = !activeId;
-    if (btnImportAudio) btnImportAudio.disabled = !activeId;
+    updateImportButtons();
     updateHints();
   }
 
@@ -4417,6 +5058,13 @@ window.mainJsOk = true;
       toast("Önce bir kütüphane seçin veya oluşturun.", true);
       return;
     }
+    if (window.pianoApi?.isWeb && !window.pianoApi.getSession?.()?.memberId) {
+      toast(
+        "MIDI kaydetmek için Wix üyeliği gerekir (tek seferlik 1 USD). Üye olmadan piyano/gitar/keman ile serbest çalabilirsiniz.",
+        true
+      );
+      return;
+    }
     try {
       try {
         requireMods().AudioEngine.ensure();
@@ -4516,16 +5164,32 @@ window.mainJsOk = true;
 
   guitarGripAllStrings?.addEventListener("change", () => {
     persistSettings({ guitarGripAllStrings: guitarGripAllStrings.checked });
-    if (window.Guitar?.buildKeys) window.Guitar.buildKeys();
+    window.Guitar?.applyLayout?.();
   });
 
   violinGripAllStrings?.addEventListener("change", () => {
     persistSettings({ violinGripAllStrings: violinGripAllStrings.checked });
-    if (window.Violin?.buildKeys) window.Violin.buildKeys();
+    window.Violin?.applyLayout?.();
+  });
+
+  guitarNeckNearbyTouch?.addEventListener("change", () => {
+    persistSettings({ guitarNeckNearbyTouch: guitarNeckNearbyTouch.checked });
+  });
+
+  violinNeckNearbyTouch?.addEventListener("change", () => {
+    persistSettings({ violinNeckNearbyTouch: violinNeckNearbyTouch.checked });
+  });
+
+  guitarStringsNearbyTouch?.addEventListener("change", () => {
+    persistSettings({ guitarStringsNearbyTouch: guitarStringsNearbyTouch.checked });
+  });
+
+  violinStringsNearbyTouch?.addEventListener("change", () => {
+    persistSettings({ violinStringsNearbyTouch: violinStringsNearbyTouch.checked });
   });
 
   [guitarNeckHeight, guitarStringHeight, guitarNeckWidth, guitarPluckWidth].forEach((el) => {
-    el?.addEventListener("input", applyGuitarLayoutFromSliders);
+    el?.addEventListener("input", applyFrettedLayoutFromSliders);
   });
 
   window.addEventListener("touch-piano:play-mode", (e) => {
@@ -4572,10 +5236,7 @@ window.mainJsOk = true;
       toast("Piyano konumu: Ayarlar → Klavye → konum / hiza.");
       return;
     }
-    if (!window.InstrumentMove) return;
-    const next = !window.InstrumentMove.isMoveMode();
-    window.InstrumentMove.setMoveMode(next);
-    toast(next ? "Panelleri sürükleyin, bitince tekrar tıklayın." : "Konum kaydedildi.");
+    toast("Gitar/keman panelleri sabit düzende. Boyut için Ayarlar → Klavye kaydırıcılarını kullanın.");
   });
 
   dynamicPressure.addEventListener("change", () => {
@@ -4763,11 +5424,18 @@ window.mainJsOk = true;
       window.__bootStatus = "kütüphane yüklendi";
       renderLibraries();
       renderSongs();
+      updateImportButtons();
     } catch (err) {
       window.__bootStatus = "hata: " + err.message;
-      toast(`Kütüphane hatası: ${err.message}`, true);
-      console.error(err);
-      return;
+      if (window.pianoApi?.isWeb) {
+        toast("Misafir modu: enstrümanı kullanabilirsiniz. Bulut kütüphane için üye olun.", false);
+        renderLibraries();
+        updateImportButtons();
+      } else {
+        toast(`Kütüphane hatası: ${err.message}`, true);
+        console.error(err);
+        return;
+      }
     }
 
     try {
@@ -4787,6 +5455,11 @@ window.mainJsOk = true;
       window.KeyboardInput?.rebuild?.();
       showInstrumentPickerIfNeeded();
       updateSettingsForPlayMode(PlaySurface.getMode());
+      updateImportButtons();
+      window.addEventListener("touch-piano:session", () => {
+        updateImportButtons();
+        updateHints();
+      });
       window.__bootStatus = "piyano hazır";
     } catch (err) {
       window.__bootStatus = "piyano hata: " + err.message;

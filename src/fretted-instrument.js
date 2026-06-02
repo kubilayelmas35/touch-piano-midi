@@ -110,7 +110,7 @@ function createFrettedInstrument(config) {
       const cardHead = 52;
       const chromePad = 170;
       const rowGaps = Math.max(0, n - 1) * 2;
-      const strGaps = Math.max(0, n - 1) * 3 + 8;
+      const strGaps = Math.max(0, n - 1) * 3 + 18;
 
       const baseNeckInner = fretHeader + n * requestedRow + rowGaps;
       const basePluckInner = n * requestedStr + strGaps;

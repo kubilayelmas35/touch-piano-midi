@@ -167,6 +167,14 @@ const StringTouch = (() => {
       onSync: (st, rows, e) => syncRows(st, rows, e),
       onEnd: (st, e) => releaseAllRows(st, e),
     });
+    if (!bundleEl.__stringTouchGuardBound) {
+      bundleEl.__stringTouchGuardBound = true;
+      window.addEventListener("blur", () => ctl.releaseAll?.(), { passive: true });
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) ctl.releaseAll?.();
+      });
+      bundleEl.addEventListener("pointerleave", () => ctl.releaseAll?.(), { passive: true });
+    }
     bundles.set(bundleEl, ctl);
   }
 
