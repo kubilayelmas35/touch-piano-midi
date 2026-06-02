@@ -6,11 +6,13 @@
   function mods() {
     return {
       Piano: window.Piano,
+      PianoRange: window.PianoRange,
       PlaySurface: window.PlaySurface,
       Game: window.Game,
       LibraryStore: window.LibraryStore,
       AppSettings: window.AppSettings,
       AudioEngine: window.AudioEngine,
+      KeyLabels: window.KeyLabels,
     };
   }
 
@@ -92,6 +94,10 @@
   const vibratoSensLabel = $("#vibratoSensLabel");
   const guitarGripAllStrings = $("#guitarGripAllStrings");
   const violinGripAllStrings = $("#violinGripAllStrings");
+  const guitarNeckNearbyTouch = $("#guitarNeckNearbyTouch");
+  const guitarStringsNearbyTouch = $("#guitarStringsNearbyTouch");
+  const violinNeckNearbyTouch = $("#violinNeckNearbyTouch");
+  const violinStringsNearbyTouch = $("#violinStringsNearbyTouch");
   const guitarNeckHeight = $("#guitarNeckHeight");
   const guitarStringHeight = $("#guitarStringHeight");
   const guitarNeckWidth = $("#guitarNeckWidth");
@@ -309,14 +315,28 @@
     const mode = window.PlaySurface?.getMode?.() || "piano";
     if (mode === "piano") {
       requireMods().Piano.setKeySize(w, h);
-    } else if ((mode === "guitar" || mode === "violin") && window.PlaySurface?.activeModule?.()?.applyLayout) {
-      window.PlaySurface.activeModule().applyLayout();
-    } else {
-      window.PlaySurface?.setKeySize?.(w, h);
+      return;
     }
+    if ((mode === "guitar" || mode === "violin") && window.PlaySurface?.activeModule?.()?.setKeySize) {
+      window.PlaySurface.activeModule().setKeySize(w, h);
+      syncFrettedSizeSliders(window.AppSettings.load());
+      return;
+    }
+    window.PlaySurface?.setKeySize?.(w, h);
   }
 
-  function applyGuitarLayoutFromSliders() {
+  function syncFrettedSizeSliders(s) {
+    if (guitarNeckHeight) guitarNeckHeight.value = String(s.guitarNeckHeight ?? 30);
+    if (guitarStringHeight) guitarStringHeight.value = String(s.guitarStringHeight ?? 30);
+    if (guitarNeckWidth) guitarNeckWidth.value = String(s.guitarNeckWidth ?? 42);
+    if (guitarPluckWidth) guitarPluckWidth.value = String(s.guitarPluckWidth ?? 220);
+    if (guitarNeckHeightLabel) guitarNeckHeightLabel.textContent = `${s.guitarNeckHeight ?? 30} px`;
+    if (guitarStringHeightLabel) guitarStringHeightLabel.textContent = `${s.guitarStringHeight ?? 30} px`;
+    if (guitarNeckWidthLabel) guitarNeckWidthLabel.textContent = `${s.guitarNeckWidth ?? 42} px`;
+    if (guitarPluckWidthLabel) guitarPluckWidthLabel.textContent = `${s.guitarPluckWidth ?? 220} px`;
+  }
+
+  function applyFrettedLayoutFromSliders() {
     const partial = {
       guitarNeckHeight: Number(guitarNeckHeight?.value || 30),
       guitarStringHeight: Number(guitarStringHeight?.value || 30),
@@ -328,7 +348,9 @@
     if (guitarNeckWidthLabel) guitarNeckWidthLabel.textContent = `${partial.guitarNeckWidth} px`;
     if (guitarPluckWidthLabel) guitarPluckWidthLabel.textContent = `${partial.guitarPluckWidth} px`;
     persistSettings(partial);
+    syncFrettedSizeSliders({ ...window.AppSettings.load(), ...partial });
     window.Guitar?.applyLayout?.();
+    window.Violin?.applyLayout?.();
     setTimeout(() => requireMods().Game.resize(), 60);
   }
 
@@ -389,9 +411,24 @@
     updateSettingsForPlayMode(m);
     applyThemeFromSettings(AppSettings.load(), m);
     const s = AppSettings.load();
-    if (m === "guitar" || m === "violin") window.PlaySurface?.activeModule?.()?.applyLayout?.();
-    else applyInstrumentKeySize(s.keyWidth, s.keyHeight);
-    setTimeout(() => requireMods().Game.resize(), 100);
+    if (m === "piano") {
+      const { Piano, PianoRange } = requireMods();
+      if (!PianoRange?.clampRange) {
+        throw new Error("PianoRange modülü yüklenemedi");
+      }
+      Piano.setAutoFit((s.pianoAlign || "stretch") === "stretch");
+      Piano.setKeySize(s.keyWidth, s.keyHeight);
+      const clamped = PianoRange.clampRange(s.octaveStart, s.octaveCount);
+      Piano.buildKeys(clamped.startOctave, clamped.octaveCount);
+      applyLabelSettings(s);
+    } else if (m === "guitar" || m === "violin") {
+      syncFrettedSizeSliders(s);
+      window.PlaySurface?.activeModule?.()?.applyLayout?.();
+    }
+    setTimeout(() => {
+      requireMods().Game.resize();
+      reloadTrackNotes();
+    }, 100);
     return m;
   }
 
@@ -493,6 +530,10 @@
     }
     if (guitarGripAllStrings) guitarGripAllStrings.checked = !!s.guitarGripAllStrings;
     if (violinGripAllStrings) violinGripAllStrings.checked = !!s.violinGripAllStrings;
+    if (guitarNeckNearbyTouch) guitarNeckNearbyTouch.checked = s.guitarNeckNearbyTouch !== false;
+    if (violinNeckNearbyTouch) violinNeckNearbyTouch.checked = s.violinNeckNearbyTouch !== false;
+    if (guitarStringsNearbyTouch) guitarStringsNearbyTouch.checked = !!s.guitarStringsNearbyTouch;
+    if (violinStringsNearbyTouch) violinStringsNearbyTouch.checked = !!s.violinStringsNearbyTouch;
     if (guitarNeckHeight) guitarNeckHeight.value = String(s.guitarNeckHeight ?? 30);
     if (guitarStringHeight) guitarStringHeight.value = String(s.guitarStringHeight ?? 30);
     if (guitarNeckWidth) guitarNeckWidth.value = String(s.guitarNeckWidth ?? 42);
@@ -502,13 +543,17 @@
     if (guitarNeckWidthLabel) guitarNeckWidthLabel.textContent = `${s.guitarNeckWidth ?? 42} px`;
     if (guitarPluckWidthLabel) guitarPluckWidthLabel.textContent = `${s.guitarPluckWidth ?? 220} px`;
     if ((s.playMode || "piano") === "guitar" || s.playMode === "violin") {
-      window.PlaySurface?.activeModule?.()?.applyLayout?.();
+      window.Guitar?.applyLayout?.();
+      window.Violin?.applyLayout?.();
     }
     if (playMode === "piano") {
+      const { Piano, PianoRange } = requireMods();
       Piano.setAutoFit((s.pianoAlign || "stretch") === "stretch");
       Piano.setKeySize(s.keyWidth, s.keyHeight);
-      const clamped = PianoRange.clampRange(s.octaveStart, s.octaveCount);
-      Piano.buildKeys(clamped.startOctave, clamped.octaveCount);
+      if (PianoRange?.clampRange) {
+        const clamped = PianoRange.clampRange(s.octaveStart, s.octaveCount);
+        Piano.buildKeys(clamped.startOctave, clamped.octaveCount);
+      }
     }
   }
 
@@ -613,7 +658,7 @@
     if (s.octaveLockManual || !s.autoKeyboardFromSong || !notes?.length) return null;
     if (!window.PianoRange?.fitRangeToNotes) return null;
 
-    const fit = PianoRange.fitRangeToNotes(notes);
+    const fit = window.PianoRange.fitRangeToNotes(notes);
     populateOctaveSelects(fit.startOctave, fit.octaveCount);
     const { Piano } = requireMods();
     Piano.setAutoFit((s.pianoAlign || "stretch") === "stretch");
@@ -650,6 +695,21 @@
     setTimeout(() => Game.resize(), 100);
   }
 
+  function updateImportButtons() {
+    const LibraryStore = requireStore();
+    const activeId = LibraryStore.getActiveLibraryId();
+    const isWebGuest =
+      window.pianoApi?.isWeb && !window.pianoApi.getSession?.()?.memberId;
+    btnImport.disabled = !activeId;
+    if (btnImportAudio) btnImportAudio.disabled = !activeId;
+    if (btnImport && isWebGuest) {
+      btnImport.title =
+        "MIDI kaydetmek için üye olun (tek seferlik 1 USD). Üye olmadan enstrümanı serbest çalabilirsiniz.";
+    } else if (btnImport) {
+      btnImport.title = "";
+    }
+  }
+
   function updateHints() {
     const LibraryStore = requireStore();
     const libId = LibraryStore.getActiveLibraryId();
@@ -658,7 +718,9 @@
     libraryHint.textContent = lib
       ? `Seçili: ${lib.name} — MIDI eklemek için + MIDI`
       : isWeb
-        ? "Kütüphane seçin veya yukarıdan ekleyin. Veriler Wix hesabınızda saklanır."
+        ? window.pianoApi.getSession?.()?.memberId
+          ? "Kütüphane seçin veya yukarıdan ekleyin. Veriler Wix hesabınızda saklanır."
+          : "Misafir modu: enstrümanı serbest çalın. MIDI kaydetmek için üye olun (tek seferlik 1 USD)."
         : "Kütüphane seçin veya yukarıdan ekleyin.";
     const activeSong = LibraryStore.getActiveSongId();
     let playReady = false;
@@ -703,8 +765,7 @@
       });
       libraryList.appendChild(li);
     }
-    btnImport.disabled = !activeId;
-    if (btnImportAudio) btnImportAudio.disabled = !activeId;
+    updateImportButtons();
     updateHints();
   }
 
@@ -896,6 +957,13 @@
       toast("Önce bir kütüphane seçin veya oluşturun.", true);
       return;
     }
+    if (window.pianoApi?.isWeb && !window.pianoApi.getSession?.()?.memberId) {
+      toast(
+        "MIDI kaydetmek için Wix üyeliği gerekir (tek seferlik 1 USD). Üye olmadan piyano/gitar/keman ile serbest çalabilirsiniz.",
+        true
+      );
+      return;
+    }
     try {
       try {
         requireMods().AudioEngine.ensure();
@@ -995,16 +1063,32 @@
 
   guitarGripAllStrings?.addEventListener("change", () => {
     persistSettings({ guitarGripAllStrings: guitarGripAllStrings.checked });
-    if (window.Guitar?.buildKeys) window.Guitar.buildKeys();
+    window.Guitar?.applyLayout?.();
   });
 
   violinGripAllStrings?.addEventListener("change", () => {
     persistSettings({ violinGripAllStrings: violinGripAllStrings.checked });
-    if (window.Violin?.buildKeys) window.Violin.buildKeys();
+    window.Violin?.applyLayout?.();
+  });
+
+  guitarNeckNearbyTouch?.addEventListener("change", () => {
+    persistSettings({ guitarNeckNearbyTouch: guitarNeckNearbyTouch.checked });
+  });
+
+  violinNeckNearbyTouch?.addEventListener("change", () => {
+    persistSettings({ violinNeckNearbyTouch: violinNeckNearbyTouch.checked });
+  });
+
+  guitarStringsNearbyTouch?.addEventListener("change", () => {
+    persistSettings({ guitarStringsNearbyTouch: guitarStringsNearbyTouch.checked });
+  });
+
+  violinStringsNearbyTouch?.addEventListener("change", () => {
+    persistSettings({ violinStringsNearbyTouch: violinStringsNearbyTouch.checked });
   });
 
   [guitarNeckHeight, guitarStringHeight, guitarNeckWidth, guitarPluckWidth].forEach((el) => {
-    el?.addEventListener("input", applyGuitarLayoutFromSliders);
+    el?.addEventListener("input", applyFrettedLayoutFromSliders);
   });
 
   window.addEventListener("touch-piano:play-mode", (e) => {
@@ -1051,10 +1135,7 @@
       toast("Piyano konumu: Ayarlar → Klavye → konum / hiza.");
       return;
     }
-    if (!window.InstrumentMove) return;
-    const next = !window.InstrumentMove.isMoveMode();
-    window.InstrumentMove.setMoveMode(next);
-    toast(next ? "Panelleri sürükleyin, bitince tekrar tıklayın." : "Konum kaydedildi.");
+    toast("Gitar/keman panelleri sabit düzende. Boyut için Ayarlar → Klavye kaydırıcılarını kullanın.");
   });
 
   dynamicPressure.addEventListener("change", () => {
@@ -1242,11 +1323,18 @@
       window.__bootStatus = "kütüphane yüklendi";
       renderLibraries();
       renderSongs();
+      updateImportButtons();
     } catch (err) {
       window.__bootStatus = "hata: " + err.message;
-      toast(`Kütüphane hatası: ${err.message}`, true);
-      console.error(err);
-      return;
+      if (window.pianoApi?.isWeb) {
+        toast("Misafir modu: enstrümanı kullanabilirsiniz. Bulut kütüphane için üye olun.", false);
+        renderLibraries();
+        updateImportButtons();
+      } else {
+        toast(`Kütüphane hatası: ${err.message}`, true);
+        console.error(err);
+        return;
+      }
     }
 
     try {
@@ -1266,6 +1354,11 @@
       window.KeyboardInput?.rebuild?.();
       showInstrumentPickerIfNeeded();
       updateSettingsForPlayMode(PlaySurface.getMode());
+      updateImportButtons();
+      window.addEventListener("touch-piano:session", () => {
+        updateImportButtons();
+        updateHints();
+      });
       window.__bootStatus = "piyano hazır";
     } catch (err) {
       window.__bootStatus = "piyano hata: " + err.message;

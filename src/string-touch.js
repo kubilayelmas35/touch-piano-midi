@@ -1,6 +1,6 @@
-/** Tel vuruşu — çoklu parmak, sürükleyerek tel değiştirme, titreşim + sönüm */
+/** Tel vuruşu — dokunma alanındaki tüm teller çalar, ayrılınca susar */
 const StringTouch = (() => {
-  const pointers = new Map();
+  const bundles = new Map();
 
   function resolveMidi(getMidi) {
     return typeof getMidi === "function" ? getMidi() : getMidi;
@@ -16,151 +16,158 @@ const StringTouch = (() => {
     else window.AudioEngine.noteOffVoice?.(voiceId);
   }
 
-  function hitRow(rows, clientY) {
-    for (const row of rows) {
-      const r = row.el.getBoundingClientRect();
-      if (clientY >= r.top - 4 && clientY <= r.bottom + 4) return row;
+  function rowsInTouch(rows, e, useNearbyTouch) {
+    const nearbyOn =
+      typeof useNearbyTouch === "function" ? !!useNearbyTouch(e) : !!useNearbyTouch;
+    if (nearbyOn) {
+      const area = window.PointerSlide?.touchRect?.(e, 16);
+      if (area) {
+        const out = [];
+        for (const row of rows) {
+          const r = row.el.getBoundingClientRect();
+          if (window.PointerSlide.rectsIntersect(r, area)) out.push(row);
+        }
+        return out;
+      }
     }
-    return null;
+    const hit = document.elementFromPoint(e.clientX, e.clientY);
+    const el = hit?.closest?.(".string-touch-target");
+    const found = el ? rows.find((r) => r.el === el) : null;
+    return found ? [found] : [];
   }
 
-  function clearRowVisual(st) {
-    if (!st?.el) return;
-    st.el.classList.remove("active", "string-held", "string-vibrating");
-    st.el.style.removeProperty("--vib-intensity");
-    st.lineEl?.classList.remove("string-line-active");
-    st.lineEl?.style.removeProperty("--vib-intensity");
-    st.row?.onVibrateEnd?.();
+  function clearRowVisual(rowState) {
+    if (!rowState?.el) return;
+    rowState.el.classList.remove("active", "string-held", "string-vibrating");
+    rowState.el.style.removeProperty("--vib-intensity");
+    rowState.lineEl?.classList.remove("string-line-active");
+    rowState.lineEl?.style.removeProperty("--vib-intensity");
+    rowState.row?.onVibrateEnd?.();
   }
 
-  function startRow(st, row, e) {
-    clearRowVisual(st);
-    st.row = row;
-    st.el = row.el;
-    st.getMidi = row.getMidi;
-    st.lineEl =
+  function rowLineEl(row) {
+    return (
       row.el.querySelector(".string-line") ||
       row.el.querySelector(".guitar-string-line") ||
       row.el.querySelector(".violin-string-line") ||
-      row.el;
-
-    const midi = resolveMidi(row.getMidi);
-    if (!midi) return;
-    st.midi = midi;
-    const vel = window.AudioEngine.velocityFromPointer(e, 0.55);
-    st.baseVel = vel;
-    st.pluck = vel;
-    st.lastX = e.clientX;
-    st.lastY = e.clientY;
-    st.lastT = performance.now();
-    st.smooth = 0;
-
-    row.el.classList.add("active", "string-held");
-    st.lineEl?.classList.add("string-line-active");
-    st.voiceId = window.AudioEngine.noteOn(midi, vel, { poly: true });
-    window.AudioEngine.setLiveGain?.(st.voiceId, vel);
-    row.onDown?.(midi, vel, e);
+      row.el
+    );
   }
 
-  function moveRow(st, e) {
-    const now = performance.now();
-    const dt = Math.max(1, now - st.lastT);
-    st.lastT = now;
+  function startRowVoice(st, row, e) {
+    const midi = resolveMidi(row.getMidi);
+    if (!midi) return null;
 
-    const midi = resolveMidi(st.getMidi);
-    if (midi !== st.midi) {
-      window.AudioEngine.setLiveVibrato?.(st.voiceId, 0);
-      releaseVoice(st.voiceId);
-      st.midi = midi;
-      const v = window.AudioEngine.velocityFromPointer(e, st.baseVel);
-      st.voiceId = window.AudioEngine.noteOn(midi, v, { poly: true });
-      st.baseVel = v;
-      st.pluck = v;
+    const vel = window.AudioEngine.velocityFromPointer(e, 0.55);
+    const lineEl = rowLineEl(row);
+    row.el.classList.add("active", "string-held");
+    lineEl?.classList.add("string-line-active");
+
+    const voiceId = window.AudioEngine.noteOn(midi, vel, { poly: true });
+    window.AudioEngine.setLiveGain?.(voiceId, vel);
+    row.onDown?.(midi, vel, e);
+
+    return {
+      row,
+      el: row.el,
+      lineEl,
+      getMidi: row.getMidi,
+      midi,
+      voiceId,
+      baseVel: vel,
+      pluck: vel,
+      lastX: e.clientX,
+      lastY: e.clientY,
+      lastT: performance.now(),
+      smooth: 0,
+    };
+  }
+
+  function moveRowVoice(rowState, e) {
+    const now = performance.now();
+    const dt = Math.max(1, now - rowState.lastT);
+    rowState.lastT = now;
+
+    const midi = resolveMidi(rowState.getMidi);
+    if (midi !== rowState.midi) {
+      window.AudioEngine.setLiveVibrato?.(rowState.voiceId, 0);
+      releaseVoice(rowState.voiceId);
+      rowState.midi = midi;
+      const v = window.AudioEngine.velocityFromPointer(e, rowState.baseVel);
+      rowState.voiceId = window.AudioEngine.noteOn(midi, v, { poly: true });
+      rowState.baseVel = v;
+      rowState.pluck = v;
     }
 
-    const dx = e.clientX - st.lastX;
-    const dy = e.clientY - st.lastY;
-    st.lastX = e.clientX;
-    st.lastY = e.clientY;
+    const dx = e.clientX - rowState.lastX;
+    const dy = e.clientY - rowState.lastY;
+    rowState.lastX = e.clientX;
+    rowState.lastY = e.clientY;
 
     const speed = Math.hypot(dx, dy);
     const vSpeed = Math.abs(dy) / dt;
-    st.smooth = st.smooth * 0.55 + speed * 0.45;
+    rowState.smooth = rowState.smooth * 0.55 + speed * 0.45;
 
     const sens = vibratoSens();
-    const depth = Math.min(4, 0.2 + st.smooth * 0.12 * sens);
-    const hz = 4.5 + Math.min(6, st.smooth * 0.14 * sens);
-    window.AudioEngine.setLiveVibrato?.(st.voiceId, depth, hz);
+    const depth = Math.min(4, 0.2 + rowState.smooth * 0.12 * sens);
+    const hz = 4.5 + Math.min(6, rowState.smooth * 0.14 * sens);
+    window.AudioEngine.setLiveVibrato?.(rowState.voiceId, depth, hz);
 
-    const pluckBoost = Math.min(1.85, 0.35 + vSpeed * 0.022 * sens + st.smooth * 0.04);
-    st.pluck = Math.max(st.pluck, pluckBoost);
-    window.AudioEngine.setLiveGain?.(st.voiceId, st.pluck);
+    const pluckBoost = Math.min(1.85, 0.35 + vSpeed * 0.022 * sens + rowState.smooth * 0.04);
+    rowState.pluck = Math.max(rowState.pluck, pluckBoost);
+    window.AudioEngine.setLiveGain?.(rowState.voiceId, rowState.pluck);
 
-    const intensity = Math.min(1, st.pluck / 1.2);
-    st.el.style.setProperty("--vib-intensity", String(intensity));
-    st.el.classList.toggle("string-vibrating", intensity > 0.05);
-    st.lineEl?.style.setProperty("--vib-intensity", String(intensity));
-    st.row?.onVibrate?.(intensity);
+    const intensity = Math.min(1, rowState.pluck / 1.2);
+    rowState.el.style.setProperty("--vib-intensity", String(intensity));
+    rowState.el.classList.toggle("string-vibrating", intensity > 0.05);
+    rowState.lineEl?.style.setProperty("--vib-intensity", String(intensity));
+    rowState.row?.onVibrate?.(intensity);
   }
 
-  function bindPluckBundle(bundleEl, getRows) {
-    const down = (e) => {
-      if (e.pointerType === "mouse" && e.button !== 0) return;
-      const rows = getRows();
-      const row = hitRow(rows, e.clientY);
-      if (!row) return;
-      e.preventDefault();
-      e.stopPropagation();
-      try {
-        bundleEl.setPointerCapture(e.pointerId);
-      } catch {
-        /* */
-      }
-      const st = { bundleEl, getRows };
-      pointers.set(e.pointerId, st);
-      startRow(st, row, e);
-    };
+  function releaseRowVoice(rowState, e) {
+    if (rowState.voiceId != null) {
+      window.AudioEngine.setLiveVibrato?.(rowState.voiceId, 0);
+      releaseVoice(rowState.voiceId);
+      rowState.row?.onUp?.(rowState.midi, e);
+    }
+    clearRowVisual(rowState);
+  }
 
-    const move = (e) => {
-      const st = pointers.get(e.pointerId);
-      if (!st) return;
-      e.preventDefault();
-      const rows = st.getRows();
-      const row = hitRow(rows, e.clientY);
-      if (row && row !== st.row) {
-        if (st.voiceId != null) {
-          window.AudioEngine.setLiveVibrato?.(st.voiceId, 0);
-          releaseVoice(st.voiceId);
-          st.row?.onUp?.(st.midi, e);
-        }
-        clearRowVisual(st);
-        startRow(st, row, e);
-      }
-      if (st.row) moveRow(st, e);
-    };
+  function syncRows(st, rows, e) {
+    if (!st.activeRows) st.activeRows = new Map();
+    const want = new Set(rows.map((r) => r.el));
 
-    const end = (e) => {
-      const st = pointers.get(e.pointerId);
-      if (!st) return;
-      e.preventDefault();
-      pointers.delete(e.pointerId);
-      if (st.voiceId != null) {
-        window.AudioEngine.setLiveVibrato?.(st.voiceId, 0);
-        releaseVoice(st.voiceId);
-        st.row?.onUp?.(st.midi, e);
-      }
-      clearRowVisual(st);
-      try {
-        bundleEl.releasePointerCapture(e.pointerId);
-      } catch {
-        /* */
-      }
-    };
+    for (const [el, rowState] of [...st.activeRows]) {
+      if (want.has(el)) continue;
+      releaseRowVoice(rowState, e);
+      st.activeRows.delete(el);
+    }
 
-    bundleEl.addEventListener("pointerdown", down, { passive: false });
-    bundleEl.addEventListener("pointermove", move, { passive: false });
-    bundleEl.addEventListener("pointerup", end, { passive: false });
-    bundleEl.addEventListener("pointercancel", end, { passive: false });
+    for (const row of rows) {
+      let rowState = st.activeRows.get(row.el);
+      if (!rowState) {
+        rowState = startRowVoice(st, row, e);
+        if (rowState) st.activeRows.set(row.el, rowState);
+      } else {
+        moveRowVoice(rowState, e);
+      }
+    }
+  }
+
+  function releaseAllRows(st, e) {
+    if (!st.activeRows) return;
+    for (const rowState of st.activeRows.values()) releaseRowVoice(rowState, e);
+    st.activeRows.clear();
+  }
+
+  function bindPluckBundle(bundleEl, getRows, options = {}) {
+    if (!window.PointerSlide?.bindMultiArea) return;
+    const ctl = window.PointerSlide.bindMultiArea(bundleEl, {
+      collectTargets: (e) => rowsInTouch(getRows(), e, options.useNearbyTouch),
+      onSync: (st, rows, e) => syncRows(st, rows, e),
+      onEnd: (st, e) => releaseAllRows(st, e),
+    });
+    bundles.set(bundleEl, ctl);
   }
 
   function bind(el, getMidi, callbacks = {}) {

@@ -30,11 +30,23 @@ function createFrettedInstrument(config) {
     let pluckRows = [];
     let fretted = {};
     let fretPointers = new Map();
-    let lockedFrets = {};
+    let autoFrets = {};
     let midiTargets = new Map();
 
     function gripAllStrings() {
       return !!window.AppSettings?.load?.()?.[gripSettingKey];
+    }
+
+    function neckNearbyEnabled() {
+      const s = window.AppSettings?.load?.() || {};
+      const key = id === "violin" ? "violinNeckNearbyTouch" : "guitarNeckNearbyTouch";
+      return s[key] !== false;
+    }
+
+    function stringsNearbyEnabled() {
+      const s = window.AppSettings?.load?.() || {};
+      const key = id === "violin" ? "violinStringsNearbyTouch" : "guitarStringsNearbyTouch";
+      return !!s[key];
     }
 
     function layoutFromSettings() {
@@ -78,23 +90,139 @@ function createFrettedInstrument(config) {
       setNeckVibrato(stringIdx, 0);
     }
 
+    function measureLayoutChrome() {
+      let h = 0;
+      const banner = document.getElementById("authBanner");
+      if (banner && banner.offsetHeight > 0) h += banner.offsetHeight;
+      const top = document.querySelector(".top-bar");
+      if (top) h += top.offsetHeight;
+      return h;
+    }
+
     function applySizeVars() {
-      if (!wrapEl) return;
       const { neckH, stringH, neckW, pluckW } = layoutFromSettings();
-      const rowRem = Math.max(0.65, neckH / 16);
-      const strRem = Math.max(0.65, stringH / 16);
-      wrapEl.style.setProperty("--inst-cell-w", `${Math.max(0.75, neckW / 16)}rem`);
-      wrapEl.style.setProperty("--inst-row-h", `${rowRem}rem`);
-      wrapEl.style.setProperty("--inst-string-h", `${strRem}rem`);
-      wrapEl.style.setProperty(pluckMinVar, `${Math.max(80, pluckW)}px`);
-      DISPLAY_STRINGS.forEach((s, i) => {
-        wrapEl.style.setProperty(`--str-thick-${i}`, `${STRING_THICK[i]}px`);
-      });
+      const requestedRow = Math.max(10, neckH);
+      const requestedStr = Math.max(10, stringH);
+      const requestedCell = Math.max(10, neckW);
+      const colCount = FRET_COUNT + 1;
+      const n = DISPLAY_STRINGS.length;
+      const fretHeader = 34;
+      const cardHead = 52;
+      const chromePad = 170;
+      const rowGaps = Math.max(0, n - 1) * 2;
+      const strGaps = Math.max(0, n - 1) * 3 + 8;
+
+      const baseNeckInner = fretHeader + n * requestedRow + rowGaps;
+      const basePluckInner = n * requestedStr + strGaps;
+      const baseUsedH = cardHead + Math.max(baseNeckInner, basePluckInner) + chromePad;
+
+      const chrome = measureLayoutChrome();
+      const maxFooter = Math.max(140, window.innerHeight - chrome);
+      const heightScale = Math.min(1, maxFooter / Math.max(1, baseUsedH));
+      let rowPx = Math.max(6, Math.floor(requestedRow * heightScale));
+      let strPx = Math.max(6, Math.floor(requestedStr * heightScale));
+
+      // Fit only by available footer height; do not lock to previous card size.
+      const contentPad = 108;
+      const availColumnH = Math.max(64, maxFooter - contentPad);
+      const fitRowPx = Math.floor((availColumnH - fretHeader - rowGaps) / Math.max(1, n));
+      const fitStrPx = Math.floor((availColumnH - strGaps) / Math.max(1, n));
+      rowPx = Math.max(6, Math.min(rowPx, fitRowPx));
+      strPx = Math.max(6, Math.min(strPx, fitStrPx));
+
+      const neckInner = fretHeader + n * rowPx + rowGaps;
+      const pluckInner = n * strPx + strGaps;
+      const usedH = cardHead + Math.max(neckInner, pluckInner) + chromePad;
+      const footerH = Math.min(usedH, maxFooter);
+
+      let pluckPx = Math.max(80, pluckW);
+      let cellPx = requestedCell;
+
+      document.documentElement.style.setProperty("--footer-row-h", `${footerH}px`);
+
+      const footerEl = document.getElementById("instrumentFooter");
+      if (footerEl) {
+        footerEl.style.height = `${footerH}px`;
+        footerEl.style.minHeight = `${footerH}px`;
+        footerEl.style.maxHeight = `${footerH}px`;
+      }
+
+      function applyDims(nextRow, nextStr, nextCell, nextPluck) {
+        const cellW = `${nextCell}px`;
+        const rowH = `${nextRow}px`;
+        const strH = `${nextStr}px`;
+        const pluck = `${nextPluck}px`;
+        const gridCols = `repeat(${colCount}, ${cellW})`;
+
+        const varTargets = [wrapEl, fretsRoot, stringsRoot].filter(Boolean);
+        for (const el of varTargets) {
+          el.style.setProperty("--inst-cell-w", cellW);
+          el.style.setProperty("--inst-row-h", rowH);
+          el.style.setProperty("--inst-string-h", strH);
+          el.style.setProperty(pluckMinVar, pluck);
+        }
+        if (wrapEl) {
+          wrapEl.style.height = "100%";
+          wrapEl.style.minHeight = "0";
+          wrapEl.style.maxHeight = "100%";
+          DISPLAY_STRINGS.forEach((s, i) => {
+            wrapEl.style.setProperty(`--str-thick-${i}`, `${STRING_THICK[i]}px`);
+          });
+        }
+
+        fretsRoot
+          ?.querySelectorAll(".guitar-fret-cells, .guitar-fret-header-cells")
+          .forEach((grid) => {
+            grid.style.gridTemplateColumns = gridCols;
+          });
+
+        fretsRoot?.querySelectorAll(".guitar-cell, .violin-cell").forEach((cell) => {
+          cell.style.width = cellW;
+          cell.style.height = rowH;
+          cell.style.minHeight = rowH;
+          cell.style.flexShrink = "0";
+        });
+
+        fretsRoot?.querySelectorAll(".guitar-string-row, .violin-string-row").forEach((row) => {
+          row.style.height = rowH;
+          row.style.minHeight = rowH;
+        });
+
+        const stringsPanel = stringsRoot?.closest(
+          ".guitar-strings-panel, .guitar-strings-card, .violin-strings-card"
+        );
+        if (stringsPanel) {
+          stringsPanel.style.width = pluck;
+          stringsPanel.style.minWidth = pluck;
+        }
+
+        const fretsPanel = fretsRoot?.closest(".guitar-frets-panel");
+        if (fretsPanel) {
+          const panelW = Math.max(120, colCount * (nextCell + 2) + 48);
+          fretsPanel.style.width = `${panelW}px`;
+          fretsPanel.style.maxWidth = "100%";
+        }
+
+        pluckRows.forEach(({ el }) => {
+          el.style.height = strH;
+          el.style.minHeight = strH;
+          el.style.flexBasis = strH;
+        });
+      }
+
+      applyDims(rowPx, strPx, cellPx, pluckPx);
     }
 
     function applySize() {
       applySizeVars();
       if (window.Game?.isReady?.()) window.Game.resize();
+    }
+
+    if (!window.__frettedLayoutResizeBound) {
+      window.__frettedLayoutResizeBound = true;
+      window.addEventListener("resize", () => {
+        if (wrapEl && !wrapEl.closest(".hidden")) applySizeVars();
+      });
     }
 
     function applyLayout() {
@@ -127,14 +255,63 @@ function createFrettedInstrument(config) {
 
     function refreshLabels() {}
 
+    function noteLabel(midi) {
+      return window.KeyLabels?.noteNameForMidi?.(midi) || String(midi);
+    }
+
+    function getTouchedFretsByString() {
+      const map = {};
+      for (const st of fretPointers.values()) {
+        if (st.cells?.length) {
+          for (const c of st.cells) {
+            if (!map[c.stringIdx]) map[c.stringIdx] = [];
+            map[c.stringIdx].push(c.fret);
+          }
+        } else if (st.gripAll) {
+          for (const s of DISPLAY_STRINGS) {
+            if (!map[s]) map[s] = [];
+            map[s].push(st.fret);
+          }
+        } else if (st.stringIdx != null) {
+          if (!map[st.stringIdx]) map[st.stringIdx] = [];
+          map[st.stringIdx].push(st.fret);
+        }
+      }
+      return map;
+    }
+
+    function formatActiveString(fret, midi, touchedFrets) {
+      const note = noteLabel(midi);
+      if (touchedFrets.length > 1) {
+        const uniq = [...new Set(touchedFrets)].sort((a, b) => a - b);
+        return `P${fret} · ${note} (${uniq.join("+")}→${fret})`;
+      }
+      if (fret > 0) return `P${fret} · ${note}`;
+      return `açık · ${note}`;
+    }
+
     function updateStringHighlights() {
+      const touched = getTouchedFretsByString();
       pluckRows.forEach(({ el, stringIdx }) => {
         const fret = fretted[stringIdx] || 0;
         const midi = currentMidiForString(stringIdx);
         el.dataset.midi = String(midi);
         el.classList.toggle("has-fret", fret > 0);
         const label = el.querySelector(".guitar-string-fret");
-        if (label) label.textContent = fret > 0 ? `perde ${fret}` : "açık";
+        if (label) label.textContent = formatActiveString(fret, midi, touched[stringIdx] || []);
+      });
+      DISPLAY_STRINGS.forEach((s) => {
+        const row = getNeckRow(s);
+        const activeEl = row?.querySelector(".guitar-neck-active");
+        if (!activeEl) return;
+        const fret = fretted[s] || 0;
+        const midi = currentMidiForString(s);
+        const touches = touched[s] || [];
+        if (touches.length || fret > 0 || autoFrets[s] != null) {
+          activeEl.textContent = formatActiveString(fret, midi, touches);
+        } else {
+          activeEl.textContent = "";
+        }
       });
     }
 
@@ -142,86 +319,146 @@ function createFrettedInstrument(config) {
       for (const s of DISPLAY_STRINGS) {
         fretCellsByString[s]?.forEach((cell) => {
           const f = Number(cell.dataset.fret);
-          const held = fretted[s] || 0;
+          const held = fretted[s] ?? 0;
+          cell.classList.remove("active-touch");
           cell.classList.toggle("fret-held", f === held && held > 0);
-          cell.classList.toggle("open-selected", f === 0 && held === 0);
         });
+      }
+      for (const st of fretPointers.values()) {
+        if (st.cells?.length) {
+          for (const c of st.cells) {
+            fretCellsByString[c.stringIdx]?.[c.fret]?.classList.add("active-touch");
+          }
+        } else if (st.gripAll) {
+          for (const s of DISPLAY_STRINGS) {
+            const cell = fretCellsByString[s]?.[st.fret];
+            cell?.classList.add("active-touch");
+          }
+        } else if (st.stringIdx != null) {
+          fretCellsByString[st.stringIdx]?.[st.fret]?.classList.add("active-touch");
+        }
       }
       updateStringHighlights();
     }
 
-    function recomputeFrettedFromPointers() {
+    function mergeFrettedDisplay() {
       const next = {};
-      for (const s of DISPLAY_STRINGS) next[s] = lockedFrets[s] || 0;
-
       for (const st of fretPointers.values()) {
-        if (st.gripAll) {
-          for (const s of DISPLAY_STRINGS) next[s] = Math.max(next[s], st.fret);
-        } else {
-          next[s] = Math.max(next[s] || 0, st.fret);
+        if (st.cells?.length) {
+          for (const c of st.cells) {
+            next[c.stringIdx] = Math.max(next[c.stringIdx] ?? 0, c.fret);
+          }
+        } else if (st.gripAll) {
+          for (const s of DISPLAY_STRINGS) next[s] = Math.max(next[s] ?? 0, st.fret);
+        } else if (st.stringIdx != null) {
+          next[st.stringIdx] = Math.max(next[st.stringIdx] ?? 0, st.fret);
         }
+      }
+      for (const s of DISPLAY_STRINGS) {
+        if (next[s] == null && autoFrets[s] != null) next[s] = autoFrets[s];
       }
       fretted = next;
       repaintFretCells();
     }
 
+    function pickBarreFret(cells, clientX) {
+      const byFret = new Map();
+      for (const c of cells) {
+        const prev = byFret.get(c.fret) || { count: 0, dist: Infinity };
+        const r = c.el.getBoundingClientRect();
+        const cx = (r.left + r.right) / 2;
+        byFret.set(c.fret, {
+          count: prev.count + 1,
+          dist: Math.min(prev.dist, Math.abs(cx - clientX)),
+        });
+      }
+      let best = 0;
+      let bestCount = -1;
+      let bestDist = Infinity;
+      for (const [f, { count, dist }] of byFret) {
+        if (count > bestCount || (count === bestCount && dist < bestDist)) {
+          bestCount = count;
+          bestDist = dist;
+          best = f;
+        }
+      }
+      return best;
+    }
+
+    function pointerStateFromCells(cells, e) {
+      if (gripAllStrings() && cells.length) {
+        return { gripAll: true, fret: pickBarreFret(cells, e.clientX) };
+      }
+      return {
+        multi: true,
+        cells: cells.map((c) => ({ stringIdx: c.stringIdx, fret: c.fret })),
+      };
+    }
+
+    function collectNeckCells(e, root) {
+      if (!neckNearbyEnabled()) {
+        const el = document.elementFromPoint(e.clientX, e.clientY)?.closest?.(".guitar-cell");
+        if (!el || !root.contains(el)) return [];
+        return [
+          {
+            el,
+            stringIdx: Number(el.dataset.string),
+            fret: Number(el.dataset.fret),
+            midi: Number(el.dataset.midi),
+          },
+        ];
+      }
+      const area = window.PointerSlide.touchRect(e, 18);
+      const cells = [];
+      root.querySelectorAll(".guitar-cell").forEach((el) => {
+        const r = el.getBoundingClientRect();
+        if (!window.PointerSlide.rectsIntersect(r, area)) return;
+        cells.push({
+          el,
+          stringIdx: Number(el.dataset.string),
+          fret: Number(el.dataset.fret),
+          midi: Number(el.dataset.midi),
+        });
+      });
+      return cells;
+    }
+
+    let neckSlideCtl = null;
+
     function releaseAll() {
+      neckSlideCtl?.releaseAll?.();
       fretPointers.clear();
+      autoFrets = {};
       fretted = {};
-      lockedFrets = {};
       window.AudioEngine?.stopAll?.();
       fretsRoot?.querySelectorAll(".guitar-cell").forEach((el) => {
-        el.classList.remove("active", "fret-held", "open-selected");
+        el.classList.remove("active", "fret-held", "active-touch", "open-selected");
       });
       pluckRows.forEach(({ el, stringIdx }) => {
-        el.classList.remove("active", "string-held", "string-vibrating", "has-fret");
+        el.classList.remove("active", "string-held", "string-vibrating", "has-fret", "hit-target");
         clearNeckVibrato(stringIdx);
       });
     }
 
-    function setLockedFret(stringIdx, fret) {
-      if (gripAllStrings()) {
-        const same = DISPLAY_STRINGS.every((s) => (lockedFrets[s] || 0) === fret);
-        const nextFret = same ? 0 : fret;
-        for (const s of DISPLAY_STRINGS) lockedFrets[s] = nextFret;
-      } else {
-        const cur = lockedFrets[stringIdx] || 0;
-        lockedFrets[stringIdx] = cur === fret ? 0 : fret;
-      }
-      recomputeFrettedFromPointers();
+    function bindNeckSlide() {
+      if (!fretsRoot || !window.PointerSlide?.bindMultiArea || neckSlideCtl) return;
+      neckSlideCtl = window.PointerSlide.bindMultiArea(fretsRoot, {
+        shouldHandle: (e) => !e.target.closest?.(".move-handle"),
+        collectTargets: collectNeckCells,
+        onSync: (st, cells, e) => {
+          st.pointerId = e.pointerId;
+          fretPointers.set(e.pointerId, pointerStateFromCells(cells, e));
+          mergeFrettedDisplay();
+        },
+        onEnd: (st) => {
+          if (st.pointerId != null) fretPointers.delete(st.pointerId);
+          mergeFrettedDisplay();
+        },
+      });
     }
 
-    function bindFretCell(el, stringIdx, fret) {
-      const down = (e) => {
-        if (e.pointerType === "mouse" && e.button !== 0) return;
-        e.preventDefault();
-        e.stopPropagation();
-        if (e.pointerType === "mouse") {
-          setLockedFret(stringIdx, fret);
-          return;
-        }
-        try {
-          el.setPointerCapture(e.pointerId);
-        } catch {
-          /* */
-        }
-        fretPointers.set(e.pointerId, { stringIdx, fret, gripAll: gripAllStrings() });
-        recomputeFrettedFromPointers();
-      };
-      const up = (e) => {
-        if (!fretPointers.has(e.pointerId)) return;
-        e.preventDefault();
-        fretPointers.delete(e.pointerId);
-        try {
-          el.releasePointerCapture(e.pointerId);
-        } catch {
-          /* */
-        }
-        recomputeFrettedFromPointers();
-      };
-      el.addEventListener("pointerdown", down, { passive: false });
-      el.addEventListener("pointerup", up, { passive: false });
-      el.addEventListener("pointercancel", up, { passive: false });
+    function bindFretCell() {
+      /* Perde kaydırma bindNeckSlide ile */
     }
 
     function buildFretGrid() {
@@ -231,7 +468,7 @@ function createFrettedInstrument(config) {
       cellMap.clear();
       fretCellsByString = {};
       fretted = {};
-      lockedFrets = {};
+      autoFrets = {};
       midiTargets = new Map();
 
       const header = document.createElement("div");
@@ -255,10 +492,10 @@ function createFrettedInstrument(config) {
         row.style.setProperty("--str-color", STRING_COLORS[colorIdx]);
         row.style.setProperty("--str-thick", `${STRING_THICK[colorIdx]}px`);
 
-        const label = document.createElement("span");
-        label.className = "guitar-string-label";
-        label.textContent = STRING_NAMES[colorIdx];
-        row.appendChild(label);
+        const labelWrap = document.createElement("div");
+        labelWrap.className = "guitar-string-label-wrap";
+        labelWrap.innerHTML = `<span class="guitar-string-label">${STRING_NAMES[colorIdx]}</span><span class="guitar-neck-active" aria-live="polite"></span>`;
+        row.appendChild(labelWrap);
 
         const lane = document.createElement("div");
         lane.className = "guitar-fret-lane";
@@ -279,7 +516,6 @@ function createFrettedInstrument(config) {
           cell.dataset.string = String(s);
           cell.dataset.fret = String(f);
           if (f === 0) cell.classList.add("open-fret");
-          bindFretCell(cell, s, f);
           cellMap.set(midi, cell);
           const prev = midiTargets.get(midi);
           if (!prev || f < prev.fret) midiTargets.set(midi, { cell, stringIdx: s, fret: f });
@@ -296,6 +532,7 @@ function createFrettedInstrument(config) {
         startMidi: Math.min(...DISPLAY_STRINGS.map((s) => STRING_OPEN[s])),
         endMidi: Math.max(...DISPLAY_STRINGS.map((s) => STRING_OPEN[s] + FRET_COUNT)),
       };
+      bindNeckSlide();
     }
 
     function buildStringPlucks() {
@@ -330,7 +567,9 @@ function createFrettedInstrument(config) {
       });
 
       stringsRoot.appendChild(pluckBundle);
-      window.StringTouch?.bindPluckBundle(pluckBundle, () => pluckRows);
+      window.StringTouch?.bindPluckBundle(pluckBundle, () => pluckRows, {
+        useNearbyTouch: () => stringsNearbyEnabled(),
+      });
       updateStringHighlights();
     }
 
@@ -365,9 +604,13 @@ function createFrettedInstrument(config) {
 
     function pressKey(midi, velocity = 0.85) {
       const target = midiTargets.get(midi);
+      if (target) {
+        autoFrets[target.stringIdx] = target.fret;
+        mergeFrettedDisplay();
+      }
       const el = target?.cell || cellMap.get(midi);
       if (el) el.classList.add("active");
-      window.AudioEngine.noteOn(midi, velocity);
+      window.AudioEngine.noteOn(midi, velocity, { poly: true });
       onNoteDown?.(midi, velocity);
       if (target?.stringIdx != null) {
         setNeckVibrato(target.stringIdx, 0.35);
@@ -387,6 +630,10 @@ function createFrettedInstrument(config) {
       window.AudioEngine.noteOff(midi);
       onNoteUp?.(midi);
       if (target?.stringIdx != null) {
+        if (autoFrets[target.stringIdx] != null) {
+          delete autoFrets[target.stringIdx];
+          mergeFrettedDisplay();
+        }
         clearNeckVibrato(target.stringIdx);
         const row = pluckRows.find((r) => r.stringIdx === target.stringIdx)?.el;
         if (row) {
@@ -395,6 +642,10 @@ function createFrettedInstrument(config) {
         }
       }
       highlightMidi(midi, false);
+    }
+
+    function getMidiTarget(midi) {
+      return midiTargets.get(midi);
     }
 
     return {
@@ -412,6 +663,7 @@ function createFrettedInstrument(config) {
       flash,
       pressKey,
       releaseKey,
+      getMidiTarget,
       getWrap: () => wrapEl,
       getNeckHint: () => (gripAllStrings() ? neckHintGrip : neckHintSingle),
       cardNeckTitle,

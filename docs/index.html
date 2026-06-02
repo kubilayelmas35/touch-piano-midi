@@ -18,7 +18,7 @@
     #authBanner.ok { background: #1a3d2e; color: #bbf7d0; }
     #authBanner.warn { background: #4a3520; color: #fde68a; }
     body.has-auth-banner {
-      grid-template-rows: auto auto minmax(0, 1fr) auto;
+      grid-template-rows: auto auto minmax(0, 1fr) minmax(0, var(--footer-row-h, auto));
       grid-template-areas:
         "banner banner"
         "header header"
@@ -204,9 +204,25 @@
           <input type="checkbox" id="guitarGripAllStrings" />
           Tüm telleri sık (gitar — bir perde → 6 tel)
         </label>
+        <label class="field settings-scope-guitar-only">
+          <input type="checkbox" id="guitarNeckNearbyTouch" checked />
+          Perde: yakın temasları da algıla
+        </label>
+        <label class="field settings-scope-guitar-only">
+          <input type="checkbox" id="guitarStringsNearbyTouch" />
+          Sağ teller: yakın temasları da algıla
+        </label>
         <label class="field settings-scope-violin-only">
           <input type="checkbox" id="violinGripAllStrings" />
           Tüm telleri sık (keman — bir pozisyon → 4 tel)
+        </label>
+        <label class="field settings-scope-violin-only">
+          <input type="checkbox" id="violinNeckNearbyTouch" checked />
+          Perde: yakın temasları da algıla
+        </label>
+        <label class="field settings-scope-violin-only">
+          <input type="checkbox" id="violinStringsNearbyTouch" />
+          Sağ teller: yakın temasları da algıla
         </label>
         <p class="hint small-hint">Kapalıyken her tele ayrı perde. Açıkken bir perde tüm tellere uygulanır.</p>
         </div>

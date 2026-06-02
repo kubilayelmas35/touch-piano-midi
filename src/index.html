@@ -173,6 +173,7 @@
         </label>
         <p class="hint small-hint">Şarkı seçilince otomatik (tam genişlik).</p>
         </div>
+        <div class="settings-scope settings-scope-piano-only">
         <label class="field">
           <span id="keyWidthDesc">Tuş genişliği</span>: <span id="keyWidthLabel">48 px</span>
           <input type="range" id="keyWidthRange" min="28" max="90" value="48" />
@@ -181,6 +182,50 @@
           <span id="keyHeightDesc">Klavye yüksekliği</span>: <span id="keyHeightLabel">160 px</span>
           <input type="range" id="keyHeightRange" min="90" max="420" value="160" />
         </label>
+        </div>
+        <div class="settings-scope settings-scope-fretted">
+        <label class="field">
+          Kol tel yüksekliği: <span id="guitarNeckHeightLabel">30 px</span>
+          <input type="range" id="guitarNeckHeight" min="10" max="220" value="30" />
+        </label>
+        <label class="field">
+          Sağ tel yüksekliği: <span id="guitarStringHeightLabel">30 px</span>
+          <input type="range" id="guitarStringHeight" min="10" max="220" value="30" />
+        </label>
+        <label class="field">
+          Kol / perde genişliği: <span id="guitarNeckWidthLabel">42 px</span>
+          <input type="range" id="guitarNeckWidth" min="10" max="240" value="42" />
+        </label>
+        <label class="field">
+          Teller paneli genişliği: <span id="guitarPluckWidthLabel">220 px</span>
+          <input type="range" id="guitarPluckWidth" min="80" max="900" value="220" />
+        </label>
+        <label class="field settings-scope-guitar-only">
+          <input type="checkbox" id="guitarGripAllStrings" />
+          Tüm telleri sık (gitar — bir perde → 6 tel)
+        </label>
+        <label class="field settings-scope-guitar-only">
+          <input type="checkbox" id="guitarNeckNearbyTouch" checked />
+          Perde: yakın temasları da algıla
+        </label>
+        <label class="field settings-scope-guitar-only">
+          <input type="checkbox" id="guitarStringsNearbyTouch" />
+          Sağ teller: yakın temasları da algıla
+        </label>
+        <label class="field settings-scope-violin-only">
+          <input type="checkbox" id="violinGripAllStrings" />
+          Tüm telleri sık (keman — bir pozisyon → 4 tel)
+        </label>
+        <label class="field settings-scope-violin-only">
+          <input type="checkbox" id="violinNeckNearbyTouch" checked />
+          Perde: yakın temasları da algıla
+        </label>
+        <label class="field settings-scope-violin-only">
+          <input type="checkbox" id="violinStringsNearbyTouch" />
+          Sağ teller: yakın temasları da algıla
+        </label>
+        <p class="hint small-hint">Kapalıyken her tele ayrı perde. Açıkken bir perde tüm tellere uygulanır.</p>
+        </div>
         <div class="settings-scope settings-scope-strings">
         <label class="field">
           Tel titreşim hassasiyeti: <span id="vibratoSensLabel">Normal</span>
@@ -315,23 +360,35 @@
       <div id="pianoKeys" class="piano-keys"></div>
     </div>
     <div id="guitarWrap" class="guitar-wrap instrument-panel hidden">
-      <div id="guitarFretsPanel" class="movable-panel guitar-frets-panel" data-move-id="guitarFrets">
-        <div class="move-handle" title="Sürükleyin">⠿ Perdeler</div>
-        <div id="guitarFrets" class="guitar-frets"></div>
+      <div class="inst-card guitar-chord-card">
+        <div class="inst-card-head">
+          <div class="inst-card-title">Gitar kolu</div>
+          <p class="inst-card-sub">Perdeye basılı tutun — ses sağdan</p>
+        </div>
+        <div id="guitarFrets" class="guitar-neck"></div>
       </div>
-      <div id="guitarStringsPanel" class="movable-panel guitar-strings-panel" data-move-id="guitarStrings">
-        <div class="move-handle" title="Sürükleyin">⠿ Teller</div>
+      <div class="inst-card guitar-strings-card">
+        <div class="inst-card-head">
+          <div class="inst-card-title">Teller (titreştir)</div>
+          <p class="inst-card-sub">Aynı renk = aynı tel</p>
+        </div>
         <div id="guitarStrings" class="guitar-strings"></div>
       </div>
     </div>
     <div id="violinWrap" class="violin-wrap instrument-panel hidden">
-      <div id="violinBoardPanel" class="movable-panel violin-board-panel" data-move-id="violinBoard">
-        <div class="move-handle" title="Sürükleyin">⠿ Keman klavyesi</div>
-        <div id="violinBoard" class="violin-board"></div>
+      <div class="inst-card violin-chord-card">
+        <div class="inst-card-head">
+          <div class="inst-card-title">Keman kolu</div>
+          <p class="inst-card-sub">Perdeye basılı tutun — ses sağdan</p>
+        </div>
+        <div id="violinBoard" class="guitar-neck"></div>
       </div>
-      <div id="violinStringsPanel" class="movable-panel violin-strings-panel" data-move-id="violinStrings">
-        <div class="move-handle" title="Sürükleyin">⠿ Teller</div>
-        <div id="violinStrings" class="violin-strings"></div>
+      <div class="inst-card violin-strings-card">
+        <div class="inst-card-head">
+          <div class="inst-card-title">Teller (titreştir)</div>
+          <p class="inst-card-sub">Aynı renk = aynı tel</p>
+        </div>
+        <div id="violinStrings" class="guitar-strings"></div>
       </div>
     </div>
   </footer>
