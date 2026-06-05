@@ -18,7 +18,7 @@
     #authBanner.ok { background: #1a3d2e; color: #bbf7d0; }
     #authBanner.warn { background: #4a3520; color: #fde68a; }
     body.has-auth-banner {
-      grid-template-rows: auto auto minmax(0, 1fr) auto;
+      grid-template-rows: auto auto minmax(0, 1fr) minmax(0, var(--footer-row-h, min(42vh, 420px)));
       grid-template-areas:
         "banner banner"
         "header header"
@@ -58,7 +58,7 @@
     }
   </style>
 </head>
-<body class="has-auth-banner">
+<body class="has-auth-banner piano-dock-bottom">
   <div id="authBanner" class="warn">Wix hesabına bağlanılıyor… Siteye giriş yaptığınızdan emin olun.</div>
 
   <div id="apiError" class="api-error hidden">
