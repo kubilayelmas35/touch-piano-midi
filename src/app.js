@@ -337,12 +337,24 @@
       requireMods().Piano.setKeySize(w, h);
       return;
     }
-    if ((mode === "guitar" || mode === "violin") && window.PlaySurface?.activeModule?.()?.setKeySize) {
-      window.PlaySurface.activeModule().setKeySize(w, h);
-      syncFrettedSizeSliders(window.AppSettings.load());
-      return;
-    }
-    window.PlaySurface?.setKeySize?.(w, h);
+    window.Guitar?.applyLayout?.();
+    window.Violin?.applyLayout?.();
+  }
+
+  function scheduleInstrumentLayoutSync() {
+    const run = () => {
+      const mode = window.PlaySurface?.getMode?.() || "piano";
+      if (mode === "piano") {
+        window.Piano?.applyLayout?.();
+      } else {
+        window.PlaySurface?.activeModule?.()?.applyLayout?.();
+      }
+      if (window.Game?.refreshView) window.Game.refreshView();
+      else window.Game?.resize?.();
+    };
+    requestAnimationFrame(() => requestAnimationFrame(run));
+    setTimeout(run, 100);
+    setTimeout(run, 350);
   }
 
   function syncFrettedSizeSliders(s) {
@@ -576,6 +588,7 @@
         Piano.buildKeys(clamped.startOctave, clamped.octaveCount);
       }
     }
+    scheduleInstrumentLayoutSync();
   }
 
   function setSidebarVisible(visible, save = true) {
@@ -1391,6 +1404,7 @@
       );
       if (window.InstrumentMove) window.InstrumentMove.applyLayout(AppSettings.load());
       applySettings(AppSettings.load());
+      scheduleInstrumentLayoutSync();
       window.KeyboardInput?.bind?.();
       window.KeyboardInput?.rebuild?.();
       showInstrumentPickerIfNeeded();

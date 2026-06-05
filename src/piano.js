@@ -276,6 +276,10 @@ const Piano = (() => {
     return midi >= range.startMidi && midi <= range.endMidi;
   }
 
+  function applyLayout() {
+    applySize();
+  }
+
   return {
     init,
     buildKeys,
@@ -287,6 +291,7 @@ const Piano = (() => {
     setAutoFit,
     getKeySize,
     applySize,
+    applyLayout,
     midiInRange,
     getRange: () => ({ ...range }),
     getKeyMap: () => keyMap,

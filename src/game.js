@@ -29,6 +29,84 @@ const Game = (() => {
   let keyPositions = new Map();
   let lastFrameT = 0;
   let autoPlayMode = false;
+  let skyStars = [];
+  let skySize = { w: 0, h: 0 };
+
+  function effectHue() {
+    const v = window.__effectHue;
+    if (typeof v === "number" && !Number.isNaN(v)) return v;
+    const css = getComputedStyle(document.documentElement).getPropertyValue("--effect-hue");
+    const n = Number(css);
+    return Number.isNaN(n) ? 275 : n;
+  }
+
+  function rebuildSky(w, h) {
+    if (w === skySize.w && h === skySize.h && skyStars.length) return;
+    skySize = { w, h };
+    const count = Math.min(320, Math.floor((w * h) / 3800));
+    skyStars = [];
+    for (let i = 0; i < count; i++) {
+      skyStars.push({
+        x: Math.random() * w,
+        y: Math.random() * h * 0.94,
+        r: Math.random() * 1.5 + 0.25,
+        phase: Math.random() * Math.PI * 2,
+        speed: 0.35 + Math.random() * 1.4,
+        bright: 0.3 + Math.random() * 0.7,
+      });
+    }
+  }
+
+  function drawStars(w, h, t) {
+    for (const s of skyStars) {
+      const tw = s.bright * (0.5 + 0.5 * Math.sin(t * s.speed + s.phase));
+      const a = tw * 0.9;
+      ctx.fillStyle = `rgba(255,255,255,${a})`;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fill();
+      if (s.r > 1.1 && tw > 0.75) {
+        ctx.fillStyle = `rgba(200,220,255,${a * 0.35})`;
+        ctx.fillRect(s.x - 2, s.y, 4, 0.5);
+        ctx.fillRect(s.x, s.y - 2, 0.5, 4);
+      }
+    }
+  }
+
+  function drawAurora(w, h, t, hue) {
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    const bands = [
+      { y: h * 0.18, amp: h * 0.09, alpha: 0.14, speed: 0.22, hueOff: -28 },
+      { y: h * 0.32, amp: h * 0.11, alpha: 0.11, speed: 0.17, hueOff: 18 },
+      { y: h * 0.48, amp: h * 0.08, alpha: 0.09, speed: 0.28, hueOff: -55 },
+    ];
+    for (const band of bands) {
+      const h1 = (hue + band.hueOff + 360) % 360;
+      const h2 = (hue + band.hueOff + 42) % 360;
+      const grad = ctx.createLinearGradient(0, band.y - band.amp, 0, band.y + band.amp * 1.6);
+      grad.addColorStop(0, `hsla(${h1}, 72%, 58%, 0)`);
+      grad.addColorStop(0.35, `hsla(${h1}, 78%, 62%, ${band.alpha})`);
+      grad.addColorStop(0.55, `hsla(${h2}, 85%, 68%, ${band.alpha * 1.15})`);
+      grad.addColorStop(1, `hsla(${h2}, 70%, 52%, 0)`);
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.moveTo(0, band.y);
+      const steps = 10;
+      for (let i = 0; i <= steps; i++) {
+        const x = (w / steps) * i;
+        const wave =
+          Math.sin(x * 0.004 + t * band.speed) * band.amp * 0.55 +
+          Math.sin(x * 0.009 - t * band.speed * 0.7) * band.amp * 0.35;
+        ctx.lineTo(x, band.y + wave);
+      }
+      ctx.lineTo(w, h);
+      ctx.lineTo(0, h);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+  }
 
   function stringLabelForMode(mode, stringIdx) {
     if (mode === "guitar") {
@@ -114,6 +192,7 @@ const Game = (() => {
     canvas.style.width = `${parent.clientWidth}px`;
     canvas.style.height = `${parent.clientHeight}px`;
     ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+    rebuildSky(parent.clientWidth, parent.clientHeight);
     positionHitLine();
   }
 
@@ -328,31 +407,38 @@ const Game = (() => {
   }
 
   function drawBackground(w, h, t) {
-    const bg = ctx.createLinearGradient(0, 0, 0, h);
-    bg.addColorStop(0, "#05060c");
-    bg.addColorStop(0.45, "#0c1020");
-    bg.addColorStop(1, "#12182a");
-    ctx.fillStyle = bg;
+    rebuildSky(w, h);
+    const hue = effectHue();
+
+    const sky = ctx.createLinearGradient(0, 0, 0, h);
+    sky.addColorStop(0, "#010208");
+    sky.addColorStop(0.35, "#060a18");
+    sky.addColorStop(0.72, "#0a1028");
+    sky.addColorStop(1, "#0c1430");
+    ctx.fillStyle = sky;
     ctx.fillRect(0, 0, w, h);
 
+    drawAurora(w, h, t, hue);
+    drawStars(w, h, t);
+
     const hitY = getHitY();
-    const vig = ctx.createRadialGradient(w * 0.5, hitY, w * 0.2, w * 0.5, hitY, w * 0.85);
-    vig.addColorStop(0, "rgba(80, 120, 255, 0.06)");
-    vig.addColorStop(1, "rgba(0, 0, 0, 0.45)");
+    const vig = ctx.createRadialGradient(w * 0.5, hitY * 0.55, w * 0.12, w * 0.5, hitY, w * 0.95);
+    vig.addColorStop(0, "rgba(40, 60, 120, 0.05)");
+    vig.addColorStop(1, "rgba(0, 0, 0, 0.55)");
     ctx.fillStyle = vig;
     ctx.fillRect(0, 0, w, h);
 
-    const glow = ctx.createLinearGradient(0, hitY - 50, 0, hitY + 30);
+    const glow = ctx.createLinearGradient(0, hitY - 60, 0, hitY + 35);
     glow.addColorStop(0, "rgba(168, 85, 247, 0)");
-    glow.addColorStop(0.45, `rgba(192, 132, 252, ${0.14 + Math.sin(t * 3) * 0.05})`);
-    glow.addColorStop(1, "rgba(124, 58, 237, 0.25)");
+    glow.addColorStop(0.4, `hsla(${hue}, 80%, 68%, ${0.12 + Math.sin(t * 2.6) * 0.04})`);
+    glow.addColorStop(1, `hsla(${hue}, 70%, 48%, 0.28)`);
     ctx.fillStyle = glow;
-    ctx.fillRect(0, hitY - 55, w, 90);
+    ctx.fillRect(0, hitY - 65, w, 100);
 
     ctx.strokeStyle = "rgba(216, 180, 254, 0.9)";
     ctx.lineWidth = 2;
-    ctx.shadowColor = "rgba(168, 85, 247, 0.85)";
-    ctx.shadowBlur = 12;
+    ctx.shadowColor = `hsla(${hue}, 80%, 60%, 0.85)`;
+    ctx.shadowBlur = 14;
     ctx.beginPath();
     ctx.moveTo(0, hitY);
     ctx.lineTo(w, hitY);
@@ -699,6 +785,11 @@ const Game = (() => {
     resize: () => {
       resize();
       updateKeyPositions();
+    },
+    refreshView: () => {
+      resize();
+      updateKeyPositions();
+      draw(performance.now() / 1000, 0);
     },
   };
 })();
