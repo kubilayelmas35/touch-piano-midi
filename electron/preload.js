@@ -41,6 +41,9 @@ try {
 }
 
 contextBridge.exposeInMainWorld("pianoApi", {
+  isDesktop: true,
+  isFullVersion: true,
+  isMember: () => true,
   getLibraries: () => ipcRenderer.invoke("libraries:get"),
   saveLibraries: (data) => ipcRenderer.invoke("libraries:save", data),
   importMidi: (libraryId) => ipcRenderer.invoke("midi:import", { libraryId }),

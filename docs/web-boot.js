@@ -8,9 +8,12 @@
       document.body.style.maxHeight = `${h}px`;
     }
     try {
+      window.Guitar?.applyLayout?.();
+      window.Violin?.applyLayout?.();
+      window.Piano?.applyLayout?.();
       window.Game?.resize?.();
     } catch {
-      /* oyun henüz yüklenmedi */
+      /* henüz yüklenmedi */
     }
   }
 
@@ -38,6 +41,11 @@
         `Giriş yapıldı${email ? `: ${email}` : ""}. Kütüphaneleriniz bulutta saklanır.`,
         "ok"
       );
+    } else {
+      setBanner(
+        "Misafir modu — piyano, gitar ve keman ile serbest çalın. MIDI kaydetmek için üye olun (tek seferlik 1 USD).",
+        "warn"
+      );
     }
     syncEmbedHeight();
   });
@@ -47,12 +55,12 @@
     try {
       if (window.self === window.top) {
         setBanner(
-          "Bu sayfa Wix sitesinde gömülü açılmalıdır. Doğrudan GitHub Pages’te kütüphane senkronu çalışmaz.",
+          "Bu sayfa Wix sitesinde gömülü açılmalıdır. Doğrudan GitHub Pages'te misafir modu çalışır; bulut senkronu için Wix gerekir.",
           "warn"
         );
       } else {
         setBanner(
-          "Wix oturumu bekleniyor… Lütfen sitede üye girişi yapın ve bu sayfayı yenileyin.",
+          "Misafir modu — serbest çalın. MIDI kaydetmek için Wix'te üye olun (tek seferlik 1 USD).",
           "warn"
         );
       }

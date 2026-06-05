@@ -152,6 +152,8 @@
   const labelAssignClear = $("#labelAssignClear");
   const labelAssignBackdrop = $("#labelAssignBackdrop");
   const keyboardEnabled = $("#keyboardEnabled");
+  const keyboardLayout = $("#keyboardLayout");
+  const keyboardLayoutHint = $("#keyboardLayoutHint");
   const btnToggleSidebar = $("#btnToggleSidebar");
   const btnFullscreen = $("#btnFullscreen");
   const comboFlare = $("#comboFlare");
@@ -283,6 +285,24 @@
       toast(`Kayıt hatası: ${err.message}`, true);
       return false;
     }
+  }
+
+  function updateKeyboardLayoutHint() {
+    if (!keyboardLayoutHint || !window.KeyboardLayout) return;
+    const detected = window.KeyboardLayout.getDetectedLabel();
+    keyboardLayoutHint.textContent =
+      keyboardLayout?.value === "auto"
+        ? `Algılanan: ${detected}`
+        : `Seçili: ${keyboardLayout.options[keyboardLayout.selectedIndex]?.text || detected}`;
+  }
+
+  function applyKeyboardLayoutSettings(s) {
+    if (!window.KeyboardLayout) return;
+    window.KeyboardLayout.setLayoutId(s.keyboardLayout || "auto");
+    window.KeyboardLayout.loadLearned(s.keyboardLearned || {});
+    if (keyboardLayout) keyboardLayout.value = s.keyboardLayout || "auto";
+    updateKeyboardLayoutHint();
+    window.KeyboardInput?.rebuild?.();
   }
 
   function applyLabelSettings(s) {
@@ -508,6 +528,7 @@
     Game.setTrim(s.trimStart ?? 0, s.trimEnd ?? 0);
     Game.setFlameStyle(s.flameStyle || "aurora");
     window.KeyboardInput?.setEnabled(s.keyboardEnabled !== false);
+    applyKeyboardLayoutSettings(s);
     if (effectHueInput) effectHueInput.value = String(s.effectHue ?? 275);
     if (keyColorTopInput) keyColorTopInput.value = s.keyColorTop || "#e8d4ff";
     if (keyColorMidInput) keyColorMidInput.value = s.keyColorMid || "#a855f7";
@@ -663,6 +684,7 @@
     const { Piano } = requireMods();
     Piano.setAutoFit((s.pianoAlign || "stretch") === "stretch");
     Piano.buildKeys(fit.startOctave, fit.octaveCount);
+    applyLabelSettings(AppSettings.load());
     persistSettings({
       octaveStart: fit.startOctave,
       octaveCount: fit.octaveCount,
@@ -684,9 +706,7 @@
       );
     } else if ((window.PlaySurface?.getMode?.() || "piano") === "piano") {
       Piano.setAutoFit((s.pianoAlign || "stretch") === "stretch");
-      if (typeof Piano.autoSizeKeys === "function") {
-        /* buildKeys içinde autoSizeKeys çağrılır */
-      }
+      window.KeyboardInput?.rebuild?.();
     }
     const range = playInstrument().getRange();
     Game.loadNotes(notes, range);
@@ -1249,6 +1269,27 @@
     if (on) window.KeyboardInput?.rebuild?.();
     persistSettings({ keyboardEnabled: on });
     toast(on ? "Klavye ile çalma açık." : "Klavye ile çalma kapalı.");
+  });
+
+  keyboardLayout?.addEventListener("change", () => {
+    const id = keyboardLayout.value;
+    window.KeyboardLayout?.setLayoutId(id);
+    persistSettings({ keyboardLayout: id });
+    updateKeyboardLayoutHint();
+    window.KeyboardInput?.rebuild?.();
+    toast(id === "auto" ? "Klavye düzeni otomatik algılanacak." : `Klavye düzeni: ${keyboardLayout.options[keyboardLayout.selectedIndex].text}`);
+  });
+
+  let keyboardLayoutSaveTimer = null;
+  window.addEventListener("keydown", () => {
+    if (keyboardLayout?.value !== "auto") return;
+    updateKeyboardLayoutHint();
+    clearTimeout(keyboardLayoutSaveTimer);
+    keyboardLayoutSaveTimer = setTimeout(() => {
+      if (window.KeyboardLayout?.getLearnedObject) {
+        persistSettings({ keyboardLearned: window.KeyboardLayout.getLearnedObject() });
+      }
+    }, 800);
   });
 
   btnToggleSidebar.addEventListener("click", () => {

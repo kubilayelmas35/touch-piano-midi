@@ -21,6 +21,9 @@ const AppSettings = (() => {
     trimEnd: 0,
     midiLabels: {},
     keyboardEnabled: true,
+    keyboardLayout: "auto",
+    keyboardLayoutDetected: "",
+    keyboardLearned: {},
     sidebarVisible: true,
     autoKeyboardFromSong: true,
     octaveLockManual: false,
@@ -3056,6 +3059,220 @@ const InstrumentMove = (() => {
 window.InstrumentMove = InstrumentMove;
 
 
+/* === keyboard-layout.js === */
+/** Klavye düzeni algılama — fiziksel tuş (code) ↔ yazılan harf (key) */
+const KeyboardLayout = (() => {
+  const LAYOUTS = {
+    qwerty: {
+      KeyQ: "q", KeyW: "w", KeyE: "e", KeyR: "r", KeyT: "t", KeyY: "y", KeyU: "u", KeyI: "i", KeyO: "o", KeyP: "p",
+      BracketLeft: "[", BracketRight: "]", Backslash: "\\",
+      KeyA: "a", KeyS: "s", KeyD: "d", KeyF: "f", KeyG: "g", KeyH: "h", KeyJ: "j", KeyK: "k", KeyL: "l",
+      Semicolon: ";", Quote: "'",
+      KeyZ: "z", KeyX: "x", KeyC: "c", KeyV: "v", KeyB: "b", KeyN: "n", KeyM: "m",
+      Comma: ",", Period: ".", Slash: "/",
+      Backquote: "`", Minus: "-", Equal: "=",
+      Digit1: "1", Digit2: "2", Digit3: "3", Digit4: "4", Digit5: "5",
+      Digit6: "6", Digit7: "7", Digit8: "8", Digit9: "9", Digit0: "0",
+    },
+    qwertz: {
+      KeyQ: "q", KeyW: "w", KeyE: "e", KeyR: "r", KeyT: "t", KeyZ: "z", KeyU: "u", KeyI: "i", KeyO: "o", KeyP: "p",
+      KeyA: "a", KeyS: "s", KeyD: "d", KeyF: "f", KeyG: "g", KeyH: "h", KeyJ: "j", KeyK: "k", KeyL: "l",
+      KeyY: "y", KeyX: "x", KeyC: "c", KeyV: "v", KeyB: "b", KeyN: "n", KeyM: "m",
+    },
+    azerty: {
+      KeyA: "q", KeyZ: "w", KeyE: "e", KeyR: "r", KeyT: "t", KeyY: "u", KeyU: "i", KeyI: "o", KeyO: "p",
+      KeyQ: "a", KeyS: "s", KeyD: "d", KeyF: "f", KeyG: "g", KeyH: "h", KeyJ: "j", KeyK: "k", KeyL: "l",
+      KeyW: "z", KeyX: "x", KeyC: "c", KeyV: "v", KeyB: "b", KeyN: "n", KeyM: "m",
+    },
+    "tr-q": {
+      KeyQ: "q", KeyW: "w", KeyE: "e", KeyR: "r", KeyT: "t", KeyY: "y", KeyU: "u", KeyI: "ı", KeyO: "o", KeyP: "p",
+      KeyA: "a", KeyS: "s", KeyD: "d", KeyF: "f", KeyG: "g", KeyH: "h", KeyJ: "j", KeyK: "k", KeyL: "l",
+      KeyZ: "z", KeyX: "x", KeyC: "c", KeyV: "v", KeyB: "b", KeyN: "n", KeyM: "m",
+      Comma: "ş", Period: "i", Slash: "ö",
+    },
+    "tr-f": {
+      KeyQ: "f", KeyW: "g", KeyE: "ğ", KeyR: "ı", KeyT: "o", KeyY: "d", KeyU: "r", KeyI: "n", KeyO: "h", KeyP: "p",
+      BracketLeft: "q", BracketRight: "w",
+      KeyA: "u", KeyS: "i", KeyD: "e", KeyF: "a", KeyG: "ü", KeyH: "t", KeyJ: "k", KeyK: "m", KeyL: "l",
+      Semicolon: "y", Quote: "ş",
+      KeyZ: "x", KeyX: "j", KeyC: "ö", KeyV: "v", KeyB: "c", KeyN: "ç", KeyM: "z",
+      Comma: "s", Period: "b", Slash: ".",
+    },
+  };
+
+  const PROBE_CODES = ["KeyQ", "KeyW", "KeyE", "KeyA", "KeyZ", "BracketRight"];
+
+  let layoutId = "auto";
+  const learned = new Map();
+  const scores = Object.create(null);
+  let layoutMapReady = null;
+
+  function normChar(ch) {
+    if (!ch || ch.length !== 1) return "";
+    return ch.toLocaleLowerCase("tr");
+  }
+
+  function mergeLayout(baseId) {
+    const base = LAYOUTS[baseId] || LAYOUTS.qwerty;
+    const out = { ...base };
+    learned.forEach((ch, code) => {
+      out[code] = ch;
+    });
+    return out;
+  }
+
+  function scoreLayout(id, code, key) {
+    const expected = LAYOUTS[id]?.[code];
+    if (!expected) return;
+    if (normChar(expected) === normChar(key)) {
+      scores[id] = (scores[id] || 0) + 2;
+    }
+  }
+
+  function localeGuess() {
+    const lang = (navigator.language || "").toLowerCase();
+    if (lang.startsWith("tr")) return "tr-f";
+    if (lang.startsWith("de") || lang.startsWith("at") || lang.startsWith("ch")) return "qwertz";
+    if (lang.startsWith("fr")) return "azerty";
+    return "qwerty";
+  }
+
+  function getDetectedId() {
+    if (layoutId !== "auto") return layoutId;
+
+    let best = null;
+    let bestScore = 0;
+    for (const [id, s] of Object.entries(scores)) {
+      if (s > bestScore) {
+        bestScore = s;
+        best = id;
+      }
+    }
+    if (best && bestScore >= 4) return best;
+    if (learned.size >= 4) return "learned";
+    return localeGuess();
+  }
+
+  function getActiveMap() {
+    const id = getDetectedId();
+    if (id === "learned") return mergeLayout(localeGuess());
+    return mergeLayout(id);
+  }
+
+  function charForCode(code) {
+    const map = getActiveMap();
+    return map[code] || LAYOUTS.qwerty[code] || null;
+  }
+
+  function codeForChar(char) {
+    const target = normChar(char);
+    if (!target) return null;
+
+    for (const [code, ch] of learned) {
+      if (normChar(ch) === target) return code;
+    }
+
+    const map = getActiveMap();
+    for (const [code, ch] of Object.entries(map)) {
+      if (normChar(ch) === target) return code;
+    }
+
+    for (const [code, ch] of Object.entries(LAYOUTS.qwerty)) {
+      if (normChar(ch) === target) return code;
+    }
+    return null;
+  }
+
+  function learnFromEvent(code, key) {
+    if (!code || !key || key.length !== 1) return;
+    if (key === "Dead" || key === "Unidentified" || key === "Process") return;
+
+    learned.set(code, key);
+    for (const id of Object.keys(LAYOUTS)) scoreLayout(id, code, key);
+
+    const detected = getDetectedId();
+    if (window.AppSettings && layoutId === "auto") {
+      try {
+        window.AppSettings.save({ keyboardLayoutDetected: detected });
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  function setLayoutId(id) {
+    layoutId = id || "auto";
+    if (id === "auto") return;
+    learned.clear();
+    for (const k of Object.keys(scores)) delete scores[k];
+  }
+
+  function getLayoutId() {
+    return layoutId;
+  }
+
+  function getDetectedLabel() {
+    const id = getDetectedId();
+    const labels = {
+      qwerty: "QWERTY",
+      qwertz: "QWERTZ",
+      azerty: "AZERTY",
+      "tr-q": "Türkçe Q",
+      "tr-f": "Türkçe F",
+      learned: "Öğrenildi",
+    };
+    return labels[id] || id;
+  }
+
+  async function tryLayoutMapApi() {
+    if (!navigator.keyboard?.getLayoutMap) return;
+    try {
+      const map = await navigator.keyboard.getLayoutMap();
+      for (const code of PROBE_CODES) {
+        const ch = map.get(code);
+        if (ch) learnFromEvent(code, ch);
+      }
+      layoutMapReady = true;
+    } catch {
+      /* izin yok veya desteklenmiyor */
+    }
+  }
+
+  function loadLearned(obj) {
+    learned.clear();
+    if (!obj || typeof obj !== "object") return;
+    for (const [code, ch] of Object.entries(obj)) {
+      if (code && ch) learned.set(code, String(ch).slice(0, 1));
+    }
+  }
+
+  function getLearnedObject() {
+    const o = {};
+    learned.forEach((ch, code) => {
+      o[code] = ch;
+    });
+    return o;
+  }
+
+  tryLayoutMapApi();
+
+  return {
+    charForCode,
+    codeForChar,
+    learnFromEvent,
+    setLayoutId,
+    getLayoutId,
+    getDetectedId,
+    getDetectedLabel,
+    loadLearned,
+    getLearnedObject,
+    LAYOUTS,
+  };
+})();
+
+window.KeyboardLayout = KeyboardLayout;
+
+
 /* === keyboard-input.js === */
 /** Bilgisayar klavyesi → piyano (oktav değişince yeniden eşleme) */
 const KeyboardInput = (() => {
@@ -3090,11 +3307,29 @@ const KeyboardInput = (() => {
     return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.isContentEditable;
   }
 
+  function usesLetterMapping() {
+    const mode = window.KeyLabels?.getMode?.();
+    return mode === "letters" || mode === "custom" || window.KeyLabels?.hasMidiLabels?.();
+  }
+
   function releaseAll() {
     for (const midi of [...held]) {
       held.delete(midi);
       window.Piano?.releaseKey?.(midi);
     }
+  }
+
+  function addLabelMapping(midi, label, range) {
+    const text = label || window.KeyLabels?.labelForMidi?.(midi, range.startMidi, range.endMidi);
+    if (!text || text === "·" || text === "?" || text.length !== 1) return;
+
+    const upper = text.toLocaleUpperCase("tr");
+    const lower = text.toLocaleLowerCase("tr");
+    charToMidi.set(upper, midi);
+    charToMidi.set(lower, midi);
+
+    const code = window.KeyboardLayout?.codeForChar?.(text);
+    if (code) codeToMidi.set(code, midi);
   }
 
   function rebuild() {
@@ -3112,31 +3347,44 @@ const KeyboardInput = (() => {
       else blacks.push(m);
     }
 
-    whites.forEach((midi, i) => {
-      if (WHITE_CODES[i]) codeToMidi.set(WHITE_CODES[i], midi);
-    });
-    blacks.forEach((midi, i) => {
-      if (BLACK_CODES[i]) codeToMidi.set(BLACK_CODES[i], midi);
-    });
-
-    for (let m = range.startMidi; m <= range.endMidi; m++) {
-      const label = window.KeyLabels?.labelForMidi?.(m, range.startMidi, range.endMidi);
-      if (!label || label === "·" || label === "?" || label.length !== 1) continue;
-      const ch = label.toUpperCase();
-      charToMidi.set(ch, m);
-      charToMidi.set(ch.toLowerCase(), m);
+    if (usesLetterMapping()) {
+      for (let m = range.startMidi; m <= range.endMidi; m++) {
+        addLabelMapping(m, null, range);
+      }
+    } else {
+      whites.forEach((midi, i) => {
+        if (WHITE_CODES[i]) codeToMidi.set(WHITE_CODES[i], midi);
+      });
+      blacks.forEach((midi, i) => {
+        if (BLACK_CODES[i]) codeToMidi.set(BLACK_CODES[i], midi);
+      });
     }
   }
 
+  function resolveMidiFromChar(key) {
+    if (!key || key.length !== 1) return null;
+    const upper = key.toLocaleUpperCase("tr");
+    const lower = key.toLocaleLowerCase("tr");
+    if (charToMidi.has(upper)) return charToMidi.get(upper);
+    if (charToMidi.has(lower)) return charToMidi.get(lower);
+    if (charToMidi.has(key)) return charToMidi.get(key);
+    return null;
+  }
+
   function resolveMidi(e) {
+    window.KeyboardLayout?.learnFromEvent?.(e.code, e.key);
+
+    if (usesLetterMapping()) {
+      const fromChar = resolveMidiFromChar(e.key);
+      if (fromChar != null) return fromChar;
+    }
+
     if (codeToMidi.has(e.code)) return codeToMidi.get(e.code);
 
-    const k = e.key;
-    if (k && k.length === 1) {
-      const upper = k.toUpperCase();
-      if (charToMidi.has(upper)) return charToMidi.get(upper);
-      if (charToMidi.has(k)) return charToMidi.get(k);
+    if (!usesLetterMapping()) {
+      return resolveMidiFromChar(e.key);
     }
+
     return null;
   }
 
@@ -4253,6 +4501,8 @@ window.mainJsOk = true;
   const labelAssignClear = $("#labelAssignClear");
   const labelAssignBackdrop = $("#labelAssignBackdrop");
   const keyboardEnabled = $("#keyboardEnabled");
+  const keyboardLayout = $("#keyboardLayout");
+  const keyboardLayoutHint = $("#keyboardLayoutHint");
   const btnToggleSidebar = $("#btnToggleSidebar");
   const btnFullscreen = $("#btnFullscreen");
   const comboFlare = $("#comboFlare");
@@ -4384,6 +4634,24 @@ window.mainJsOk = true;
       toast(`Kayıt hatası: ${err.message}`, true);
       return false;
     }
+  }
+
+  function updateKeyboardLayoutHint() {
+    if (!keyboardLayoutHint || !window.KeyboardLayout) return;
+    const detected = window.KeyboardLayout.getDetectedLabel();
+    keyboardLayoutHint.textContent =
+      keyboardLayout?.value === "auto"
+        ? `Algılanan: ${detected}`
+        : `Seçili: ${keyboardLayout.options[keyboardLayout.selectedIndex]?.text || detected}`;
+  }
+
+  function applyKeyboardLayoutSettings(s) {
+    if (!window.KeyboardLayout) return;
+    window.KeyboardLayout.setLayoutId(s.keyboardLayout || "auto");
+    window.KeyboardLayout.loadLearned(s.keyboardLearned || {});
+    if (keyboardLayout) keyboardLayout.value = s.keyboardLayout || "auto";
+    updateKeyboardLayoutHint();
+    window.KeyboardInput?.rebuild?.();
   }
 
   function applyLabelSettings(s) {
@@ -4609,6 +4877,7 @@ window.mainJsOk = true;
     Game.setTrim(s.trimStart ?? 0, s.trimEnd ?? 0);
     Game.setFlameStyle(s.flameStyle || "aurora");
     window.KeyboardInput?.setEnabled(s.keyboardEnabled !== false);
+    applyKeyboardLayoutSettings(s);
     if (effectHueInput) effectHueInput.value = String(s.effectHue ?? 275);
     if (keyColorTopInput) keyColorTopInput.value = s.keyColorTop || "#e8d4ff";
     if (keyColorMidInput) keyColorMidInput.value = s.keyColorMid || "#a855f7";
@@ -5350,6 +5619,27 @@ window.mainJsOk = true;
     if (on) window.KeyboardInput?.rebuild?.();
     persistSettings({ keyboardEnabled: on });
     toast(on ? "Klavye ile çalma açık." : "Klavye ile çalma kapalı.");
+  });
+
+  keyboardLayout?.addEventListener("change", () => {
+    const id = keyboardLayout.value;
+    window.KeyboardLayout?.setLayoutId(id);
+    persistSettings({ keyboardLayout: id });
+    updateKeyboardLayoutHint();
+    window.KeyboardInput?.rebuild?.();
+    toast(id === "auto" ? "Klavye düzeni otomatik algılanacak." : `Klavye düzeni: ${keyboardLayout.options[keyboardLayout.selectedIndex].text}`);
+  });
+
+  let keyboardLayoutSaveTimer = null;
+  window.addEventListener("keydown", () => {
+    if (keyboardLayout?.value !== "auto") return;
+    updateKeyboardLayoutHint();
+    clearTimeout(keyboardLayoutSaveTimer);
+    keyboardLayoutSaveTimer = setTimeout(() => {
+      if (window.KeyboardLayout?.getLearnedObject) {
+        persistSettings({ keyboardLearned: window.KeyboardLayout.getLearnedObject() });
+      }
+    }, 800);
   });
 
   btnToggleSidebar.addEventListener("click", () => {

@@ -6,6 +6,9 @@
   const MSG_SOURCE = "touch-piano";
   const MSG_REPLY = "touch-piano-wix";
   const pending = new Map();
+  const GUEST_STORAGE_KEY = "touch-piano-guest-libraries";
+  const MEMBERSHIP_HINT =
+    "MIDI kaydetmek için Wix üyeliği gerekir (tek seferlik 1 USD). Üye olmadan enstrümanı serbest çalabilirsiniz.";
 
   const config = {
     /** Wix site kökü, örn. https://sizin-site.wixsite.com/siteniz */
@@ -22,6 +25,28 @@
 
   let session = { memberId: null, email: null };
   let bridgeReady = false;
+
+  function isMember() {
+    return !!session.memberId;
+  }
+
+  function readGuestLibraries() {
+    try {
+      const raw = localStorage.getItem(GUEST_STORAGE_KEY);
+      if (!raw) return { libraries: [] };
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed?.libraries) ? parsed : { libraries: [] };
+    } catch {
+      return { libraries: [] };
+    }
+  }
+
+  function writeGuestLibraries(data) {
+    localStorage.setItem(
+      GUEST_STORAGE_KEY,
+      JSON.stringify({ libraries: data?.libraries || [] })
+    );
+  }
 
   function inIframe() {
     try {
@@ -78,9 +103,9 @@
 
     if (data.type === "WIX_SESSION") {
       session = { memberId: data.memberId || null, email: data.email || null };
-      bridgeReady = !!session.memberId;
+      bridgeReady = true;
       window.dispatchEvent(
-        new CustomEvent("touch-piano:session", { detail: { ...session } })
+        new CustomEvent("touch-piano:session", { detail: { ...session, isGuest: !session.memberId } })
       );
       return;
     }
@@ -210,23 +235,40 @@
 
   window.pianoApi = {
     isWeb: true,
-    getSession: () => ({ ...session }),
+    getSession: () => ({ ...session, isGuest: !session.memberId }),
     isBridgeReady: () => bridgeReady,
+    isMember,
+    membershipHint: MEMBERSHIP_HINT,
 
     getLibraries: async () => {
-      const data = await apiCall("pianoGetLibraries", {});
-      return data?.libraries ? data : { libraries: [] };
+      if (!isMember()) {
+        return readGuestLibraries();
+      }
+      try {
+        const data = await apiCall("pianoGetLibraries", {});
+        return data?.libraries ? data : { libraries: [] };
+      } catch (err) {
+        console.warn("getLibraries", err);
+        return readGuestLibraries();
+      }
     },
 
     saveLibraries: async (data) => {
       if (!data || !Array.isArray(data.libraries)) {
         throw new Error("Geçersiz kütüphane verisi");
       }
+      if (!isMember()) {
+        writeGuestLibraries(data);
+        return true;
+      }
       await apiCall("pianoSaveLibraries", { libraries: data.libraries });
       return true;
     },
 
     importMidi: async (libraryId) => {
+      if (!isMember()) {
+        throw new Error(MEMBERSHIP_HINT);
+      }
       const files = await pickMidiFiles();
       if (!files.length) return [];
       const imported = [];

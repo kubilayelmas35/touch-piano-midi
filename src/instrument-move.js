@@ -1,13 +1,13 @@
-/** Enstrüman panellerini sürükleyerek konumlandır */
+/** Enstrüman panellerini sürükleyerek konumlandır (alt kenara sabitli — yukarı büyür) */
 const InstrumentMove = (() => {
   let moveMode = false;
   let drag = null;
 
   const PANELS = {
-    guitarFrets: { selector: "#guitarFretsPanel", defaultPos: { x: 1, y: 2 } },
-    guitarStrings: { selector: "#guitarStringsPanel", defaultPos: { x: 72, y: 4 } },
-    violinBoard: { selector: "#violinBoardPanel", defaultPos: { x: 1, y: 4 } },
-    violinStrings: { selector: "#violinStringsPanel", defaultPos: { x: 72, y: 6 } },
+    guitarFrets: { selector: "#guitarFretsPanel", defaultPos: { x: 1, y: 0 } },
+    guitarStrings: { selector: "#guitarStringsPanel", defaultPos: { x: 72, y: 0 } },
+    violinBoard: { selector: "#violinBoardPanel", defaultPos: { x: 1, y: 0 } },
+    violinStrings: { selector: "#violinStringsPanel", defaultPos: { x: 72, y: 0 } },
   };
 
   function layoutKey(id) {
@@ -17,7 +17,18 @@ const InstrumentMove = (() => {
   function applyPanelPosition(el, pos) {
     if (!el || !pos) return;
     el.style.left = `${pos.x}%`;
-    el.style.top = `${pos.y}%`;
+    el.style.top = "auto";
+    el.style.bottom = `${pos.y}%`;
+  }
+
+  function readPanelY(panel) {
+    const bottom = parseFloat(panel.style.bottom);
+    if (!Number.isNaN(bottom) && panel.style.bottom) return bottom;
+    const top = parseFloat(panel.style.top);
+    if (!Number.isNaN(top) && panel.style.top) {
+      return Math.max(0, Math.min(92, 100 - top - 14));
+    }
+    return 0;
   }
 
   function applyLayout(settings) {
@@ -25,8 +36,15 @@ const InstrumentMove = (() => {
     for (const [id, meta] of Object.entries(PANELS)) {
       const el = document.querySelector(meta.selector);
       if (!el) continue;
-      const pos = layout[layoutKey(id)] || meta.defaultPos;
+      const saved = layout[layoutKey(id)];
+      const pos = saved || meta.defaultPos;
       applyPanelPosition(el, pos);
+      if (saved?.fromTop && !saved?.migrated) {
+        applyPanelPosition(el, {
+          x: saved.x,
+          y: Math.max(0, Math.min(92, 100 - saved.y - 14)),
+        });
+      }
     }
   }
 
@@ -36,6 +54,7 @@ const InstrumentMove = (() => {
     layout[layoutKey(id)] = {
       x: Math.max(0, Math.min(92, x)),
       y: Math.max(0, Math.min(92, y)),
+      anchor: "bottom",
     };
     window.AppSettings.save({ panelLayout: layout });
   }
@@ -65,7 +84,7 @@ const InstrumentMove = (() => {
     const parent = panel.offsetParent || panel.parentElement;
     const pr = parent.getBoundingClientRect();
     const left = parseFloat(panel.style.left) || 0;
-    const top = parseFloat(panel.style.top) || 0;
+    const bottom = readPanelY(panel);
     drag = {
       panel,
       id: panel.dataset.moveId,
@@ -74,7 +93,7 @@ const InstrumentMove = (() => {
       startX: e.clientX,
       startY: e.clientY,
       origX: left,
-      origY: top,
+      origY: bottom,
     };
     panel.setPointerCapture(e.pointerId);
   }
@@ -85,15 +104,16 @@ const InstrumentMove = (() => {
     const dx = ((e.clientX - drag.startX) / drag.parentW) * 100;
     const dy = ((e.clientY - drag.startY) / drag.parentH) * 100;
     const x = Math.max(0, Math.min(92, drag.origX + dx));
-    const y = Math.max(0, Math.min(92, drag.origY + dy));
+    const y = Math.max(0, Math.min(92, drag.origY - dy));
     drag.panel.style.left = `${x}%`;
-    drag.panel.style.top = `${y}%`;
+    drag.panel.style.top = "auto";
+    drag.panel.style.bottom = `${y}%`;
   }
 
   function onPointerUp(e) {
     if (!drag) return;
     const x = parseFloat(drag.panel.style.left) || 0;
-    const y = parseFloat(drag.panel.style.top) || 0;
+    const y = readPanelY(drag.panel);
     if (drag.id) savePanelPosition(drag.id, x, y);
     try {
       drag.panel.releasePointerCapture(e.pointerId);

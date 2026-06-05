@@ -133,6 +133,7 @@ const PlaySurface = (() => {
     setAutoFit: (...a) => delegate("setAutoFit", ...a),
     getKeySize: () => delegate("getKeySize"),
     refreshLabels: () => delegate("refreshLabels"),
+    getMidiTarget: (midi) => delegate("getMidiTarget", midi),
     flash,
     pressKey,
     releaseKey,

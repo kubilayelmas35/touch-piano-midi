@@ -19,6 +19,24 @@ const Piano = (() => {
     if (!wrapEl) return;
     wrapEl.style.setProperty("--white-key-width", `${keyWidth}px`);
     wrapEl.style.setProperty("--piano-height", `${keyHeight}px`);
+    let chrome = 0;
+    const banner = document.getElementById("authBanner");
+    if (banner?.offsetHeight) chrome += banner.offsetHeight;
+    const top = document.querySelector(".top-bar");
+    if (top) chrome += top.offsetHeight;
+    const usedH = keyHeight + 20;
+    const maxFooter = Math.max(120, window.innerHeight - chrome);
+    const footerH = Math.min(usedH, maxFooter);
+    document.documentElement.style.setProperty("--footer-row-h", `${footerH}px`);
+    const footerEl = document.getElementById("instrumentFooter");
+    if (footerEl) {
+      footerEl.style.height = `${footerH}px`;
+      footerEl.style.minHeight = `${footerH}px`;
+      footerEl.style.maxHeight = `${footerH}px`;
+    }
+    wrapEl.style.height = "100%";
+    wrapEl.style.minHeight = "0";
+    wrapEl.style.maxHeight = "100%";
     if (window.Game && typeof window.Game.resize === "function") {
       window.Game.resize();
     }
@@ -104,6 +122,7 @@ const Piano = (() => {
     if (autoFitWidth) autoSizeKeys();
     else applySize();
     refreshLabels();
+    bindKeyboardSlide();
   }
 
   function createKey(midi, kind) {
@@ -153,6 +172,7 @@ const Piano = (() => {
   }
 
   function releaseAll() {
+    slideCtl?.releaseAll?.();
     for (const [, m] of activePointers) {
       window.AudioEngine.noteOff(m);
     }
@@ -168,37 +188,37 @@ const Piano = (() => {
   }
 
   function bindPointer(el, midi) {
-    const down = (e) => {
-      if (e.pointerType === "mouse" && e.button !== 0) return;
-      if (e.pointerType === "touch" && e.button !== 0) return;
-      e.preventDefault();
-      el.setPointerCapture(e.pointerId);
-      const vel = window.AudioEngine.velocityFromPointer(e);
-      el.classList.add("active");
-      activePointers.set(e.pointerId, midi);
-      window.AudioEngine.noteOn(midi, vel);
-      onNoteDown?.(midi, vel, e);
-    };
+    /* Oynatma kaydırma bindKeyboardSlide ile — yalnızca sağ tık etiket */
+  }
 
-    const up = (e) => {
-      if (!activePointers.has(e.pointerId)) return;
-      e.preventDefault();
-      activePointers.delete(e.pointerId);
-      el.classList.remove("active");
-      try {
-        el.releasePointerCapture(e.pointerId);
-      } catch {
-        /* ignore */
-      }
-      window.AudioEngine.noteOff(midi);
-      onNoteUp?.(midi, e);
-    };
+  let slideCtl = null;
 
-    el.addEventListener("pointerdown", down);
-    el.addEventListener("pointerup", up);
-    el.addEventListener("pointercancel", up);
-    el.addEventListener("pointerleave", (e) => {
-      if (activePointers.get(e.pointerId) === midi) up(e);
+  function bindKeyboardSlide() {
+    if (!container || !window.PointerSlide || slideCtl) return;
+    slideCtl = window.PointerSlide.bind(container, {
+      hitTest: (x, y) => {
+        const el = document.elementFromPoint(x, y)?.closest?.(".key");
+        if (!el || !container.contains(el)) return null;
+        const midi = Number(el.dataset.midi);
+        if (!midi) return null;
+        return { el, midi };
+      },
+      onEnter: (st, target, e) => {
+        st.el = target.el;
+        st.midi = target.midi;
+        target.el.classList.add("active");
+        const vel = window.AudioEngine.velocityFromPointer(e);
+        window.AudioEngine.noteOn(st.midi, vel, { poly: true });
+        onNoteDown?.(st.midi, vel, e);
+      },
+      onLeave: (st, e) => {
+        if (st.midi == null) return;
+        st.el?.classList.remove("active");
+        window.AudioEngine.noteOff(st.midi);
+        onNoteUp?.(st.midi, e);
+        st.midi = null;
+        st.el = null;
+      },
     });
   }
 
@@ -246,6 +266,7 @@ const Piano = (() => {
     wrapEl = wrap;
     onNoteDown = noteDownCb;
     onNoteUp = noteUpCb;
+    bindKeyboardSlide();
     window.addEventListener("resize", () => {
       if (autoFitWidth) autoSizeKeys();
     });

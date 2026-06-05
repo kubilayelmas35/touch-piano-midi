@@ -125,7 +125,12 @@ const Game = (() => {
       return area?.clientHeight * HIT_LINE_FALLBACK || 400;
     }
     const ar = area.getBoundingClientRect();
-    const pr = instWrap.getBoundingClientRect();
+    const mode = window.PlaySurface?.getMode?.() || "piano";
+    const footer = document.getElementById("instrumentFooter");
+    const pr =
+      (mode === "guitar" || mode === "violin") && footer
+        ? footer.getBoundingClientRect()
+        : instWrap.getBoundingClientRect();
     return Math.max(48, Math.round(pr.top - ar.top));
   }
 
@@ -144,30 +149,39 @@ const Game = (() => {
     const range = surface.getRange();
     if (!range) return;
     const mode = surface.getMode();
-    let selector = ".piano-keys .key";
-    if (mode === "guitar" || mode === "violin") selector = ".guitar-neck .guitar-cell";
-
     const area = canvas.parentElement;
     const areaRect = area.getBoundingClientRect();
 
+    if (mode === "guitar" || mode === "violin") {
+      const mod = surface.activeModule?.();
+      const midis = new Set();
+      document.querySelectorAll(".guitar-neck .guitar-cell").forEach((key) => {
+        const midi = Number(key.dataset.midi);
+        if (midi >= range.startMidi && midi <= range.endMidi) midis.add(midi);
+      });
+      for (const midi of midis) {
+        const target = mod?.getMidiTarget?.(midi);
+        const cell = target?.cell;
+        if (!cell) continue;
+        const r = cell.getBoundingClientRect();
+        const centerX = r.left + r.width / 2 - areaRect.left;
+        const fret = target.fret;
+        const stringIdx = target.stringIdx;
+        const label = `${stringLabelForMode(mode, stringIdx)}${fret}`;
+        const laneColor =
+          getComputedStyle(cell).getPropertyValue("--str-color")?.trim() || null;
+        keyPositions.set(midi, { x: centerX, w: r.width, fret, label, laneColor });
+      }
+      return;
+    }
+
+    let selector = ".piano-keys .key";
     document.querySelectorAll(selector).forEach((key) => {
       const midi = Number(key.dataset.midi);
       if (!midi || midi < range.startMidi || midi > range.endMidi) return;
       const r = key.getBoundingClientRect();
       const centerX = r.left + r.width / 2 - areaRect.left;
-      if (mode === "guitar" || mode === "violin") {
-        const fret = Number(key.dataset.fret || 0);
-        const stringIdx = Number(key.dataset.string || 0);
-        const label = `${stringLabelForMode(mode, stringIdx)}${fret}`;
-        const laneColor =
-          getComputedStyle(key).getPropertyValue("--str-color")?.trim() || null;
-        const prev = keyPositions.get(midi);
-        if (!prev || fret < prev.fret) {
-          keyPositions.set(midi, { x: centerX, w: r.width, fret, label, laneColor });
-        }
-      } else {
-        keyPositions.set(midi, { x: centerX, w: r.width });
-      }
+      keyPositions.set(midi, { x: centerX, w: r.width });
     });
   }
 
@@ -417,11 +431,13 @@ const Game = (() => {
         const vel = Math.max(0.2, Math.min(1, n.velocity ?? 0.75));
         inst?.pressKey?.(n.midi, vel);
         boostKeyAura(n.midi, 1);
-        n.hit = true;
       }
       if (n._autoStarted && !n._autoEnded && t >= n.time + n.duration) {
         n._autoEnded = true;
         inst?.releaseKey?.(n.midi);
+      }
+      if (n._autoStarted && t >= n.time && !n.hit) {
+        n.hit = true;
       }
     }
   }

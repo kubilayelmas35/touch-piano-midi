@@ -333,6 +333,18 @@
           <span>Bilgisayar klavyesi</span>
           <input type="checkbox" id="keyboardEnabled" checked />
         </label>
+        <label class="field">
+          Klavye düzeni
+          <select id="keyboardLayout">
+            <option value="auto">Otomatik algıla</option>
+            <option value="qwerty">QWERTY (ABD/İngilizce)</option>
+            <option value="tr-f">Türkçe F</option>
+            <option value="tr-q">Türkçe Q</option>
+            <option value="qwertz">QWERTZ (Almanca)</option>
+            <option value="azerty">AZERTY (Fransızca)</option>
+          </select>
+        </label>
+        <p class="hint small-hint" id="keyboardLayoutHint">Algılanan: —</p>
         <label class="field toggle-row">
           <span>Dinamik basınç</span>
           <input type="checkbox" id="dynamicPressure" checked />

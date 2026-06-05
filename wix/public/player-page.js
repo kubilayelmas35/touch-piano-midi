@@ -255,19 +255,34 @@ async function deleteSong(payload) {
 
 async function sendSession(html) {
   try {
-    const member = await currentMember.getMember();
-    if (!member?._id) return;
+    let member = null;
+    try {
+      member = await currentMember.getMember();
+    } catch {
+      /* misafir */
+    }
     html.postMessage(
       {
         source: MSG_OUT,
         type: "WIX_SESSION",
-        memberId: member._id,
-        email: member.loginEmail || "",
+        memberId: member?._id || null,
+        email: member?.loginEmail || "",
+        isGuest: !member?._id,
       },
       pagesOrigin()
     );
   } catch (e) {
     console.error("sendSession", e);
+    html.postMessage(
+      {
+        source: MSG_OUT,
+        type: "WIX_SESSION",
+        memberId: null,
+        email: "",
+        isGuest: true,
+      },
+      pagesOrigin()
+    );
   }
 }
 
