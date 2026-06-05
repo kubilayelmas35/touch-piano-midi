@@ -43,7 +43,7 @@
       );
     } else {
       setBanner(
-        "Misafir modu — piyano, gitar ve keman ile serbest çalın. MIDI kaydetmek için üye olun (tek seferlik 1 USD).",
+        "Misafir modu — serbest çalın. MIDI bu tarayıcıda saklanır; buluta kayıt için üye olun (tek seferlik 1 USD).",
         "warn"
       );
     }
