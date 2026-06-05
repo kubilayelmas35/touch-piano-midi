@@ -98,6 +98,11 @@ const PlaySurface = (() => {
     const s = window.AppSettings?.load?.() || {};
     setMode(s.playMode || "piano", { force: true, syncSound: false });
     if (s.instrumentId) window.AudioEngine?.setInstrument?.(s.instrumentId);
+    activeModule()?.applyLayout?.();
+    requestAnimationFrame(() => {
+      activeModule()?.applyLayout?.();
+      window.Game?.refreshView?.() || window.Game?.resize?.();
+    });
   }
 
   function delegate(name, ...args) {

@@ -806,7 +806,7 @@ body.sidebar-hidden #btnToggleSidebar {
   align-self: end;
   width: 100%;
   height: var(--footer-row-h, min(42vh, 420px));
-  min-height: min(28vh, 260px);
+  min-height: 0;
   max-height: var(--footer-row-h, 50vh);
   background: #0a0c10;
   overflow: hidden;
@@ -825,6 +825,11 @@ body.sidebar-hidden #btnToggleSidebar {
   max-height: none;
   overflow: visible;
   box-sizing: border-box;
+}
+
+body[data-play-mode="piano"] .instrument-footer {
+  min-height: 0;
+  justify-content: flex-end;
 }
 
 body[data-play-mode="guitar"] .instrument-footer,
