@@ -74,8 +74,11 @@ const PlaySurface = (() => {
       window.AudioEngine?.setInstrument?.(MODES[mode].sound);
     }
 
+    mod?.applyLayout?.();
+
     window.dispatchEvent(new CustomEvent("touch-piano:play-mode", { detail: { mode } }));
     requestAnimationFrame(() => {
+      mod?.applyLayout?.();
       if (window.Game?.isReady?.()) window.Game.resize();
     });
     return mode;
