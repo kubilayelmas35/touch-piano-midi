@@ -52,8 +52,12 @@ const LibraryStore = (() => {
 
   async function importSongs(libraryId, imported) {
     const lib = getLibrary(libraryId);
-    if (!lib) return;
+    if (!lib) {
+      throw new Error("Kütüphane bulunamadı. Listeyi yenileyip tekrar deneyin.");
+    }
+    if (!Array.isArray(lib.songs)) lib.songs = [];
     for (const item of imported) {
+      if (lib.songs.some((s) => s.id === item.id)) continue;
       const entry = {
         id: item.id,
         name: item.name,
@@ -66,6 +70,18 @@ const LibraryStore = (() => {
       lib.songs.push(entry);
     }
     await save();
+  }
+
+  async function reload() {
+    const prevLib = activeLibraryId;
+    const prevSong = activeSongId;
+    await load();
+    if (prevLib && getLibrary(prevLib)) {
+      activeLibraryId = prevLib;
+      if (prevSong && getLibrary(prevLib)?.songs?.some((s) => s.id === prevSong)) {
+        activeSongId = prevSong;
+      }
+    }
   }
 
   async function loadSongMidi(song) {
@@ -139,6 +155,7 @@ const LibraryStore = (() => {
 
   return {
     load,
+    reload,
     save,
     createLibrary,
     getLibraries,
@@ -159,9 +176,3 @@ const LibraryStore = (() => {
 })();
 
 window.LibraryStore = LibraryStore;
-
-
-window.mainJsOk = true;
-
-
-window.mainJsOk = true;

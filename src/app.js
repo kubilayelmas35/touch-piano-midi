@@ -753,7 +753,7 @@
       : isWeb
         ? window.pianoApi.getSession?.()?.memberId
           ? "Kütüphane seçin veya yukarıdan ekleyin. Veriler Wix hesabınızda saklanır."
-          : "Misafir modu: enstrümanı serbest çalın. MIDI kaydetmek için üye olun (tek seferlik 1 USD)."
+          : "Misafir modu: MIDI bu tarayıcıda saklanır. Buluta kayıt için Wix üyeliği (tek seferlik 1 USD)."
         : "Kütüphane seçin veya yukarıdan ekleyin.";
     const activeSong = LibraryStore.getActiveSongId();
     let playReady = false;
@@ -990,13 +990,6 @@
       toast("Önce bir kütüphane seçin veya oluşturun.", true);
       return;
     }
-    if (window.pianoApi?.isWeb && !window.pianoApi.getSession?.()?.memberId) {
-      toast(
-        "MIDI kaydetmek için Wix üyeliği gerekir (tek seferlik 1 USD). Üye olmadan piyano/gitar/keman ile serbest çalabilirsiniz.",
-        true
-      );
-      return;
-    }
     try {
       try {
         requireMods().AudioEngine.ensure();
@@ -1006,8 +999,18 @@
       const imported = await window.pianoApi.importMidi(libId);
       if (!imported.length) return;
       await LibraryStore.importSongs(libId, imported);
+      if (window.pianoApi.isMember?.()) {
+        await LibraryStore.reload();
+        LibraryStore.setActiveLibrary(libId);
+      }
+      renderLibraries();
       renderSongs();
-      toast(`${imported.length} MIDI dosyası eklendi.`);
+      const cloud = window.pianoApi.isMember?.();
+      toast(
+        cloud
+          ? `${imported.length} MIDI buluta kaydedildi.`
+          : `${imported.length} MIDI bu tarayıcıya kaydedildi (misafir).`
+      );
     } catch (err) {
       toast(`MIDI eklenemedi: ${err.message}`, true);
     }

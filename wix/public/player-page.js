@@ -196,12 +196,28 @@ async function uploadMidi({ libraryId, fileName, base64, name }) {
 
   await upsertMidiRow(memberId, libraryId, songId, safeName, base64);
 
-  return {
+  const entry = {
     id: songId,
     name: (name || safeName).replace(/\.(mid|midi)$/i, ""),
     fileName: safeName,
     storage: "cms",
   };
+
+  const data = await loadLibraries();
+  const lib = data.libraries.find((l) => l.id === libraryId);
+  if (!lib) {
+    await removeMidiRow(memberId, songId);
+    throw new Error(
+      "Kütüphane bulutta bulunamadı. Önce kütüphaneyi kaydedin (+ Yeni), sonra MIDI yükleyin."
+    );
+  }
+  if (!Array.isArray(lib.songs)) lib.songs = [];
+  if (!lib.songs.some((s) => s.id === songId)) {
+    lib.songs.push(entry);
+    await saveLibraries(data.libraries);
+  }
+
+  return entry;
 }
 
 async function getMidiData({ songId }) {

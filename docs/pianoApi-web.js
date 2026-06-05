@@ -7,8 +7,10 @@
   const MSG_REPLY = "touch-piano-wix";
   const pending = new Map();
   const GUEST_STORAGE_KEY = "touch-piano-guest-libraries";
+  /** Misafir: localStorage'da base64 MIDI (~1.5 MB ham dosya) */
+  const MAX_GUEST_MIDI_B64 = 2 * 1024 * 1024;
   const MEMBERSHIP_HINT =
-    "MIDI kaydetmek için Wix üyeliği gerekir (tek seferlik 1 USD). Üye olmadan enstrümanı serbest çalabilirsiniz.";
+    "Buluta MIDI kaydetmek için Wix üyeliği gerekir (tek seferlik 1 USD). Misafir modunda MIDI yalnızca bu tarayıcıda saklanır.";
 
   const config = {
     /** Wix site kökü, örn. https://sizin-site.wixsite.com/siteniz */
@@ -244,13 +246,8 @@
       if (!isMember()) {
         return readGuestLibraries();
       }
-      try {
-        const data = await apiCall("pianoGetLibraries", {});
-        return data?.libraries ? data : { libraries: [] };
-      } catch (err) {
-        console.warn("getLibraries", err);
-        return readGuestLibraries();
-      }
+      const data = await apiCall("pianoGetLibraries", {});
+      return data?.libraries ? data : { libraries: [] };
     },
 
     saveLibraries: async (data) => {
@@ -266,8 +263,8 @@
     },
 
     importMidi: async (libraryId) => {
-      if (!isMember()) {
-        throw new Error(MEMBERSHIP_HINT);
+      if (!libraryId) {
+        throw new Error("Önce bir kütüphane seçin veya oluşturun.");
       }
       const files = await pickMidiFiles();
       if (!files.length) return [];
@@ -275,6 +272,21 @@
       for (const file of files) {
         const base64 = await fileToBase64(file);
         const baseName = file.name.replace(/\.(mid|midi)$/i, "") || "parca";
+        if (!isMember()) {
+          if (base64.length > MAX_GUEST_MIDI_B64) {
+            throw new Error(
+              `"${file.name}" çok büyük. Misafir modunda parça başına en fazla ~1.5 MB MIDI yükleyebilirsiniz.`
+            );
+          }
+          imported.push({
+            id: `song-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            name: baseName,
+            fileName: file.name,
+            midiBase64: base64,
+            storage: "local",
+          });
+          continue;
+        }
         const entry = await apiCall("pianoUploadMidi", {
           libraryId,
           fileName: file.name,
@@ -299,6 +311,7 @@
     readMidi,
 
     deleteMidi: async (ref, meta) => {
+      if (!isMember()) return true;
       const payload =
         meta && typeof meta === "object"
           ? { midiUrl: ref, songId: meta.songId, libraryId: meta.libraryId }
