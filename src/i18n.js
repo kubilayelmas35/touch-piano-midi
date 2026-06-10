@@ -201,6 +201,8 @@ const I18n = (() => {
     "toast.importCancel": "Cancelled or no file selected.",
     "toast.audioConverted": "{n} tracks converted ({notes} notes). Select and play.",
     "toast.bootGuest": "Guest mode: you can play. Sign up for cloud library.",
+    "toast.cloudLibError":
+      "Cloud library unavailable: {msg}. You can still play the sample track.",
     "toast.bootLibError": "Library error: {msg}",
     "toast.pianoWarn": "Piano warning: {msg}",
     "toast.demoError": "Demo song: {msg}",
@@ -251,6 +253,8 @@ const I18n = (() => {
     "picker.title": "Hangi enstrümanla çalmak istersiniz?",
     "starter.lib": "Örnek Parçalar (telifsiz)",
     "starter.song": "Bach — Prelude BWV 846",
+    "toast.cloudLibError":
+      "Bulut kütüphanesi açılamadı: {msg}. Örnek parça yine de yüklendi.",
   };
 
   const de = {

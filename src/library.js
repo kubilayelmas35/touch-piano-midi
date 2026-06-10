@@ -32,6 +32,27 @@ const LibraryStore = (() => {
     data.libraries.unshift(lib);
   }
 
+  /** Bulut kaydı olmadan belleğe şarkı ekle (örnek parça / CMS hatası yedek) */
+  function addSongsInMemory(libraryId, entries) {
+    const lib = getLibrary(libraryId);
+    if (!lib || !Array.isArray(entries)) return false;
+    if (!Array.isArray(lib.songs)) lib.songs = [];
+    for (const item of entries) {
+      if (lib.songs.some((s) => s.id === item.id)) continue;
+      const entry = {
+        id: item.id,
+        name: item.name,
+        fileName: item.fileName,
+      };
+      if (item.midiUrl) entry.midiUrl = item.midiUrl;
+      if (item.midiBase64) entry.midiBase64 = item.midiBase64;
+      if (item.storage) entry.storage = item.storage;
+      if (item.relativePath) entry.relativePath = item.relativePath;
+      lib.songs.push(entry);
+    }
+    return true;
+  }
+
   function getLibraries() {
     return data.libraries;
   }
@@ -172,6 +193,7 @@ const LibraryStore = (() => {
     save,
     createLibrary,
     dataPushStarter,
+    addSongsInMemory,
     getLibraries,
     getLibrary,
     setActiveLibrary,

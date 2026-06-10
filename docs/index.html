@@ -147,7 +147,22 @@
       <h2 data-i18n="settings.title">Settings</h2>
       <label class="field">
         <span data-i18n="settings.language">Language</span>
-        <select id="localeSelect" aria-label="Language"></select>
+        <select id="localeSelect" aria-label="Language">
+          <option value="auto">🌐 Auto / Otomatik</option>
+          <option value="en">English</option>
+          <option value="tr">Türkçe</option>
+          <option value="de">Deutsch</option>
+          <option value="fr">Français</option>
+          <option value="it">Italiano</option>
+          <option value="es">Español</option>
+          <option value="pt">Português</option>
+          <option value="nl">Nederlands</option>
+          <option value="pl">Polski</option>
+          <option value="ru">Русский</option>
+          <option value="ja">日本語</option>
+          <option value="ko">한국어</option>
+          <option value="zh">中文</option>
+        </select>
       </label>
       <div class="panel-actions">
         <button type="button" id="btnMoveInstrument" class="btn small" data-i18n="settings.move">↔ Move panels</button>
@@ -481,6 +496,6 @@
   <script src="pianoApi-web.js"></script>
   <script src="web-boot.js"></script>
   <script src="touch-guard.js"></script>
-  <script src="main.js?v=web20"></script>
+  <script src="main.js?v=web21"></script>
 </body>
 </html>

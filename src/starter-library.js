@@ -44,7 +44,11 @@ const StarterLibrary = (() => {
         createdAt: new Date().toISOString(),
         starter: true,
       });
-      await LibraryStore.save();
+      try {
+        await LibraryStore.save();
+      } catch (err) {
+        console.warn("Starter kütüphane kaydı:", err);
+      }
     }
 
     let base64;
@@ -55,20 +59,39 @@ const StarterLibrary = (() => {
       return false;
     }
 
+    const localEntry = {
+      ...SONG_META,
+      midiBase64: base64,
+      storage: "local",
+    };
+
     const api = window.pianoApi;
     if (api?.isMember?.()) {
-      const entry = await api.uploadMidiBase64(LIB_ID, SONG_META.fileName, base64, SONG_META.name);
-      await LibraryStore.importSongs(LIB_ID, [entry]);
-      return true;
+      try {
+        const entry = await api.uploadMidiBase64(
+          LIB_ID,
+          SONG_META.fileName,
+          base64,
+          SONG_META.name
+        );
+        try {
+          await LibraryStore.importSongs(LIB_ID, [entry]);
+        } catch (importErr) {
+          console.warn("Starter bulut içe aktarma:", importErr);
+          LibraryStore.addSongsInMemory(LIB_ID, [entry]);
+        }
+        return true;
+      } catch (uploadErr) {
+        console.warn("Starter bulut yükleme:", uploadErr);
+      }
     }
 
-    await LibraryStore.importSongs(LIB_ID, [
-      {
-        ...SONG_META,
-        midiBase64: base64,
-        storage: "local",
-      },
-    ]);
+    LibraryStore.addSongsInMemory(LIB_ID, [localEntry]);
+    try {
+      await LibraryStore.save();
+    } catch (err) {
+      console.warn("Starter yerel kayıt:", err);
+    }
     return true;
   }
 

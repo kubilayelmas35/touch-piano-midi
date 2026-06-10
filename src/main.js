@@ -204,6 +204,8 @@ const I18n = (() => {
     "toast.importCancel": "Cancelled or no file selected.",
     "toast.audioConverted": "{n} tracks converted ({notes} notes). Select and play.",
     "toast.bootGuest": "Guest mode: you can play. Sign up for cloud library.",
+    "toast.cloudLibError":
+      "Cloud library unavailable: {msg}. You can still play the sample track.",
     "toast.bootLibError": "Library error: {msg}",
     "toast.pianoWarn": "Piano warning: {msg}",
     "toast.demoError": "Demo song: {msg}",
@@ -254,6 +256,8 @@ const I18n = (() => {
     "picker.title": "Hangi enstrümanla çalmak istersiniz?",
     "starter.lib": "Örnek Parçalar (telifsiz)",
     "starter.song": "Bach — Prelude BWV 846",
+    "toast.cloudLibError":
+      "Bulut kütüphanesi açılamadı: {msg}. Örnek parça yine de yüklendi.",
   };
 
   const de = {
@@ -4969,6 +4973,27 @@ const LibraryStore = (() => {
     data.libraries.unshift(lib);
   }
 
+  /** Bulut kaydı olmadan belleğe şarkı ekle (örnek parça / CMS hatası yedek) */
+  function addSongsInMemory(libraryId, entries) {
+    const lib = getLibrary(libraryId);
+    if (!lib || !Array.isArray(entries)) return false;
+    if (!Array.isArray(lib.songs)) lib.songs = [];
+    for (const item of entries) {
+      if (lib.songs.some((s) => s.id === item.id)) continue;
+      const entry = {
+        id: item.id,
+        name: item.name,
+        fileName: item.fileName,
+      };
+      if (item.midiUrl) entry.midiUrl = item.midiUrl;
+      if (item.midiBase64) entry.midiBase64 = item.midiBase64;
+      if (item.storage) entry.storage = item.storage;
+      if (item.relativePath) entry.relativePath = item.relativePath;
+      lib.songs.push(entry);
+    }
+    return true;
+  }
+
   function getLibraries() {
     return data.libraries;
   }
@@ -5109,6 +5134,7 @@ const LibraryStore = (() => {
     save,
     createLibrary,
     dataPushStarter,
+    addSongsInMemory,
     getLibraries,
     getLibrary,
     setActiveLibrary,
@@ -5176,7 +5202,11 @@ const StarterLibrary = (() => {
         createdAt: new Date().toISOString(),
         starter: true,
       });
-      await LibraryStore.save();
+      try {
+        await LibraryStore.save();
+      } catch (err) {
+        console.warn("Starter kütüphane kaydı:", err);
+      }
     }
 
     let base64;
@@ -5187,20 +5217,39 @@ const StarterLibrary = (() => {
       return false;
     }
 
+    const localEntry = {
+      ...SONG_META,
+      midiBase64: base64,
+      storage: "local",
+    };
+
     const api = window.pianoApi;
     if (api?.isMember?.()) {
-      const entry = await api.uploadMidiBase64(LIB_ID, SONG_META.fileName, base64, SONG_META.name);
-      await LibraryStore.importSongs(LIB_ID, [entry]);
-      return true;
+      try {
+        const entry = await api.uploadMidiBase64(
+          LIB_ID,
+          SONG_META.fileName,
+          base64,
+          SONG_META.name
+        );
+        try {
+          await LibraryStore.importSongs(LIB_ID, [entry]);
+        } catch (importErr) {
+          console.warn("Starter bulut içe aktarma:", importErr);
+          LibraryStore.addSongsInMemory(LIB_ID, [entry]);
+        }
+        return true;
+      } catch (uploadErr) {
+        console.warn("Starter bulut yükleme:", uploadErr);
+      }
     }
 
-    await LibraryStore.importSongs(LIB_ID, [
-      {
-        ...SONG_META,
-        midiBase64: base64,
-        storage: "local",
-      },
-    ]);
+    LibraryStore.addSongsInMemory(LIB_ID, [localEntry]);
+    try {
+      await LibraryStore.save();
+    } catch (err) {
+      console.warn("Starter yerel kayıt:", err);
+    }
     return true;
   }
 
@@ -5654,17 +5703,28 @@ window.mainJsOk = true;
 
   function syncLocaleSelect() {
     if (!localeSelect || !window.I18n) return;
-    if (!localeSelect.dataset.filled) {
+    const locales = window.I18n.getLocales();
+    if (!locales.length) return;
+    if (localeSelect.options.length !== locales.length) {
       localeSelect.innerHTML = "";
-      for (const loc of window.I18n.getLocales()) {
+      for (const loc of locales) {
         const opt = document.createElement("option");
         opt.value = loc.id;
         opt.textContent = loc.label;
         localeSelect.appendChild(opt);
       }
-      localeSelect.dataset.filled = "1";
+    } else {
+      locales.forEach((loc, i) => {
+        const opt = localeSelect.options[i];
+        if (!opt) return;
+        opt.value = loc.id;
+        opt.textContent = loc.label;
+      });
     }
-    localeSelect.value = AppSettings.load().locale || "auto";
+    const pref = AppSettings.load().locale || "auto";
+    localeSelect.value = [...localeSelect.options].some((o) => o.value === pref)
+      ? pref
+      : "auto";
   }
 
   function syncPlayModeSelect() {
@@ -6903,35 +6963,6 @@ window.mainJsOk = true;
       console.warn("Intro:", err);
     }
     try {
-      if (window.pianoApi?.isWeb && window.pianoApi.waitForSession) {
-        await window.pianoApi.waitForSession(4500);
-      }
-      await requireStore().load();
-      if (window.StarterLibrary?.ensure) {
-        try {
-          await window.StarterLibrary.ensure(requireStore());
-        } catch (err) {
-          console.warn("Örnek kütüphane:", err);
-        }
-      }
-      window.__bootStatus = "kütüphane yüklendi";
-      renderLibraries();
-      renderSongs();
-      updateImportButtons();
-    } catch (err) {
-      window.__bootStatus = "hata: " + err.message;
-      if (window.pianoApi?.isWeb) {
-        toast(t("toast.bootGuest"), false);
-        renderLibraries();
-        updateImportButtons();
-      } else {
-        toast(t("toast.bootLibError", { msg: err.message }), true);
-        console.error(err);
-        return;
-      }
-    }
-
-    try {
       const { PlaySurface, Game, AppSettings } = requireMods();
       Game.init($("#notesCanvas"), {
         onScoreChange,
@@ -6949,31 +6980,79 @@ window.mainJsOk = true;
       window.KeyboardInput?.rebuild?.();
       showInstrumentPickerIfNeeded();
       updateSettingsForPlayMode(PlaySurface.getMode());
-      updateImportButtons();
-      let lastCloudMemberId = window.pianoApi.getSession?.().memberId || null;
-      window.addEventListener("touch-piano:session", async (e) => {
-        const mid = e.detail?.memberId || null;
-        if (mid && mid !== lastCloudMemberId) {
-          lastCloudMemberId = mid;
-          try {
-            await requireStore().reload();
-            renderLibraries();
-            renderSongs();
-          } catch (err) {
-            console.error(err);
-          }
-        } else if (!mid) {
-          lastCloudMemberId = null;
-        }
-        updateImportButtons();
-        updateHints();
-      });
+      applyAppTranslations();
       window.__bootStatus = "piyano hazır";
     } catch (err) {
       window.__bootStatus = "piyano hata: " + err.message;
       toast(t("toast.pianoWarn", { msg: err.message }), true);
       console.error(err);
     }
+
+    let cloudLibError = null;
+    try {
+      if (window.pianoApi?.isWeb && window.pianoApi.waitForSession) {
+        await window.pianoApi.waitForSession(4500);
+      }
+      try {
+        await requireStore().load();
+      } catch (loadErr) {
+        cloudLibError = loadErr.message;
+        if (!window.pianoApi?.isWeb) throw loadErr;
+      }
+      if (window.StarterLibrary?.ensure) {
+        try {
+          await window.StarterLibrary.ensure(requireStore());
+        } catch (err) {
+          console.warn("Örnek kütüphane:", err);
+        }
+      }
+      window.__bootStatus = "kütüphane yüklendi";
+      renderLibraries();
+      renderSongs();
+      updateImportButtons();
+    } catch (err) {
+      window.__bootStatus = "hata: " + err.message;
+      if (window.pianoApi?.isWeb) {
+        cloudLibError = cloudLibError || err.message;
+        renderLibraries();
+        updateImportButtons();
+      } else {
+        toast(t("toast.bootLibError", { msg: err.message }), true);
+        console.error(err);
+        return;
+      }
+    }
+
+    if (cloudLibError) {
+      if (window.pianoApi?.isMember?.()) {
+        toast(t("toast.cloudLibError", { msg: cloudLibError }), true);
+      } else if (window.pianoApi?.isWeb) {
+        toast(t("toast.bootGuest"), false);
+      }
+    }
+
+    let lastCloudMemberId = window.pianoApi.getSession?.().memberId || null;
+    window.addEventListener("touch-piano:session", async (e) => {
+      const mid = e.detail?.memberId || null;
+      if (mid && mid !== lastCloudMemberId) {
+        lastCloudMemberId = mid;
+        try {
+          await requireStore().reload();
+          if (window.StarterLibrary?.ensure) {
+            await window.StarterLibrary.ensure(requireStore());
+          }
+          renderLibraries();
+          renderSongs();
+        } catch (err) {
+          console.error(err);
+          toast(t("toast.cloudLibError", { msg: err.message }), true);
+        }
+      } else if (!mid) {
+        lastCloudMemberId = null;
+      }
+      updateImportButtons();
+      updateHints();
+    });
 
     try {
       const demo =
@@ -6993,6 +7072,19 @@ window.mainJsOk = true;
       toast(t("toast.demoError", { msg: err.message }), true);
       console.error(err);
     }
+
+    applyAppTranslations();
+    scheduleInstrumentLayoutSync();
+    setTimeout(scheduleInstrumentLayoutSync, 150);
+    setTimeout(() => {
+      try {
+        window.dispatchEvent(new Event("resize"));
+        requireMods().Game.resize();
+      } catch {
+        /* */
+      }
+    }, 400);
+    window.dispatchEvent(new CustomEvent("staveflow:booted"));
   })();
 })();
 
