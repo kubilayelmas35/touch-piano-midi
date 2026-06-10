@@ -442,6 +442,8 @@
     requestAnimationFrame(() => requestAnimationFrame(run));
     setTimeout(run, 100);
     setTimeout(run, 350);
+    setTimeout(run, 700);
+    setTimeout(run, 1200);
   }
 
   function syncFrettedSizeSliders(s) {
@@ -539,10 +541,12 @@
       syncFrettedSizeSliders(s);
       window.PlaySurface?.activeModule?.()?.applyLayout?.();
     }
+    scheduleInstrumentLayoutSync();
     setTimeout(() => {
       requireMods().Game.resize();
       reloadTrackNotes();
     }, 100);
+    setTimeout(() => requireMods().Game.resize(), 500);
     return m;
   }
 
@@ -566,8 +570,14 @@
     });
   }
 
+  function effectivePianoDock(s) {
+    const mode = window.PlaySurface?.getMode?.() || s?.playMode || "piano";
+    if (mode === "guitar" || mode === "violin") return "middle";
+    return s?.pianoDock || "bottom";
+  }
+
   function applyPianoLayout(s) {
-    const dock = s.pianoDock || "bottom";
+    const dock = effectivePianoDock(s);
     const align = s.pianoAlign || "stretch";
     document.body.classList.remove("piano-dock-bottom", "piano-dock-top", "piano-dock-middle");
     document.body.classList.add(`piano-dock-${dock}`);

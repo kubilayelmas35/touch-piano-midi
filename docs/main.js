@@ -4238,6 +4238,16 @@ const Game = (() => {
       });
       for (const el of observeTargets) ro.observe(el);
     }
+    window.addEventListener("touch-piano:play-mode", () => {
+      requestAnimationFrame(() => {
+        resize();
+        updateKeyPositions();
+      });
+    });
+    window.addEventListener("staveflow:booted", () => {
+      setTimeout(() => resize(), 50);
+      setTimeout(() => resize(), 400);
+    });
   }
 
   function setFlameIntensity(level) {
@@ -4310,13 +4320,43 @@ const Game = (() => {
 
   function getHitY() {
     const area = canvas?.parentElement;
-    const playEl = getPlaySurfaceEl();
-    if (!area || !playEl || playEl.closest(".hidden")) {
-      return area?.clientHeight * HIT_LINE_FALLBACK || 400;
-    }
+    if (!area) return 400;
+    const mode = window.PlaySurface?.getMode?.() || "piano";
     const ar = area.getBoundingClientRect();
-    const pr = playEl.getBoundingClientRect();
-    const y = Math.round(pr.top - ar.top - 3);
+
+    let target = getPlaySurfaceEl();
+    if (mode === "guitar") {
+      target =
+        document.getElementById("guitarFrets") ||
+        document.getElementById("guitarWrap") ||
+        target;
+    } else if (mode === "violin") {
+      target =
+        document.getElementById("violinBoard") ||
+        document.getElementById("violinWrap") ||
+        target;
+    }
+
+    if (!target || target.closest(".hidden")) {
+      return area.clientHeight * HIT_LINE_FALLBACK;
+    }
+
+    const pr = target.getBoundingClientRect();
+    if (pr.height < 4) {
+      return area.clientHeight * HIT_LINE_FALLBACK;
+    }
+
+    let y = Math.round(pr.top - ar.top - 3);
+
+    // Alt satır dock: enstrüman oyun alanının altında — çizgiyi klavye üstüne sabitle
+    if (y > area.clientHeight - 8) {
+      const footer = document.getElementById("instrumentFooter");
+      const fr = footer?.getBoundingClientRect();
+      if (fr && fr.height > 8) {
+        y = Math.round(fr.top - ar.top - 3);
+      }
+    }
+
     return Math.max(56, Math.min(area.clientHeight - 6, y));
   }
 
@@ -5895,6 +5935,8 @@ window.mainJsOk = true;
     requestAnimationFrame(() => requestAnimationFrame(run));
     setTimeout(run, 100);
     setTimeout(run, 350);
+    setTimeout(run, 700);
+    setTimeout(run, 1200);
   }
 
   function syncFrettedSizeSliders(s) {
@@ -5992,10 +6034,12 @@ window.mainJsOk = true;
       syncFrettedSizeSliders(s);
       window.PlaySurface?.activeModule?.()?.applyLayout?.();
     }
+    scheduleInstrumentLayoutSync();
     setTimeout(() => {
       requireMods().Game.resize();
       reloadTrackNotes();
     }, 100);
+    setTimeout(() => requireMods().Game.resize(), 500);
     return m;
   }
 
@@ -6019,8 +6063,14 @@ window.mainJsOk = true;
     });
   }
 
+  function effectivePianoDock(s) {
+    const mode = window.PlaySurface?.getMode?.() || s?.playMode || "piano";
+    if (mode === "guitar" || mode === "violin") return "middle";
+    return s?.pianoDock || "bottom";
+  }
+
   function applyPianoLayout(s) {
-    const dock = s.pianoDock || "bottom";
+    const dock = effectivePianoDock(s);
     const align = s.pianoAlign || "stretch";
     document.body.classList.remove("piano-dock-bottom", "piano-dock-top", "piano-dock-middle");
     document.body.classList.add(`piano-dock-${dock}`);

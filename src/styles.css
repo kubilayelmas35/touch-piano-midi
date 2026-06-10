@@ -78,6 +78,14 @@ body.piano-dock-top {
     "sidebar main";
 }
 
+body.piano-dock-middle {
+  grid-template-rows: auto minmax(0, 1fr) 0;
+}
+
+body.has-auth-banner.piano-dock-middle {
+  grid-template-rows: auto auto minmax(0, 1fr) 0;
+}
+
 body.piano-dock-middle .game-area,
 body.piano-dock-middle .instrument-footer,
 body.piano-dock-middle .piano-wrap {
@@ -91,6 +99,12 @@ body.piano-dock-middle .piano-wrap {
   background: rgba(10, 12, 16, 0.94);
   border-top: 1px solid #2a3040;
   box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.45);
+  pointer-events: auto;
+}
+
+body.piano-dock-middle .instrument-footer {
+  height: auto;
+  max-height: min(46vh, 440px);
 }
 
 .piano-wrap.piano-align-stretch .piano-keys {
