@@ -59,6 +59,16 @@
   </style>
 </head>
 <body class="has-auth-banner piano-dock-bottom">
+  <div id="introSplash" class="hidden" aria-hidden="true">
+    <canvas id="introSplashCanvas" aria-hidden="true"></canvas>
+    <video id="introSplashVideo" class="hidden" playsinline muted aria-hidden="true"></video>
+    <div class="intro-splash-content">
+      <h2 class="intro-splash-logo">Touch Piano</h2>
+      <p class="intro-splash-tag">MIDI ile öğren · çal · hisset</p>
+    </div>
+    <button type="button" id="introSplashSkip" class="btn">Atla</button>
+  </div>
+
   <div id="authBanner" class="warn">Wix hesabına bağlanılıyor… Siteye giriş yaptığınızdan emin olun.</div>
 
   <div id="apiError" class="api-error hidden">

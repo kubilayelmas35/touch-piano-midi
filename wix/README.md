@@ -8,7 +8,9 @@ Touch Piano web sürümü (GitHub Pages) Wix **Members** ile giriş yapar; MIDI 
 2. Velo **Backend** — şu dosyaları ekleyin (repodan kopyalayın):
    - `backend/pianoLibraryCore.js`
    - `backend/pianoLibrary.web.js`
-   - `backend/pianoMedia.web.js` (isteğe bağlı; sayfa kodu Media kullanmıyor)
+   - `backend/pianoMidiCmsCore.js` (**zorunlu** — MIDI CMS + suppressAuth)
+   - `backend/pianoMidiCms.web.js` (**zorunlu**)
+   - `backend/pianoMedia.web.js` (isteğe bağlı; HTTP Media yolu)
 3. `http-functions.js` (isteğe bağlı).
 4. Sayfa **Piyano**:
    - Embed, **ID:** `pianoHtml`
@@ -19,8 +21,8 @@ Touch Piano web sürümü (GitHub Pages) Wix **Members** ile giriş yapar; MIDI 
 ## Akış
 
 - Kullanıcı Wix’te giriş yapar → iframe GitHub Pages oynatıcıyı açar.
-- Kütüphane listesi: `player-page.js` → **wix-data** (CMS) — webMethod değil.
-- MIDI yükleme: `player-page.js` → `UserPianoMidi` koleksiyonu (~15 MB / parça).
+- Kütüphane + MIDI: `player-page.js` → backend **webMethod** (`pianoMidiCms.web.js`, CMS `suppressAuth`).
+- MIDI yükleme: `UserPianoMidi` koleksiyonu (~15 MB / parça) + `UserPianoData` şarkı listesi.
 
 ## Dosyalar
 

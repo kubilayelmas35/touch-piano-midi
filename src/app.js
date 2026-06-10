@@ -276,6 +276,9 @@
         toast(`"${trimmed}" kütüphanesi eklendi.`);
       }
       await LibraryStore.save();
+      if (window.pianoApi?.isMember?.()) {
+        await LibraryStore.reload();
+      }
       if (!libraryModal.classList.contains("hidden")) closeModal();
       renderLibraries();
       renderSongs();
@@ -999,10 +1002,7 @@
       const imported = await window.pianoApi.importMidi(libId);
       if (!imported.length) return;
       await LibraryStore.importSongs(libId, imported);
-      if (window.pianoApi.isMember?.()) {
-        await LibraryStore.reload();
-        LibraryStore.setActiveLibrary(libId);
-      }
+      LibraryStore.setActiveLibrary(libId);
       renderLibraries();
       renderSongs();
       const cloud = window.pianoApi.isMember?.();
@@ -1376,6 +1376,16 @@
     window.__appVersion = APP_VERSION;
     window.__bootStatus = "başlıyor";
     try {
+      if (window.IntroSplash?.play) {
+        await window.IntroSplash.play();
+      }
+    } catch (err) {
+      console.warn("Intro:", err);
+    }
+    try {
+      if (window.pianoApi?.isWeb && window.pianoApi.waitForSession) {
+        await window.pianoApi.waitForSession(4500);
+      }
       await requireStore().load();
       window.__bootStatus = "kütüphane yüklendi";
       renderLibraries();
@@ -1413,7 +1423,21 @@
       showInstrumentPickerIfNeeded();
       updateSettingsForPlayMode(PlaySurface.getMode());
       updateImportButtons();
-      window.addEventListener("touch-piano:session", () => {
+      let lastCloudMemberId = window.pianoApi.getSession?.().memberId || null;
+      window.addEventListener("touch-piano:session", async (e) => {
+        const mid = e.detail?.memberId || null;
+        if (mid && mid !== lastCloudMemberId) {
+          lastCloudMemberId = mid;
+          try {
+            await requireStore().reload();
+            renderLibraries();
+            renderSongs();
+          } catch (err) {
+            console.error(err);
+          }
+        } else if (!mid) {
+          lastCloudMemberId = null;
+        }
         updateImportButtons();
         updateHints();
       });

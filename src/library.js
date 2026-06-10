@@ -55,6 +55,14 @@ const LibraryStore = (() => {
     if (!lib) {
       throw new Error("Kütüphane bulunamadı. Listeyi yenileyip tekrar deneyin.");
     }
+    const fromCloud =
+      window.pianoApi?.isMember?.() &&
+      imported.length > 0 &&
+      imported.every((item) => item.storage === "cms");
+    if (fromCloud) {
+      await reload();
+      return;
+    }
     if (!Array.isArray(lib.songs)) lib.songs = [];
     for (const item of imported) {
       if (lib.songs.some((s) => s.id === item.id)) continue;

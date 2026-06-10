@@ -127,6 +127,24 @@
   if (inIframe() && config.useParentBridge) {
     requestPing();
     setTimeout(requestPing, 400);
+    setTimeout(requestPing, 1200);
+  }
+
+  function waitForSession(timeoutMs = 4500) {
+    if (!inIframe() || !config.useParentBridge || bridgeReady) {
+      return Promise.resolve({ ...session, isGuest: !session.memberId });
+    }
+    return new Promise((resolve) => {
+      const done = (detail) => {
+        clearTimeout(timer);
+        window.removeEventListener("touch-piano:session", onEvt);
+        resolve(detail || { ...session, isGuest: !session.memberId });
+      };
+      const onEvt = (e) => done(e.detail);
+      const timer = setTimeout(() => done(null), timeoutMs);
+      window.addEventListener("touch-piano:session", onEvt);
+      requestPing();
+    });
   }
 
   function parseMidiBytes(bytes) {
@@ -239,6 +257,7 @@
     isWeb: true,
     getSession: () => ({ ...session, isGuest: !session.memberId }),
     isBridgeReady: () => bridgeReady,
+    waitForSession,
     isMember,
     membershipHint: MEMBERSHIP_HINT,
 
