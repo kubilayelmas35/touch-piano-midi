@@ -1,0 +1,552 @@
+/** StaveFlow — çok dilli arayüz (otomatik algılama + ayarlar) */
+const I18n = (() => {
+  const APP_NAME = "StaveFlow";
+  const SETTINGS_KEY = "touch-piano-settings";
+  const FALLBACK = "en";
+
+  const LOCALES = [
+    { id: "auto", label: "🌐 Auto / Otomatik" },
+    { id: "en", label: "English" },
+    { id: "tr", label: "Türkçe" },
+    { id: "de", label: "Deutsch" },
+    { id: "fr", label: "Français" },
+    { id: "it", label: "Italiano" },
+    { id: "es", label: "Español" },
+    { id: "pt", label: "Português" },
+    { id: "nl", label: "Nederlands" },
+    { id: "pl", label: "Polski" },
+    { id: "ru", label: "Русский" },
+    { id: "ja", label: "日本語" },
+    { id: "ko", label: "한국어" },
+    { id: "zh", label: "中文" },
+  ];
+
+  const en = {
+    "app.tagline": "Piano · Guitar · Violin — play with MIDI",
+    "intro.tag": "Piano · Guitar · Violin — play with MIDI",
+    "intro.hint": "Tap anywhere or Skip",
+    "intro.skip": "Skip",
+    "auth.connecting": "Connecting to Wix account… Please sign in on the site.",
+    "auth.member": "Signed in{email}. Your libraries are saved in the cloud.",
+    "auth.guest": "Guest mode — play freely. MIDI is stored in this browser; sign up for cloud sync (one-time $1 USD).",
+    "auth.embedOnly": "Open this player from your Wix Piano page. GitHub Pages works in guest mode; Wix is required for cloud sync.",
+    "auth.guestShort": "Guest mode — sign up on Wix to save MIDI (one-time $1 USD).",
+    "auth.bridgeFail": "Could not connect to Wix bridge.",
+    "apiError.web": "Player failed to load. Open from your Wix <strong>Piano</strong> page or check configuration.",
+    "apiError.desktop": "Main app failed to load. Run: <code>npm start</code>",
+    "header.score": "Score",
+    "header.remaining": "Left:",
+    "header.play": "▶ Play (you play)",
+    "header.autoplay": "🎹 Auto play",
+    "header.autoplayPause": "⏸ Pause auto",
+    "header.stop": "■ Stop",
+    "header.speed": "Speed",
+    "header.menu": "☰ Menu",
+    "header.menuOpen": "☰ Open menu",
+    "header.fullscreen": "⛶ Full screen",
+    "header.window": "⛶ Window",
+    "header.instrument": "Instrument",
+    "header.trackPosition": "Track position",
+    "libs.title": "Libraries",
+    "libs.new": "New library name",
+    "libs.add": "Add",
+    "libs.hint": "Select or add a library above. Files are saved to your Wix account.",
+    "libs.hintGuest": "Guest mode: MIDI stays in this browser. Wix membership for cloud (one-time $1 USD).",
+    "libs.hintDesktop": "Select or add a library above.",
+    "libs.hintSelected": "Selected: {name} — use + MIDI to add files",
+    "libs.empty": "No libraries yet.",
+    "libs.renameTitle": "Double-click: rename",
+    "songs.title": "Songs",
+    "songs.midi": "+ MIDI",
+    "songs.hintWeb": "Web: ~15 MB per MIDI. Desktop for MP3→MIDI (<code>npm start</code>). Select a song then <strong>▶ Play</strong>.",
+    "songs.hintSelectLib": "Select a library first.",
+    "songs.hintPick": "Pick a song from the list to play.",
+    "songs.hintAddMidi": "Add files with + MIDI to this library.",
+    "songs.hintPlay": "▶ Play — notes fall from the top. Touch or keyboard to play.",
+    "songs.empty": "No songs yet.",
+    "songs.select": "Select a song",
+    "songs.trackOption": "{name} ({count} notes){inst}",
+    "settings.title": "Settings",
+    "settings.language": "Language",
+    "settings.move": "↔ Move panels",
+    "settings.tab.song": "Track",
+    "settings.tab.keys": "Keyboard",
+    "settings.tab.look": "Look",
+    "settings.tab.play": "Play",
+    "settings.track": "MIDI track",
+    "settings.trackEmpty": "Select a song first",
+    "settings.trimStart": "Trim start (sec)",
+    "settings.trimEnd": "Trim end (sec)",
+    "settings.trimHint": "Track reloads after trimming.",
+    "settings.octaveStart": "Start octave",
+    "settings.octaveCount": "Octave count",
+    "settings.octaveHint": "Auto-fits full width when a song is selected.",
+    "settings.keyWidth.piano": "Key width",
+    "settings.keyWidth.fretted": "Fret cell width",
+    "settings.keyHeight.piano": "Keyboard height",
+    "settings.keyHeight.fretted": "Panel height",
+    "settings.neckHeight": "Neck row height",
+    "settings.stringHeight": "String row height",
+    "settings.neckWidth": "Neck / fret width",
+    "settings.pluckWidth": "Strings panel width",
+    "settings.gripGuitar": "Grip all strings (guitar — one fret → 6 strings)",
+    "settings.gripViolin": "Grip all strings (violin — one position → 4 strings)",
+    "settings.neckNearby": "Frets: detect nearby touch",
+    "settings.stringsNearby": "Strings: detect nearby touch",
+    "settings.gripHint": "Off = separate fret per string. On = one fret applies to all strings.",
+    "settings.vibrato": "String vibrato sensitivity",
+    "settings.vibratoHint": "On strings panel, hold and slide slightly to add vibrato.",
+    "settings.dock.piano": "Keyboard position (vertical)",
+    "settings.dock.other": "Instrument position (vertical)",
+    "settings.align.piano": "Keyboard alignment (horizontal)",
+    "settings.align.other": "Instrument alignment (horizontal)",
+    "settings.dock.bottom": "Bottom (default)",
+    "settings.dock.middle": "Middle (below notes)",
+    "settings.dock.top": "Top",
+    "settings.align.stretch": "Full width",
+    "settings.align.left": "Left",
+    "settings.align.center": "Center",
+    "settings.align.right": "Right",
+    "settings.dockHintPiano": "With few octaves, try center/right align or middle position.",
+    "settings.dockHintStrings": "Drag panels with ↔ Move in the sidebar.",
+    "settings.instrumentSound": "Instrument sound",
+    "settings.labelMode": "Label mode",
+    "settings.label.note": "Note name",
+    "settings.label.letters": "Letter layout",
+    "settings.label.custom": "Custom list",
+    "settings.labelPreset": "Letter preset",
+    "settings.label.game": "Game (ZXCV…)",
+    "settings.label.piano": "Keyboard (AWSE…)",
+    "settings.customLetters": "Custom letters",
+    "settings.apply": "Apply",
+    "settings.labelHint": "Right-click a key to assign a letter. On touch, edit in Settings.",
+    "settings.effectHue": "Effect hue",
+    "settings.keyTop": "Pressed key (top)",
+    "settings.keyMid": "Pressed key (mid)",
+    "settings.keyBottom": "Pressed key (bottom)",
+    "settings.hitLine": "Hit line",
+    "settings.noteStyle": "Note style",
+    "settings.flame.aurora": "Aurora",
+    "settings.flame.fire": "Fire",
+    "settings.flame.ice": "Ice",
+    "settings.flame.neon": "Neon",
+    "settings.flame.rainbow": "Rainbow",
+    "settings.flame.plasma": "Plasma",
+    "settings.flame.minimal": "Minimal",
+    "settings.flameIntensity": "Effect intensity",
+    "settings.pcKeyboard": "Computer keyboard",
+    "settings.kbLayout": "Keyboard layout",
+    "settings.kb.auto": "Auto-detect",
+    "settings.kb.qwerty": "QWERTY (US/English)",
+    "settings.kb.tr-f": "Turkish F",
+    "settings.kb.tr-q": "Turkish Q",
+    "settings.kb.qwertz": "QWERTZ (German)",
+    "settings.kb.azerty": "AZERTY (French)",
+    "settings.kb.detected": "Detected: {name}",
+    "settings.kb.selected": "Selected: {name}",
+    "settings.dynamic": "Dynamic pressure",
+    "settings.sustain": "Sustain (soft release)",
+    "settings.timing": "Timing window",
+    "settings.touchHint": "Touch: multi-finger gestures disabled.",
+    "inst.piano": "Piano",
+    "inst.guitar": "Guitar",
+    "inst.violin": "Violin",
+    "inst.flute": "Flute",
+    "inst.brass": "Brass",
+    "inst.synth": "Synth",
+    "inst.guitarNeck": "Guitar neck",
+    "inst.guitarNeckSub": "Hold a fret — sound from the right",
+    "inst.strings": "Strings (pluck)",
+    "inst.stringsSub": "Same color = same string",
+    "inst.violinNeck": "Violin fingerboard",
+    "picker.title": "Which instrument do you want to play?",
+    "picker.hint": "Falling notes stay the same; the play surface below changes. Switch anytime from the top menu.",
+    "modal.newLib": "New library",
+    "modal.renameLib": "Rename library",
+    "modal.libName": "Library name",
+    "modal.cancel": "Cancel",
+    "modal.save": "Save",
+    "modal.assignKey": "Assign key letter",
+    "modal.assignHint": "{name} — one letter or empty",
+    "modal.oneLetter": "One letter",
+    "modal.clear": "Clear",
+    "modal.assignClear": "Letter removed",
+    "modal.assignSet": "Key → \"{ch}\"",
+    "intensity.light": "Light",
+    "intensity.normal": "Normal",
+    "intensity.strong": "Strong",
+    "intensity.max": "Maximum",
+    "intensity.flame": "Blazing!",
+    "toast.libEmpty": "Library name cannot be empty.",
+    "toast.libRenamed": "Library renamed.",
+    "toast.libAdded": "\"{name}\" library added.",
+    "toast.saveError": "Save error: {msg}",
+    "toast.octavePianoOnly": "Octave settings apply in piano mode only.",
+    "toast.octaveSet": "Keyboard: octave {start}, {count} octaves",
+    "toast.fitSong": "Keyboard fit to song: {count} octaves (full width)",
+    "toast.instrument": "Instrument: {name}",
+    "toast.fullscreenOn": "Full screen (F11 / Esc)",
+    "toast.windowMode": "Window mode",
+    "toast.songLoaded": "\"{name}\" loaded.",
+    "toast.songLoadFail": "Could not load song: {msg}",
+    "toast.noNotes": "No notes in this MIDI file.",
+    "toast.songDeleted": "Song deleted.",
+    "toast.deleteFail": "Could not delete: {msg}",
+    "toast.trackDone": "Track finished! Press ■ to restart.",
+    "toast.midiCloud": "{n} MIDI saved to cloud.",
+    "toast.midiLocal": "{n} MIDI saved in this browser (guest).",
+    "toast.midiFail": "Could not add MIDI: {msg}",
+    "toast.pickLib": "Select or create a library first.",
+    "toast.trim": "Trim: start {start}s, end {end}s",
+    "toast.importCancel": "Cancelled or no file selected.",
+    "toast.audioConverted": "{n} tracks converted ({notes} notes). Select and play.",
+    "toast.bootGuest": "Guest mode: you can play. Sign up for cloud library.",
+    "toast.bootLibError": "Library error: {msg}",
+    "toast.pianoWarn": "Piano warning: {msg}",
+    "toast.demoError": "Demo song: {msg}",
+    "toast.autoPlayOn": "Auto play — notes are hit automatically.",
+    "feedback.miss": "Miss!",
+    "feedback.good": "+{points}",
+    "starter.lib": "Sample tracks (royalty-free)",
+    "starter.song": "Bach — Prelude BWV 846",
+    "import.memberTitle": "Sign up to save MIDI (one-time $1 USD). You can still play without an account.",
+  };
+
+  const tr = {
+    ...en,
+    "app.tagline": "Piyano · Gitar · Keman — MIDI ile çal",
+    "intro.tag": "Piyano · Gitar · Keman — MIDI ile çal",
+    "intro.hint": "Dokunun veya Atla",
+    "intro.skip": "Atla",
+    "auth.connecting": "Wix hesabına bağlanılıyor… Siteye giriş yaptığınızdan emin olun.",
+    "auth.member": "Giriş yapıldı{email}. Kütüphaneleriniz bulutta saklanır.",
+    "auth.guest": "Misafir modu — serbest çalın. MIDI bu tarayıcıda saklanır; buluta kayıt için üye olun (tek seferlik 1 USD).",
+    "header.score": "Puan",
+    "header.remaining": "Kalan:",
+    "header.play": "▶ Oynat (sen çal)",
+    "header.autoplay": "🎹 Sen çal",
+    "header.stop": "■ Durdur",
+    "header.speed": "Hız",
+    "header.menu": "☰ Menü",
+    "header.menuOpen": "☰ Menüyü aç",
+    "header.fullscreen": "⛶ Tam ekran",
+    "header.window": "⛶ Pencere",
+    "header.trackPosition": "Parça konumu",
+    "libs.title": "Kütüphaneler",
+    "libs.new": "Yeni kütüphane adı",
+    "libs.add": "Ekle",
+    "libs.hint": "Kütüphane seçin veya yukarıdan ekleyin. Dosyalar Wix hesabınıza kaydedilir.",
+    "libs.hintGuest": "Misafir modu: MIDI bu tarayıcıda saklanır. Buluta kayıt için Wix üyeliği (tek seferlik 1 USD).",
+    "libs.hintDesktop": "Kütüphane seçin veya yukarıdan ekleyin.",
+    "libs.empty": "Henüz kütüphane yok.",
+    "libs.renameTitle": "Çift tık: yeniden adlandır",
+    "songs.title": "Şarkılar",
+    "settings.title": "Ayarlar",
+    "settings.language": "Dil",
+    "settings.move": "↔ Hareket ettir",
+    "settings.tab.song": "Parça",
+    "settings.tab.keys": "Klavye",
+    "settings.tab.look": "Görünüm",
+    "settings.tab.play": "Oyun",
+    "picker.title": "Hangi enstrümanla çalmak istersiniz?",
+    "starter.lib": "Örnek Parçalar (telifsiz)",
+    "starter.song": "Bach — Prelude BWV 846",
+  };
+
+  const de = {
+    ...en,
+    "app.tagline": "Klavier · Gitarre · Violine — mit MIDI spielen",
+    "intro.tag": "Klavier · Gitarre · Violine — mit MIDI spielen",
+    "intro.hint": "Tippen oder Überspringen",
+    "intro.skip": "Überspringen",
+    "header.score": "Punkte",
+    "header.remaining": "Rest:",
+    "header.play": "▶ Abspielen (du spielst)",
+    "header.autoplay": "🎹 Auto-Spiel",
+    "header.stop": "■ Stopp",
+    "header.speed": "Tempo",
+    "libs.title": "Bibliotheken",
+    "songs.title": "Stücke",
+    "settings.title": "Einstellungen",
+    "settings.language": "Sprache",
+    "inst.piano": "Klavier",
+    "inst.guitar": "Gitarre",
+    "inst.violin": "Violine",
+    "picker.title": "Welches Instrument möchten Sie spielen?",
+    "starter.lib": "Beispielstücke (lizenzfrei)",
+  };
+
+  const fr = {
+    ...en,
+    "app.tagline": "Piano · Guitare · Violon — jouer avec MIDI",
+    "intro.hint": "Appuyez ou Ignorer",
+    "intro.skip": "Ignorer",
+    "header.score": "Score",
+    "header.remaining": "Reste :",
+    "header.play": "▶ Jouer (vous jouez)",
+    "header.stop": "■ Stop",
+    "libs.title": "Bibliothèques",
+    "songs.title": "Morceaux",
+    "settings.title": "Paramètres",
+    "settings.language": "Langue",
+    "inst.piano": "Piano",
+    "inst.guitar": "Guitare",
+    "inst.violin": "Violon",
+    "picker.title": "Quel instrument voulez-vous jouer ?",
+    "starter.lib": "Exemples (libres de droits)",
+  };
+
+  const it = {
+    ...en,
+    "app.tagline": "Piano · Chitarra · Violino — suona con MIDI",
+    "intro.hint": "Tocca o Salta",
+    "intro.skip": "Salta",
+    "header.score": "Punteggio",
+    "header.remaining": "Rimasto:",
+    "header.play": "▶ Riproduci (suoni tu)",
+    "header.stop": "■ Stop",
+    "libs.title": "Librerie",
+    "songs.title": "Brani",
+    "settings.title": "Impostazioni",
+    "settings.language": "Lingua",
+    "inst.piano": "Piano",
+    "inst.guitar": "Chitarra",
+    "inst.violin": "Violino",
+    "picker.title": "Quale strumento vuoi suonare?",
+    "starter.lib": "Brani di esempio (royalty-free)",
+  };
+
+  const es = {
+    ...en,
+    "app.tagline": "Piano · Guitarra · Violín — toca con MIDI",
+    "intro.hint": "Toca o Omitir",
+    "intro.skip": "Omitir",
+    "header.score": "Puntuación",
+    "header.remaining": "Queda:",
+    "libs.title": "Bibliotecas",
+    "songs.title": "Canciones",
+    "settings.title": "Ajustes",
+    "settings.language": "Idioma",
+    "inst.piano": "Piano",
+    "inst.guitar": "Guitarra",
+    "inst.violin": "Violín",
+    "picker.title": "¿Qué instrumento quieres tocar?",
+    "starter.lib": "Ejemplos (libres de derechos)",
+  };
+
+  const pt = {
+    ...en,
+    "app.tagline": "Piano · Guitarra · Violino — toque com MIDI",
+    "intro.skip": "Pular",
+    "libs.title": "Bibliotecas",
+    "songs.title": "Músicas",
+    "settings.language": "Idioma",
+    "inst.piano": "Piano",
+    "inst.guitar": "Guitarra",
+    "inst.violin": "Violino",
+    "starter.lib": "Exemplos (livres de royalties)",
+  };
+
+  const nl = {
+    ...en,
+    "app.tagline": "Piano · Gitaar · Viool — speel met MIDI",
+    "intro.skip": "Overslaan",
+    "libs.title": "Bibliotheken",
+    "settings.language": "Taal",
+    "inst.piano": "Piano",
+    "inst.guitar": "Gitaar",
+    "inst.violin": "Viool",
+    "starter.lib": "Voorbeelden (royalty-vrij)",
+  };
+
+  const pl = {
+    ...en,
+    "app.tagline": "Fortepian · Gitara · Skrzypce — graj z MIDI",
+    "intro.skip": "Pomiń",
+    "libs.title": "Biblioteki",
+    "settings.language": "Język",
+    "inst.piano": "Fortepian",
+    "inst.guitar": "Gitara",
+    "inst.violin": "Skrzypce",
+    "starter.lib": "Przykłady (bez tantiem)",
+  };
+
+  const ru = {
+    ...en,
+    "app.tagline": "Пианино · Гитара · Скрипка — играйте с MIDI",
+    "intro.skip": "Пропустить",
+    "libs.title": "Библиотеки",
+    "settings.language": "Язык",
+    "inst.piano": "Пианино",
+    "inst.guitar": "Гитара",
+    "inst.violin": "Скрипка",
+    "starter.lib": "Примеры (без лицензии)",
+  };
+
+  const ja = {
+    ...en,
+    "app.tagline": "ピアノ · ギター · バイオリン — MIDIで演奏",
+    "intro.skip": "スキップ",
+    "libs.title": "ライブラリ",
+    "settings.language": "言語",
+    "inst.piano": "ピアノ",
+    "inst.guitar": "ギター",
+    "inst.violin": "バイオリン",
+    "starter.lib": "サンプル（ロイヤリティフリー）",
+  };
+
+  const ko = {
+    ...en,
+    "app.tagline": "피아노 · 기타 · 바이올린 — MIDI로 연주",
+    "intro.skip": "건너뛰기",
+    "libs.title": "라이브러리",
+    "settings.language": "언어",
+    "inst.piano": "피아노",
+    "inst.guitar": "기타",
+    "inst.violin": "바이올린",
+    "starter.lib": "샘플 (로열티 프리)",
+  };
+
+  const zh = {
+    ...en,
+    "app.tagline": "钢琴 · 吉他 · 小提琴 — MIDI 演奏",
+    "intro.skip": "跳过",
+    "libs.title": "曲库",
+    "settings.language": "语言",
+    "inst.piano": "钢琴",
+    "inst.guitar": "吉他",
+    "inst.violin": "小提琴",
+    "starter.lib": "示例曲目（免版税）",
+  };
+
+  const PACKS = { en, tr, de, fr, it, es, pt, nl, pl, ru, ja, ko, zh };
+  let locale = FALLBACK;
+  let preference = "auto";
+
+  function readPref() {
+    try {
+      const raw = localStorage.getItem(SETTINGS_KEY);
+      if (!raw) return "auto";
+      const s = JSON.parse(raw);
+      return s.locale || "auto";
+    } catch {
+      return "auto";
+    }
+  }
+
+  function detectLocale() {
+    const list = navigator.languages?.length
+      ? [...navigator.languages]
+      : [navigator.language || FALLBACK];
+    for (const raw of list) {
+      const tag = String(raw).toLowerCase().replace("_", "-");
+      const base = tag.split("-")[0];
+      if (PACKS[tag]) return tag;
+      if (PACKS[base]) return base;
+    }
+    return FALLBACK;
+  }
+
+  function resolveLocale(pref) {
+    if (!pref || pref === "auto") return detectLocale();
+    return PACKS[pref] ? pref : FALLBACK;
+  }
+
+  function interpolate(str, vars) {
+    if (!vars) return str;
+    return str.replace(/\{(\w+)\}/g, (_, k) =>
+      vars[k] !== undefined && vars[k] !== null ? String(vars[k]) : ""
+    );
+  }
+
+  function t(key, vars) {
+    const pack = PACKS[locale] || PACKS[FALLBACK];
+    const base = PACKS[FALLBACK];
+    const raw = pack[key] ?? base[key] ?? key;
+    return interpolate(raw, vars);
+  }
+
+  function applyDOM(root = document) {
+    root.querySelectorAll("[data-i18n]").forEach((el) => {
+      const key = el.getAttribute("data-i18n");
+      if (key) el.textContent = t(key);
+    });
+    root.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
+      const key = el.getAttribute("data-i18n-placeholder");
+      if (key) el.placeholder = t(key);
+    });
+    root.querySelectorAll("[data-i18n-title]").forEach((el) => {
+      const key = el.getAttribute("data-i18n-title");
+      if (key) el.title = t(key);
+    });
+    root.querySelectorAll("[data-i18n-aria]").forEach((el) => {
+      const key = el.getAttribute("data-i18n-aria");
+      if (key) el.setAttribute("aria-label", t(key));
+    });
+    root.querySelectorAll("option[data-i18n]").forEach((el) => {
+      const key = el.getAttribute("data-i18n");
+      if (key) el.textContent = t(key);
+    });
+    document.documentElement.lang = locale;
+  }
+
+  function init() {
+    preference = readPref();
+    locale = resolveLocale(preference);
+    window.__appName = APP_NAME;
+    return locale;
+  }
+
+  function setPreference(pref) {
+    preference = pref || "auto";
+    locale = resolveLocale(preference);
+    try {
+      const raw = localStorage.getItem(SETTINGS_KEY);
+      const s = raw ? JSON.parse(raw) : {};
+      s.locale = preference;
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+    } catch {
+      /* */
+    }
+    applyDOM();
+    window.dispatchEvent(
+      new CustomEvent("staveflow:locale", { detail: { locale, preference } })
+    );
+    return locale;
+  }
+
+  function getLocale() {
+    return locale;
+  }
+
+  function getPreference() {
+    return preference;
+  }
+
+  function getLocales() {
+    return LOCALES.map((item) => ({
+      ...item,
+      label: item.id === "auto" ? item.label : item.label,
+    }));
+  }
+
+  function formatMemberBanner(email) {
+    const emailPart = email ? `: ${email}` : "";
+    return t("auth.member", { email: emailPart });
+  }
+
+  return {
+    APP_NAME,
+    init,
+    t,
+    applyDOM,
+    setPreference,
+    getLocale,
+    getPreference,
+    getLocales,
+    formatMemberBanner,
+    detectLocale,
+  };
+})();
+
+window.I18n = I18n;

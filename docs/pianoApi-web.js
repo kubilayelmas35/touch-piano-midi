@@ -329,6 +329,27 @@
 
     readMidi,
 
+    uploadMidiBase64: async (libraryId, fileName, base64, name) => {
+      if (!libraryId || !fileName || !base64) {
+        throw new Error("MIDI yükleme verisi eksik");
+      }
+      if (!isMember()) {
+        return {
+          id: `song-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          name: name || fileName.replace(/\.(mid|midi)$/i, ""),
+          fileName,
+          midiBase64: base64,
+          storage: "local",
+        };
+      }
+      return apiCall("pianoUploadMidi", {
+        libraryId,
+        fileName,
+        base64,
+        name: name || fileName.replace(/\.(mid|midi)$/i, ""),
+      });
+    },
+
     deleteMidi: async (ref, meta) => {
       if (!isMember()) return true;
       const payload =

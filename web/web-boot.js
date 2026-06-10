@@ -1,5 +1,7 @@
 /** Web: oturum banner, köprü durumu, iframe yükseklik senkronu */
 (function () {
+  const t = (key, vars) => window.I18n?.t?.(key, vars) ?? key;
+
   function syncEmbedHeight() {
     const h = window.innerHeight;
     if (h > 0) {
@@ -34,38 +36,42 @@
     banner.className = kind || "";
   }
 
+  if (window.I18n) {
+    window.I18n.init();
+    setBanner(t("auth.connecting"), "warn");
+  }
+
   window.addEventListener("touch-piano:session", (e) => {
     const { memberId, email } = e.detail || {};
     if (memberId) {
       setBanner(
-        `Giriş yapıldı${email ? `: ${email}` : ""}. Kütüphaneleriniz bulutta saklanır.`,
+        window.I18n
+          ? window.I18n.formatMemberBanner(email)
+          : `Signed in${email ? `: ${email}` : ""}.`,
         "ok"
       );
     } else {
-      setBanner(
-        "Misafir modu — serbest çalın. MIDI bu tarayıcıda saklanır; buluta kayıt için üye olun (tek seferlik 1 USD).",
-        "warn"
-      );
+      setBanner(t("auth.guest"), "warn");
     }
     syncEmbedHeight();
+  });
+
+  window.addEventListener("staveflow:locale", () => {
+    if (!window.pianoApi?.getSession?.()?.memberId) {
+      setBanner(t("auth.guest"), "warn");
+    }
   });
 
   setTimeout(() => {
     if (window.pianoApi.isBridgeReady?.()) return;
     try {
       if (window.self === window.top) {
-        setBanner(
-          "Bu sayfa Wix sitesinde gömülü açılmalıdır. Doğrudan GitHub Pages'te misafir modu çalışır; bulut senkronu için Wix gerekir.",
-          "warn"
-        );
+        setBanner(t("auth.embedOnly"), "warn");
       } else {
-        setBanner(
-          "Misafir modu — serbest çalın. MIDI kaydetmek için Wix'te üye olun (tek seferlik 1 USD).",
-          "warn"
-        );
+        setBanner(t("auth.guestShort"), "warn");
       }
     } catch {
-      setBanner("Wix köprüsü bağlanamadı.", "warn");
+      setBanner(t("auth.bridgeFail"), "warn");
     }
   }, 3500);
 })();

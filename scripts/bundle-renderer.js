@@ -3,6 +3,7 @@ const path = require("path");
 
 const src = path.join(__dirname, "..", "src");
 const coreFiles = [
+  "i18n.js",
   "settings.js",
   "theme.js",
   "audio.js",
@@ -23,6 +24,7 @@ const coreFiles = [
   "keyboard-input.js",
   "game.js",
   "library.js",
+  "starter-library.js",
   "intro-splash.js",
 ];
 const appFile = "app.js";

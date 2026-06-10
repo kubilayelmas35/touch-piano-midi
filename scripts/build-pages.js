@@ -30,6 +30,7 @@ if (fs.existsSync(path.join(root, "src", "styles-instruments-extra.css"))) {
 copy(path.join(root, "src", "main.js"), path.join(docs, "main.js"));
 copy(path.join(root, "src", "touch-guard.js"), path.join(docs, "touch-guard.js"));
 copy(path.join(root, "web", "index.html"), path.join(docs, "index.html"));
+copy(path.join(root, "src", "i18n.js"), path.join(docs, "i18n.js"));
 copy(path.join(root, "web", "pianoApi-web.js"), path.join(docs, "pianoApi-web.js"));
 copy(path.join(root, "web", "web-boot.js"), path.join(docs, "web-boot.js"));
 copy(path.join(root, "web", "wix-config.example.js"), path.join(docs, "wix-config.example.js"));

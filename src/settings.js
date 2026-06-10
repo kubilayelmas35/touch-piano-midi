@@ -48,6 +48,8 @@ const AppSettings = (() => {
     guitarStringHeight: 30,
     guitarNeckWidth: 42,
     guitarPluckWidth: 220,
+    /** "auto" veya en, tr, de, fr, it, … */
+    locale: "auto",
   };
 
   function load() {
