@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Touch Piano MIDI — Web</title>
+  <title>StaveFlow — Piano · Guitar · Violin</title>
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="styles-instruments-extra.css" />
   <style>
@@ -63,10 +63,11 @@
     <canvas id="introSplashCanvas" aria-hidden="true"></canvas>
     <video id="introSplashVideo" class="hidden" playsinline muted aria-hidden="true"></video>
     <div class="intro-splash-content">
-      <h2 class="intro-splash-logo">Touch Piano</h2>
-      <p class="intro-splash-tag">MIDI ile öğren · çal · hisset</p>
+      <h2 class="intro-splash-logo">StaveFlow</h2>
+      <p class="intro-splash-tag" data-i18n="intro.tag">Piano · Guitar · Violin — play with MIDI</p>
+      <p class="intro-splash-hint" data-i18n="intro.hint">Tap anywhere or Skip</p>
     </div>
-    <button type="button" id="introSplashSkip" class="btn">Atla</button>
+    <button type="button" id="introSplashSkip" class="btn" data-i18n="intro.skip">Skip</button>
   </div>
 
   <div id="authBanner" class="warn">Wix hesabına bağlanılıyor… Siteye giriş yaptığınızdan emin olun.</div>
@@ -76,9 +77,9 @@
   </div>
 
   <header class="top-bar">
-    <h1>Touch Piano</h1>
+    <h1>StaveFlow</h1>
     <div class="score-panel">
-      <span class="score-label">Puan</span>
+      <span class="score-label" data-i18n="header.score">Score</span>
       <span id="scoreValue">0</span>
       <span class="combo" id="comboValue"></span>
     </div>
@@ -88,9 +89,10 @@
         <span class="time-sep">/</span>
         <span id="timeTotal">0:00</span>
       </div>
-      <div class="time-remaining">Kalan: <strong id="timeRemaining">0:00</strong></div>
-      <div class="progress-track">
+      <div class="time-remaining"><span id="timeRemainingLabel" data-i18n="header.remaining">Left:</span> <strong id="timeRemaining">0:00</strong></div>
+      <div id="progressTrack" class="progress-track" role="slider" aria-label="Parça konumu" aria-valuemin="0" aria-valuemax="100">
         <div id="progressFill" class="progress-fill"></div>
+        <div id="progressThumb" class="progress-thumb"></div>
       </div>
     </div>
     <div class="view-controls">
@@ -142,7 +144,11 @@
     </section>
 
     <section class="panel settings-panel">
-      <h2>Ayarlar</h2>
+      <h2 data-i18n="settings.title">Settings</h2>
+      <label class="field">
+        <span data-i18n="settings.language">Language</span>
+        <select id="localeSelect" aria-label="Language"></select>
+      </label>
       <div class="panel-actions">
         <button type="button" id="btnMoveInstrument" class="btn small" title="Gitar/keman panellerini sürükleyin">↔ Hareket ettir</button>
       </div>

@@ -27,6 +27,11 @@ const LibraryStore = (() => {
     return lib;
   }
 
+  function dataPushStarter(lib) {
+    if (data.libraries.some((l) => l.id === lib.id)) return;
+    data.libraries.unshift(lib);
+  }
+
   function getLibraries() {
     return data.libraries;
   }
@@ -166,6 +171,7 @@ const LibraryStore = (() => {
     reload,
     save,
     createLibrary,
+    dataPushStarter,
     getLibraries,
     getLibrary,
     setActiveLibrary,

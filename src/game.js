@@ -133,8 +133,11 @@ const Game = (() => {
     const observeTargets = [
       document.getElementById("instrumentFooter"),
       document.getElementById("pianoWrap"),
+      document.getElementById("pianoKeys"),
       document.getElementById("guitarWrap"),
+      document.getElementById("guitarFrets"),
       document.getElementById("violinWrap"),
+      document.getElementById("violinBoard"),
     ].filter(Boolean);
     if (typeof ResizeObserver !== "undefined") {
       const ro = new ResizeObserver(() => {
@@ -196,21 +199,33 @@ const Game = (() => {
     positionHitLine();
   }
 
+  function getPlaySurfaceEl() {
+    const mode = window.PlaySurface?.getMode?.() || "piano";
+    if (mode === "guitar") {
+      return (
+        document.getElementById("guitarFrets") ||
+        document.getElementById("guitarWrap")
+      );
+    }
+    if (mode === "violin") {
+      return (
+        document.getElementById("violinBoard") ||
+        document.getElementById("violinWrap")
+      );
+    }
+    return document.getElementById("pianoKeys") || document.getElementById("pianoWrap");
+  }
+
   function getHitY() {
     const area = canvas?.parentElement;
-    const instWrap =
-      window.PlaySurface?.getWrapEl?.() || document.getElementById("pianoWrap");
-    if (!area || !instWrap || instWrap.classList.contains("hidden")) {
+    const playEl = getPlaySurfaceEl();
+    if (!area || !playEl || playEl.closest(".hidden")) {
       return area?.clientHeight * HIT_LINE_FALLBACK || 400;
     }
     const ar = area.getBoundingClientRect();
-    const mode = window.PlaySurface?.getMode?.() || "piano";
-    const footer = document.getElementById("instrumentFooter");
-    const pr =
-      (mode === "guitar" || mode === "violin") && footer
-        ? footer.getBoundingClientRect()
-        : instWrap.getBoundingClientRect();
-    return Math.max(48, Math.round(pr.top - ar.top));
+    const pr = playEl.getBoundingClientRect();
+    const y = Math.round(pr.top - ar.top - 3);
+    return Math.max(56, Math.min(area.clientHeight - 6, y));
   }
 
   function positionHitLine() {
@@ -493,6 +508,38 @@ const Game = (() => {
     } else {
       pausedAt = t;
     }
+  }
+
+  function resetNoteStatesFrom(timeSec) {
+    for (const n of notes) {
+      n.hit = n.time < timeSec - 0.02;
+      n.missed = false;
+      n._autoStarted = n.time < timeSec;
+      n._autoEnded = n.time + n.duration < timeSec;
+      n._impactDone = n.time < timeSec;
+    }
+    pendingHits = notes.map((n) => ({ ...n, id: `${n.midi}-${n.time}` }));
+    impactCooldown.clear();
+    keyAuras.clear();
+    particles = particles.filter((p) => p.life > 0.05);
+  }
+
+  function seekTo(sec) {
+    const total = songDuration || 0;
+    const t = Math.max(0, Math.min(total, Number(sec) || 0));
+    pausedAt = t;
+    if (playing) {
+      startTime = performance.now() / 1000 - t / speed;
+    }
+    lastFrameT = t;
+    resetNoteStatesFrom(t);
+    window.AudioEngine?.stopAll?.();
+    emitTime(t);
+    draw(t);
+  }
+
+  function getCurrentTime() {
+    return currentTime();
   }
 
   function setTimingWindow(ms) {
@@ -779,6 +826,8 @@ const Game = (() => {
     resetScore,
     resetRound,
     getSongDuration: () => songDuration,
+    getCurrentTime,
+    seekTo,
     isPlaying: () => playing,
     hasNotes: () => notes.length > 0,
     isReady,

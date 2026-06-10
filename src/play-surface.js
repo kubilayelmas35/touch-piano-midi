@@ -1,9 +1,15 @@
 /** Aktif çalma yüzeyi — piyano / gitar / keman */
 const PlaySurface = (() => {
+  function modeLabel(id) {
+    const t = window.I18n?.t?.bind(window.I18n);
+    if (!t) return { piano: "Piano", guitar: "Guitar", violin: "Violin" }[id] || id;
+    return t(`inst.${id}`);
+  }
+
   const MODES = {
-    piano: { label: "Piyano", icon: "🎹", sound: "piano" },
-    guitar: { label: "Gitar", icon: "🎸", sound: "guitar" },
-    violin: { label: "Keman", icon: "🎻", sound: "violin" },
+    piano: { icon: "🎹", sound: "piano" },
+    guitar: { icon: "🎸", sound: "guitar" },
+    violin: { icon: "🎻", sound: "violin" },
   };
 
   let mode = "piano";
@@ -32,6 +38,7 @@ const PlaySurface = (() => {
 
   function setMode(next, opts = {}) {
     const m = MODES[next] ? next : "piano";
+    /* label via getModes() */
     if (m === mode && !opts.force) return mode;
 
     window.Piano?.releaseAll?.();
@@ -89,7 +96,11 @@ const PlaySurface = (() => {
   }
 
   function getModes() {
-    return MODES;
+    const out = {};
+    for (const [id, meta] of Object.entries(MODES)) {
+      out[id] = { ...meta, label: modeLabel(id) };
+    }
+    return out;
   }
 
   function init(noteDown, noteUp) {

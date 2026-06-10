@@ -1,5 +1,560 @@
 /* Otomatik birleştirilmiş — npm start öncesi üretilir */
 
+/* === i18n.js === */
+/** StaveFlow — çok dilli arayüz (otomatik algılama + ayarlar) */
+const I18n = (() => {
+  const APP_NAME = "StaveFlow";
+  const SETTINGS_KEY = "touch-piano-settings";
+  const FALLBACK = "en";
+
+  const LOCALES = [
+    { id: "auto", label: "🌐 Auto / Otomatik" },
+    { id: "en", label: "English" },
+    { id: "tr", label: "Türkçe" },
+    { id: "de", label: "Deutsch" },
+    { id: "fr", label: "Français" },
+    { id: "it", label: "Italiano" },
+    { id: "es", label: "Español" },
+    { id: "pt", label: "Português" },
+    { id: "nl", label: "Nederlands" },
+    { id: "pl", label: "Polski" },
+    { id: "ru", label: "Русский" },
+    { id: "ja", label: "日本語" },
+    { id: "ko", label: "한국어" },
+    { id: "zh", label: "中文" },
+  ];
+
+  const en = {
+    "app.tagline": "Piano · Guitar · Violin — play with MIDI",
+    "intro.tag": "Piano · Guitar · Violin — play with MIDI",
+    "intro.hint": "Tap anywhere or Skip",
+    "intro.skip": "Skip",
+    "auth.connecting": "Connecting to Wix account… Please sign in on the site.",
+    "auth.member": "Signed in{email}. Your libraries are saved in the cloud.",
+    "auth.guest": "Guest mode — play freely. MIDI is stored in this browser; sign up for cloud sync (one-time $1 USD).",
+    "auth.embedOnly": "Open this player from your Wix Piano page. GitHub Pages works in guest mode; Wix is required for cloud sync.",
+    "auth.guestShort": "Guest mode — sign up on Wix to save MIDI (one-time $1 USD).",
+    "auth.bridgeFail": "Could not connect to Wix bridge.",
+    "apiError.web": "Player failed to load. Open from your Wix <strong>Piano</strong> page or check configuration.",
+    "apiError.desktop": "Main app failed to load. Run: <code>npm start</code>",
+    "header.score": "Score",
+    "header.remaining": "Left:",
+    "header.play": "▶ Play (you play)",
+    "header.autoplay": "🎹 Auto play",
+    "header.autoplayPause": "⏸ Pause auto",
+    "header.stop": "■ Stop",
+    "header.speed": "Speed",
+    "header.menu": "☰ Menu",
+    "header.menuOpen": "☰ Open menu",
+    "header.fullscreen": "⛶ Full screen",
+    "header.window": "⛶ Window",
+    "header.instrument": "Instrument",
+    "header.trackPosition": "Track position",
+    "libs.title": "Libraries",
+    "libs.new": "New library name",
+    "libs.add": "Add",
+    "libs.hint": "Select or add a library above. Files are saved to your Wix account.",
+    "libs.hintGuest": "Guest mode: MIDI stays in this browser. Wix membership for cloud (one-time $1 USD).",
+    "libs.hintDesktop": "Select or add a library above.",
+    "libs.hintSelected": "Selected: {name} — use + MIDI to add files",
+    "libs.empty": "No libraries yet.",
+    "libs.renameTitle": "Double-click: rename",
+    "songs.title": "Songs",
+    "songs.midi": "+ MIDI",
+    "songs.hintWeb": "Web: ~15 MB per MIDI. Desktop for MP3→MIDI (<code>npm start</code>). Select a song then <strong>▶ Play</strong>.",
+    "songs.hintSelectLib": "Select a library first.",
+    "songs.hintPick": "Pick a song from the list to play.",
+    "songs.hintAddMidi": "Add files with + MIDI to this library.",
+    "songs.hintPlay": "▶ Play — notes fall from the top. Touch or keyboard to play.",
+    "songs.empty": "No songs yet.",
+    "songs.select": "Select a song",
+    "songs.trackOption": "{name} ({count} notes){inst}",
+    "settings.title": "Settings",
+    "settings.language": "Language",
+    "settings.move": "↔ Move panels",
+    "settings.tab.song": "Track",
+    "settings.tab.keys": "Keyboard",
+    "settings.tab.look": "Look",
+    "settings.tab.play": "Play",
+    "settings.track": "MIDI track",
+    "settings.trackEmpty": "Select a song first",
+    "settings.trimStart": "Trim start (sec)",
+    "settings.trimEnd": "Trim end (sec)",
+    "settings.trimHint": "Track reloads after trimming.",
+    "settings.octaveStart": "Start octave",
+    "settings.octaveCount": "Octave count",
+    "settings.octaveHint": "Auto-fits full width when a song is selected.",
+    "settings.keyWidth.piano": "Key width",
+    "settings.keyWidth.fretted": "Fret cell width",
+    "settings.keyHeight.piano": "Keyboard height",
+    "settings.keyHeight.fretted": "Panel height",
+    "settings.neckHeight": "Neck row height",
+    "settings.stringHeight": "String row height",
+    "settings.neckWidth": "Neck / fret width",
+    "settings.pluckWidth": "Strings panel width",
+    "settings.gripGuitar": "Grip all strings (guitar — one fret → 6 strings)",
+    "settings.gripViolin": "Grip all strings (violin — one position → 4 strings)",
+    "settings.neckNearby": "Frets: detect nearby touch",
+    "settings.stringsNearby": "Strings: detect nearby touch",
+    "settings.gripHint": "Off = separate fret per string. On = one fret applies to all strings.",
+    "settings.vibrato": "String vibrato sensitivity",
+    "settings.vibratoHint": "On strings panel, hold and slide slightly to add vibrato.",
+    "settings.dock.piano": "Keyboard position (vertical)",
+    "settings.dock.other": "Instrument position (vertical)",
+    "settings.align.piano": "Keyboard alignment (horizontal)",
+    "settings.align.other": "Instrument alignment (horizontal)",
+    "settings.dock.bottom": "Bottom (default)",
+    "settings.dock.middle": "Middle (below notes)",
+    "settings.dock.top": "Top",
+    "settings.align.stretch": "Full width",
+    "settings.align.left": "Left",
+    "settings.align.center": "Center",
+    "settings.align.right": "Right",
+    "settings.dockHintPiano": "With few octaves, try center/right align or middle position.",
+    "settings.dockHintStrings": "Drag panels with ↔ Move in the sidebar.",
+    "settings.instrumentSound": "Instrument sound",
+    "settings.labelMode": "Label mode",
+    "settings.label.note": "Note name",
+    "settings.label.letters": "Letter layout",
+    "settings.label.custom": "Custom list",
+    "settings.labelPreset": "Letter preset",
+    "settings.label.game": "Game (ZXCV…)",
+    "settings.label.piano": "Keyboard (AWSE…)",
+    "settings.customLetters": "Custom letters",
+    "settings.apply": "Apply",
+    "settings.labelHint": "Right-click a key to assign a letter. On touch, edit in Settings.",
+    "settings.effectHue": "Effect hue",
+    "settings.keyTop": "Pressed key (top)",
+    "settings.keyMid": "Pressed key (mid)",
+    "settings.keyBottom": "Pressed key (bottom)",
+    "settings.hitLine": "Hit line",
+    "settings.noteStyle": "Note style",
+    "settings.flame.aurora": "Aurora",
+    "settings.flame.fire": "Fire",
+    "settings.flame.ice": "Ice",
+    "settings.flame.neon": "Neon",
+    "settings.flame.rainbow": "Rainbow",
+    "settings.flame.plasma": "Plasma",
+    "settings.flame.minimal": "Minimal",
+    "settings.flameIntensity": "Effect intensity",
+    "settings.pcKeyboard": "Computer keyboard",
+    "settings.kbLayout": "Keyboard layout",
+    "settings.kb.auto": "Auto-detect",
+    "settings.kb.qwerty": "QWERTY (US/English)",
+    "settings.kb.tr-f": "Turkish F",
+    "settings.kb.tr-q": "Turkish Q",
+    "settings.kb.qwertz": "QWERTZ (German)",
+    "settings.kb.azerty": "AZERTY (French)",
+    "settings.kb.detected": "Detected: {name}",
+    "settings.kb.selected": "Selected: {name}",
+    "settings.dynamic": "Dynamic pressure",
+    "settings.sustain": "Sustain (soft release)",
+    "settings.timing": "Timing window",
+    "settings.touchHint": "Touch: multi-finger gestures disabled.",
+    "inst.piano": "Piano",
+    "inst.guitar": "Guitar",
+    "inst.violin": "Violin",
+    "inst.flute": "Flute",
+    "inst.brass": "Brass",
+    "inst.synth": "Synth",
+    "inst.guitarNeck": "Guitar neck",
+    "inst.guitarNeckSub": "Hold a fret — sound from the right",
+    "inst.strings": "Strings (pluck)",
+    "inst.stringsSub": "Same color = same string",
+    "inst.violinNeck": "Violin fingerboard",
+    "picker.title": "Which instrument do you want to play?",
+    "picker.hint": "Falling notes stay the same; the play surface below changes. Switch anytime from the top menu.",
+    "modal.newLib": "New library",
+    "modal.renameLib": "Rename library",
+    "modal.libName": "Library name",
+    "modal.cancel": "Cancel",
+    "modal.save": "Save",
+    "modal.assignKey": "Assign key letter",
+    "modal.assignHint": "{name} — one letter or empty",
+    "modal.oneLetter": "One letter",
+    "modal.clear": "Clear",
+    "modal.assignClear": "Letter removed",
+    "modal.assignSet": "Key → \"{ch}\"",
+    "intensity.light": "Light",
+    "intensity.normal": "Normal",
+    "intensity.strong": "Strong",
+    "intensity.max": "Maximum",
+    "intensity.flame": "Blazing!",
+    "toast.libEmpty": "Library name cannot be empty.",
+    "toast.libRenamed": "Library renamed.",
+    "toast.libAdded": "\"{name}\" library added.",
+    "toast.saveError": "Save error: {msg}",
+    "toast.octavePianoOnly": "Octave settings apply in piano mode only.",
+    "toast.octaveSet": "Keyboard: octave {start}, {count} octaves",
+    "toast.fitSong": "Keyboard fit to song: {count} octaves (full width)",
+    "toast.instrument": "Instrument: {name}",
+    "toast.fullscreenOn": "Full screen (F11 / Esc)",
+    "toast.windowMode": "Window mode",
+    "toast.songLoaded": "\"{name}\" loaded.",
+    "toast.songLoadFail": "Could not load song: {msg}",
+    "toast.noNotes": "No notes in this MIDI file.",
+    "toast.songDeleted": "Song deleted.",
+    "toast.deleteFail": "Could not delete: {msg}",
+    "toast.trackDone": "Track finished! Press ■ to restart.",
+    "toast.midiCloud": "{n} MIDI saved to cloud.",
+    "toast.midiLocal": "{n} MIDI saved in this browser (guest).",
+    "toast.midiFail": "Could not add MIDI: {msg}",
+    "toast.pickLib": "Select or create a library first.",
+    "toast.trim": "Trim: start {start}s, end {end}s",
+    "toast.importCancel": "Cancelled or no file selected.",
+    "toast.audioConverted": "{n} tracks converted ({notes} notes). Select and play.",
+    "toast.bootGuest": "Guest mode: you can play. Sign up for cloud library.",
+    "toast.bootLibError": "Library error: {msg}",
+    "toast.pianoWarn": "Piano warning: {msg}",
+    "toast.demoError": "Demo song: {msg}",
+    "toast.autoPlayOn": "Auto play — notes are hit automatically.",
+    "feedback.miss": "Miss!",
+    "feedback.good": "+{points}",
+    "starter.lib": "Sample tracks (royalty-free)",
+    "starter.song": "Bach — Prelude BWV 846",
+    "import.memberTitle": "Sign up to save MIDI (one-time $1 USD). You can still play without an account.",
+  };
+
+  const tr = {
+    ...en,
+    "app.tagline": "Piyano · Gitar · Keman — MIDI ile çal",
+    "intro.tag": "Piyano · Gitar · Keman — MIDI ile çal",
+    "intro.hint": "Dokunun veya Atla",
+    "intro.skip": "Atla",
+    "auth.connecting": "Wix hesabına bağlanılıyor… Siteye giriş yaptığınızdan emin olun.",
+    "auth.member": "Giriş yapıldı{email}. Kütüphaneleriniz bulutta saklanır.",
+    "auth.guest": "Misafir modu — serbest çalın. MIDI bu tarayıcıda saklanır; buluta kayıt için üye olun (tek seferlik 1 USD).",
+    "header.score": "Puan",
+    "header.remaining": "Kalan:",
+    "header.play": "▶ Oynat (sen çal)",
+    "header.autoplay": "🎹 Sen çal",
+    "header.stop": "■ Durdur",
+    "header.speed": "Hız",
+    "header.menu": "☰ Menü",
+    "header.menuOpen": "☰ Menüyü aç",
+    "header.fullscreen": "⛶ Tam ekran",
+    "header.window": "⛶ Pencere",
+    "header.trackPosition": "Parça konumu",
+    "libs.title": "Kütüphaneler",
+    "libs.new": "Yeni kütüphane adı",
+    "libs.add": "Ekle",
+    "libs.hint": "Kütüphane seçin veya yukarıdan ekleyin. Dosyalar Wix hesabınıza kaydedilir.",
+    "libs.hintGuest": "Misafir modu: MIDI bu tarayıcıda saklanır. Buluta kayıt için Wix üyeliği (tek seferlik 1 USD).",
+    "libs.hintDesktop": "Kütüphane seçin veya yukarıdan ekleyin.",
+    "libs.empty": "Henüz kütüphane yok.",
+    "libs.renameTitle": "Çift tık: yeniden adlandır",
+    "songs.title": "Şarkılar",
+    "settings.title": "Ayarlar",
+    "settings.language": "Dil",
+    "settings.move": "↔ Hareket ettir",
+    "settings.tab.song": "Parça",
+    "settings.tab.keys": "Klavye",
+    "settings.tab.look": "Görünüm",
+    "settings.tab.play": "Oyun",
+    "picker.title": "Hangi enstrümanla çalmak istersiniz?",
+    "starter.lib": "Örnek Parçalar (telifsiz)",
+    "starter.song": "Bach — Prelude BWV 846",
+  };
+
+  const de = {
+    ...en,
+    "app.tagline": "Klavier · Gitarre · Violine — mit MIDI spielen",
+    "intro.tag": "Klavier · Gitarre · Violine — mit MIDI spielen",
+    "intro.hint": "Tippen oder Überspringen",
+    "intro.skip": "Überspringen",
+    "header.score": "Punkte",
+    "header.remaining": "Rest:",
+    "header.play": "▶ Abspielen (du spielst)",
+    "header.autoplay": "🎹 Auto-Spiel",
+    "header.stop": "■ Stopp",
+    "header.speed": "Tempo",
+    "libs.title": "Bibliotheken",
+    "songs.title": "Stücke",
+    "settings.title": "Einstellungen",
+    "settings.language": "Sprache",
+    "inst.piano": "Klavier",
+    "inst.guitar": "Gitarre",
+    "inst.violin": "Violine",
+    "picker.title": "Welches Instrument möchten Sie spielen?",
+    "starter.lib": "Beispielstücke (lizenzfrei)",
+  };
+
+  const fr = {
+    ...en,
+    "app.tagline": "Piano · Guitare · Violon — jouer avec MIDI",
+    "intro.hint": "Appuyez ou Ignorer",
+    "intro.skip": "Ignorer",
+    "header.score": "Score",
+    "header.remaining": "Reste :",
+    "header.play": "▶ Jouer (vous jouez)",
+    "header.stop": "■ Stop",
+    "libs.title": "Bibliothèques",
+    "songs.title": "Morceaux",
+    "settings.title": "Paramètres",
+    "settings.language": "Langue",
+    "inst.piano": "Piano",
+    "inst.guitar": "Guitare",
+    "inst.violin": "Violon",
+    "picker.title": "Quel instrument voulez-vous jouer ?",
+    "starter.lib": "Exemples (libres de droits)",
+  };
+
+  const it = {
+    ...en,
+    "app.tagline": "Piano · Chitarra · Violino — suona con MIDI",
+    "intro.hint": "Tocca o Salta",
+    "intro.skip": "Salta",
+    "header.score": "Punteggio",
+    "header.remaining": "Rimasto:",
+    "header.play": "▶ Riproduci (suoni tu)",
+    "header.stop": "■ Stop",
+    "libs.title": "Librerie",
+    "songs.title": "Brani",
+    "settings.title": "Impostazioni",
+    "settings.language": "Lingua",
+    "inst.piano": "Piano",
+    "inst.guitar": "Chitarra",
+    "inst.violin": "Violino",
+    "picker.title": "Quale strumento vuoi suonare?",
+    "starter.lib": "Brani di esempio (royalty-free)",
+  };
+
+  const es = {
+    ...en,
+    "app.tagline": "Piano · Guitarra · Violín — toca con MIDI",
+    "intro.hint": "Toca o Omitir",
+    "intro.skip": "Omitir",
+    "header.score": "Puntuación",
+    "header.remaining": "Queda:",
+    "libs.title": "Bibliotecas",
+    "songs.title": "Canciones",
+    "settings.title": "Ajustes",
+    "settings.language": "Idioma",
+    "inst.piano": "Piano",
+    "inst.guitar": "Guitarra",
+    "inst.violin": "Violín",
+    "picker.title": "¿Qué instrumento quieres tocar?",
+    "starter.lib": "Ejemplos (libres de derechos)",
+  };
+
+  const pt = {
+    ...en,
+    "app.tagline": "Piano · Guitarra · Violino — toque com MIDI",
+    "intro.skip": "Pular",
+    "libs.title": "Bibliotecas",
+    "songs.title": "Músicas",
+    "settings.language": "Idioma",
+    "inst.piano": "Piano",
+    "inst.guitar": "Guitarra",
+    "inst.violin": "Violino",
+    "starter.lib": "Exemplos (livres de royalties)",
+  };
+
+  const nl = {
+    ...en,
+    "app.tagline": "Piano · Gitaar · Viool — speel met MIDI",
+    "intro.skip": "Overslaan",
+    "libs.title": "Bibliotheken",
+    "settings.language": "Taal",
+    "inst.piano": "Piano",
+    "inst.guitar": "Gitaar",
+    "inst.violin": "Viool",
+    "starter.lib": "Voorbeelden (royalty-vrij)",
+  };
+
+  const pl = {
+    ...en,
+    "app.tagline": "Fortepian · Gitara · Skrzypce — graj z MIDI",
+    "intro.skip": "Pomiń",
+    "libs.title": "Biblioteki",
+    "settings.language": "Język",
+    "inst.piano": "Fortepian",
+    "inst.guitar": "Gitara",
+    "inst.violin": "Skrzypce",
+    "starter.lib": "Przykłady (bez tantiem)",
+  };
+
+  const ru = {
+    ...en,
+    "app.tagline": "Пианино · Гитара · Скрипка — играйте с MIDI",
+    "intro.skip": "Пропустить",
+    "libs.title": "Библиотеки",
+    "settings.language": "Язык",
+    "inst.piano": "Пианино",
+    "inst.guitar": "Гитара",
+    "inst.violin": "Скрипка",
+    "starter.lib": "Примеры (без лицензии)",
+  };
+
+  const ja = {
+    ...en,
+    "app.tagline": "ピアノ · ギター · バイオリン — MIDIで演奏",
+    "intro.skip": "スキップ",
+    "libs.title": "ライブラリ",
+    "settings.language": "言語",
+    "inst.piano": "ピアノ",
+    "inst.guitar": "ギター",
+    "inst.violin": "バイオリン",
+    "starter.lib": "サンプル（ロイヤリティフリー）",
+  };
+
+  const ko = {
+    ...en,
+    "app.tagline": "피아노 · 기타 · 바이올린 — MIDI로 연주",
+    "intro.skip": "건너뛰기",
+    "libs.title": "라이브러리",
+    "settings.language": "언어",
+    "inst.piano": "피아노",
+    "inst.guitar": "기타",
+    "inst.violin": "바이올린",
+    "starter.lib": "샘플 (로열티 프리)",
+  };
+
+  const zh = {
+    ...en,
+    "app.tagline": "钢琴 · 吉他 · 小提琴 — MIDI 演奏",
+    "intro.skip": "跳过",
+    "libs.title": "曲库",
+    "settings.language": "语言",
+    "inst.piano": "钢琴",
+    "inst.guitar": "吉他",
+    "inst.violin": "小提琴",
+    "starter.lib": "示例曲目（免版税）",
+  };
+
+  const PACKS = { en, tr, de, fr, it, es, pt, nl, pl, ru, ja, ko, zh };
+  let locale = FALLBACK;
+  let preference = "auto";
+
+  function readPref() {
+    try {
+      const raw = localStorage.getItem(SETTINGS_KEY);
+      if (!raw) return "auto";
+      const s = JSON.parse(raw);
+      return s.locale || "auto";
+    } catch {
+      return "auto";
+    }
+  }
+
+  function detectLocale() {
+    const list = navigator.languages?.length
+      ? [...navigator.languages]
+      : [navigator.language || FALLBACK];
+    for (const raw of list) {
+      const tag = String(raw).toLowerCase().replace("_", "-");
+      const base = tag.split("-")[0];
+      if (PACKS[tag]) return tag;
+      if (PACKS[base]) return base;
+    }
+    return FALLBACK;
+  }
+
+  function resolveLocale(pref) {
+    if (!pref || pref === "auto") return detectLocale();
+    return PACKS[pref] ? pref : FALLBACK;
+  }
+
+  function interpolate(str, vars) {
+    if (!vars) return str;
+    return str.replace(/\{(\w+)\}/g, (_, k) =>
+      vars[k] !== undefined && vars[k] !== null ? String(vars[k]) : ""
+    );
+  }
+
+  function t(key, vars) {
+    const pack = PACKS[locale] || PACKS[FALLBACK];
+    const base = PACKS[FALLBACK];
+    const raw = pack[key] ?? base[key] ?? key;
+    return interpolate(raw, vars);
+  }
+
+  function applyDOM(root = document) {
+    root.querySelectorAll("[data-i18n]").forEach((el) => {
+      const key = el.getAttribute("data-i18n");
+      if (key) el.textContent = t(key);
+    });
+    root.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
+      const key = el.getAttribute("data-i18n-placeholder");
+      if (key) el.placeholder = t(key);
+    });
+    root.querySelectorAll("[data-i18n-title]").forEach((el) => {
+      const key = el.getAttribute("data-i18n-title");
+      if (key) el.title = t(key);
+    });
+    root.querySelectorAll("[data-i18n-aria]").forEach((el) => {
+      const key = el.getAttribute("data-i18n-aria");
+      if (key) el.setAttribute("aria-label", t(key));
+    });
+    root.querySelectorAll("option[data-i18n]").forEach((el) => {
+      const key = el.getAttribute("data-i18n");
+      if (key) el.textContent = t(key);
+    });
+    document.documentElement.lang = locale;
+  }
+
+  function init() {
+    preference = readPref();
+    locale = resolveLocale(preference);
+    window.__appName = APP_NAME;
+    return locale;
+  }
+
+  function setPreference(pref) {
+    preference = pref || "auto";
+    locale = resolveLocale(preference);
+    try {
+      const raw = localStorage.getItem(SETTINGS_KEY);
+      const s = raw ? JSON.parse(raw) : {};
+      s.locale = preference;
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+    } catch {
+      /* */
+    }
+    applyDOM();
+    window.dispatchEvent(
+      new CustomEvent("staveflow:locale", { detail: { locale, preference } })
+    );
+    return locale;
+  }
+
+  function getLocale() {
+    return locale;
+  }
+
+  function getPreference() {
+    return preference;
+  }
+
+  function getLocales() {
+    return LOCALES.map((item) => ({
+      ...item,
+      label: item.id === "auto" ? item.label : item.label,
+    }));
+  }
+
+  function formatMemberBanner(email) {
+    const emailPart = email ? `: ${email}` : "";
+    return t("auth.member", { email: emailPart });
+  }
+
+  return {
+    APP_NAME,
+    init,
+    t,
+    applyDOM,
+    setPreference,
+    getLocale,
+    getPreference,
+    getLocales,
+    formatMemberBanner,
+    detectLocale,
+  };
+})();
+
+window.I18n = I18n;
+
+
 /* === settings.js === */
 const AppSettings = (() => {
   const KEY = "touch-piano-settings";
@@ -51,6 +606,8 @@ const AppSettings = (() => {
     guitarStringHeight: 30,
     guitarNeckWidth: 42,
     guitarPluckWidth: 220,
+    /** "auto" veya en, tr, de, fr, it, … */
+    locale: "auto",
   };
 
   function load() {
@@ -2778,10 +3335,16 @@ window.StringTouch = StringTouch;
 /* === play-surface.js === */
 /** Aktif çalma yüzeyi — piyano / gitar / keman */
 const PlaySurface = (() => {
+  function modeLabel(id) {
+    const t = window.I18n?.t?.bind(window.I18n);
+    if (!t) return { piano: "Piano", guitar: "Guitar", violin: "Violin" }[id] || id;
+    return t(`inst.${id}`);
+  }
+
   const MODES = {
-    piano: { label: "Piyano", icon: "🎹", sound: "piano" },
-    guitar: { label: "Gitar", icon: "🎸", sound: "guitar" },
-    violin: { label: "Keman", icon: "🎻", sound: "violin" },
+    piano: { icon: "🎹", sound: "piano" },
+    guitar: { icon: "🎸", sound: "guitar" },
+    violin: { icon: "🎻", sound: "violin" },
   };
 
   let mode = "piano";
@@ -2810,6 +3373,7 @@ const PlaySurface = (() => {
 
   function setMode(next, opts = {}) {
     const m = MODES[next] ? next : "piano";
+    /* label via getModes() */
     if (m === mode && !opts.force) return mode;
 
     window.Piano?.releaseAll?.();
@@ -2867,7 +3431,11 @@ const PlaySurface = (() => {
   }
 
   function getModes() {
-    return MODES;
+    const out = {};
+    for (const [id, meta] of Object.entries(MODES)) {
+      out[id] = { ...meta, label: modeLabel(id) };
+    }
+    return out;
   }
 
   function init(noteDown, noteUp) {
@@ -3653,8 +4221,11 @@ const Game = (() => {
     const observeTargets = [
       document.getElementById("instrumentFooter"),
       document.getElementById("pianoWrap"),
+      document.getElementById("pianoKeys"),
       document.getElementById("guitarWrap"),
+      document.getElementById("guitarFrets"),
       document.getElementById("violinWrap"),
+      document.getElementById("violinBoard"),
     ].filter(Boolean);
     if (typeof ResizeObserver !== "undefined") {
       const ro = new ResizeObserver(() => {
@@ -3716,21 +4287,33 @@ const Game = (() => {
     positionHitLine();
   }
 
+  function getPlaySurfaceEl() {
+    const mode = window.PlaySurface?.getMode?.() || "piano";
+    if (mode === "guitar") {
+      return (
+        document.getElementById("guitarFrets") ||
+        document.getElementById("guitarWrap")
+      );
+    }
+    if (mode === "violin") {
+      return (
+        document.getElementById("violinBoard") ||
+        document.getElementById("violinWrap")
+      );
+    }
+    return document.getElementById("pianoKeys") || document.getElementById("pianoWrap");
+  }
+
   function getHitY() {
     const area = canvas?.parentElement;
-    const instWrap =
-      window.PlaySurface?.getWrapEl?.() || document.getElementById("pianoWrap");
-    if (!area || !instWrap || instWrap.classList.contains("hidden")) {
+    const playEl = getPlaySurfaceEl();
+    if (!area || !playEl || playEl.closest(".hidden")) {
       return area?.clientHeight * HIT_LINE_FALLBACK || 400;
     }
     const ar = area.getBoundingClientRect();
-    const mode = window.PlaySurface?.getMode?.() || "piano";
-    const footer = document.getElementById("instrumentFooter");
-    const pr =
-      (mode === "guitar" || mode === "violin") && footer
-        ? footer.getBoundingClientRect()
-        : instWrap.getBoundingClientRect();
-    return Math.max(48, Math.round(pr.top - ar.top));
+    const pr = playEl.getBoundingClientRect();
+    const y = Math.round(pr.top - ar.top - 3);
+    return Math.max(56, Math.min(area.clientHeight - 6, y));
   }
 
   function positionHitLine() {
@@ -4013,6 +4596,38 @@ const Game = (() => {
     } else {
       pausedAt = t;
     }
+  }
+
+  function resetNoteStatesFrom(timeSec) {
+    for (const n of notes) {
+      n.hit = n.time < timeSec - 0.02;
+      n.missed = false;
+      n._autoStarted = n.time < timeSec;
+      n._autoEnded = n.time + n.duration < timeSec;
+      n._impactDone = n.time < timeSec;
+    }
+    pendingHits = notes.map((n) => ({ ...n, id: `${n.midi}-${n.time}` }));
+    impactCooldown.clear();
+    keyAuras.clear();
+    particles = particles.filter((p) => p.life > 0.05);
+  }
+
+  function seekTo(sec) {
+    const total = songDuration || 0;
+    const t = Math.max(0, Math.min(total, Number(sec) || 0));
+    pausedAt = t;
+    if (playing) {
+      startTime = performance.now() / 1000 - t / speed;
+    }
+    lastFrameT = t;
+    resetNoteStatesFrom(t);
+    window.AudioEngine?.stopAll?.();
+    emitTime(t);
+    draw(t);
+  }
+
+  function getCurrentTime() {
+    return currentTime();
   }
 
   function setTimingWindow(ms) {
@@ -4299,6 +4914,8 @@ const Game = (() => {
     resetScore,
     resetRound,
     getSongDuration: () => songDuration,
+    getCurrentTime,
+    seekTo,
     isPlaying: () => playing,
     hasNotes: () => notes.length > 0,
     isReady,
@@ -4345,6 +4962,11 @@ const LibraryStore = (() => {
     };
     data.libraries.push(lib);
     return lib;
+  }
+
+  function dataPushStarter(lib) {
+    if (data.libraries.some((l) => l.id === lib.id)) return;
+    data.libraries.unshift(lib);
   }
 
   function getLibraries() {
@@ -4486,6 +5108,7 @@ const LibraryStore = (() => {
     reload,
     save,
     createLibrary,
+    dataPushStarter,
     getLibraries,
     getLibrary,
     setActiveLibrary,
@@ -4506,69 +5129,168 @@ const LibraryStore = (() => {
 window.LibraryStore = LibraryStore;
 
 
+/* === starter-library.js === */
+/** Tüm kullanıcılara telifsiz örnek MIDI (Bach BWV 846 — kamu malı) */
+const StarterLibrary = (() => {
+  const LIB_ID = "lib-starter";
+  const ASSET = "assets/bach_846.mid";
+
+  function songMeta() {
+    const t = window.I18n?.t?.bind(window.I18n) || ((k) => k);
+    return {
+      id: "song-bach-846",
+      name: t("starter.song"),
+      fileName: "bach_846.mid",
+      license: "public-domain",
+    };
+  }
+
+  function libName() {
+    return window.I18n?.t?.("starter.lib") || "Sample tracks (royalty-free)";
+  }
+
+  async function fetchBase64(url) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Örnek MIDI yüklenemedi (${res.status})`);
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    let binary = "";
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    return btoa(binary);
+  }
+
+  async function ensure(LibraryStore) {
+    if (!window.pianoApi?.isWeb) return false;
+    if (LibraryStore.getLibrary("lib-demo")?.songs?.length) return false;
+
+    const lib = LibraryStore.getLibrary(LIB_ID);
+    const SONG_META = songMeta();
+    if (lib?.songs?.some((s) => s.id === SONG_META.id || s.fileName === SONG_META.fileName)) {
+      return false;
+    }
+
+    if (!lib) {
+      LibraryStore.dataPushStarter({
+        id: LIB_ID,
+        name: libName(),
+        songs: [],
+        createdAt: new Date().toISOString(),
+        starter: true,
+      });
+      await LibraryStore.save();
+    }
+
+    let base64;
+    try {
+      base64 = await fetchBase64(ASSET);
+    } catch (err) {
+      console.warn("Starter MIDI:", err);
+      return false;
+    }
+
+    const api = window.pianoApi;
+    if (api?.isMember?.()) {
+      const entry = await api.uploadMidiBase64(LIB_ID, SONG_META.fileName, base64, SONG_META.name);
+      await LibraryStore.importSongs(LIB_ID, [entry]);
+      return true;
+    }
+
+    await LibraryStore.importSongs(LIB_ID, [
+      {
+        ...SONG_META,
+        midiBase64: base64,
+        storage: "local",
+      },
+    ]);
+    return true;
+  }
+
+  return { LIB_ID, ensure };
+})();
+
+window.StarterLibrary = StarterLibrary;
+
+
 /* === intro-splash.js === */
-/** Açılış videosu / aurora splash — her oturumda bir kez */
+/** Açılış — responsive aurora splash + isteğe bağlı video */
 const IntroSplash = (() => {
-  const MIN_SHOW_MS = 2200;
-  const MAX_SHOW_MS = 12000;
+  const MIN_SHOW_MS = 2600;
+  const MAX_SHOW_MS = 9000;
+  const APP_NAME = window.__appName || window.I18n?.APP_NAME || "StaveFlow";
   let playing = false;
 
   function $(id) {
     return document.getElementById(id);
   }
 
+  function viewSize() {
+    return {
+      w: document.documentElement.clientWidth || window.innerWidth,
+      h: document.documentElement.clientHeight || window.innerHeight,
+    };
+  }
+
   function drawAuroraFrame(ctx, w, h, t) {
     const g = ctx.createLinearGradient(0, 0, 0, h);
-    g.addColorStop(0, "#050510");
-    g.addColorStop(0.45, "#0c0a1e");
-    g.addColorStop(1, "#120820");
+    g.addColorStop(0, "#03030a");
+    g.addColorStop(0.42, "#0a0818");
+    g.addColorStop(1, "#140a1c");
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, w, h);
 
-    for (let i = 0; i < 90; i++) {
+    const starCount = Math.min(140, Math.floor((w * h) / 9000));
+    for (let i = 0; i < starCount; i++) {
       const sx = ((i * 97) % 1000) / 1000;
       const sy = ((i * 53) % 1000) / 1000;
-      const tw = 0.35 + 0.65 * Math.sin(t * 1.4 + i);
-      ctx.fillStyle = `rgba(255,255,255,${0.12 + tw * 0.35})`;
+      const tw = 0.35 + 0.65 * Math.sin(t * 1.2 + i * 0.7);
+      ctx.fillStyle = `rgba(255,255,255,${0.1 + tw * 0.32})`;
       ctx.beginPath();
-      ctx.arc(sx * w, sy * h * 0.72, 0.6 + (i % 3) * 0.35, 0, Math.PI * 2);
+      ctx.arc(sx * w, sy * h * 0.78, 0.45 + (i % 4) * 0.22, 0, Math.PI * 2);
       ctx.fill();
     }
 
     for (let band = 0; band < 3; band++) {
-      const y = h * (0.28 + band * 0.12) + Math.sin(t * 0.55 + band) * 18;
-      const grad = ctx.createLinearGradient(0, y - 40, w, y + 80);
+      const y = h * (0.22 + band * 0.14) + Math.sin(t * 0.48 + band * 1.1) * h * 0.018;
+      const grad = ctx.createLinearGradient(0, y - h * 0.08, w, y + h * 0.12);
       grad.addColorStop(0, "rgba(88,28,135,0)");
-      grad.addColorStop(0.35, `rgba(168,85,247,${0.14 + band * 0.04})`);
-      grad.addColorStop(0.65, `rgba(56,189,248,${0.1 + band * 0.03})`);
+      grad.addColorStop(0.4, `rgba(168,85,247,${0.1 + band * 0.03})`);
+      grad.addColorStop(0.62, `rgba(56,189,248,${0.08 + band * 0.025})`);
       grad.addColorStop(1, "rgba(88,28,135,0)");
       ctx.fillStyle = grad;
-      ctx.fillRect(0, y - 50, w, 140);
+      ctx.fillRect(0, y - h * 0.09, w, h * 0.18);
     }
+
+    const vign = ctx.createRadialGradient(w * 0.5, h * 0.45, w * 0.15, w * 0.5, h * 0.5, w * 0.75);
+    vign.addColorStop(0, "rgba(0,0,0,0)");
+    vign.addColorStop(1, "rgba(0,0,0,0.45)");
+    ctx.fillStyle = vign;
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  function resizeCanvas(canvas) {
+    const { w, h } = viewSize();
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.floor(w * dpr);
+    canvas.height = Math.floor(h * dpr);
+    canvas.style.width = `${w}px`;
+    canvas.style.height = `${h}px`;
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { w, h };
   }
 
   function startCanvasLoop(canvas) {
     const ctx = canvas.getContext("2d");
     let raf = 0;
+    let size = resizeCanvas(canvas);
     const loop = (now) => {
       const t = now / 1000;
-      const w = canvas.width;
-      const h = canvas.height;
-      drawAuroraFrame(ctx, w, h, t);
+      drawAuroraFrame(ctx, size.w, size.h, t);
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
-  }
-
-  function resizeCanvas(canvas) {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = Math.floor(window.innerWidth * dpr);
-    canvas.height = Math.floor(window.innerHeight * dpr);
-    canvas.style.width = "100%";
-    canvas.style.height = "100%";
-    const ctx = canvas.getContext("2d");
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return () => {
+      cancelAnimationFrame(raf);
+    };
   }
 
   function finish(overlay, stopLoop, resolve) {
@@ -4580,7 +5302,7 @@ const IntroSplash = (() => {
       stopLoop?.();
       playing = false;
       resolve();
-    }, 520);
+    }, 480);
   }
 
   function play() {
@@ -4591,6 +5313,13 @@ const IntroSplash = (() => {
     const video = $("introSplashVideo");
     const canvas = $("introSplashCanvas");
     const skipBtn = $("introSplashSkip");
+    const logoEl = overlay.querySelector(".intro-splash-logo");
+    const tagEl = overlay.querySelector(".intro-splash-tag");
+    const hintEl = overlay.querySelector(".intro-splash-hint");
+    if (logoEl) logoEl.textContent = APP_NAME;
+    if (tagEl && window.I18n) tagEl.textContent = window.I18n.t("intro.tag");
+    if (hintEl && window.I18n) hintEl.textContent = window.I18n.t("intro.hint");
+    if (skipBtn && window.I18n) skipBtn.textContent = window.I18n.t("intro.skip");
     if (!canvas) return Promise.resolve();
 
     playing = true;
@@ -4600,6 +5329,7 @@ const IntroSplash = (() => {
     resizeCanvas(canvas);
     const onResize = () => resizeCanvas(canvas);
     window.addEventListener("resize", onResize);
+    window.addEventListener("orientationchange", onResize);
     const stopLoop = startCanvasLoop(canvas);
 
     return new Promise((resolve) => {
@@ -4609,6 +5339,7 @@ const IntroSplash = (() => {
         if (closed) return;
         closed = true;
         window.removeEventListener("resize", onResize);
+        window.removeEventListener("orientationchange", onResize);
         finish(overlay, stopLoop, resolve);
       };
 
@@ -4629,14 +5360,17 @@ const IntroSplash = (() => {
         },
         { once: true }
       );
-      overlay.addEventListener("click", tryClose, { once: true });
+      overlay.addEventListener("click", (e) => {
+        if (e.target === skipBtn) return;
+        tryClose();
+      });
 
       if (video) {
         const sources = ["assets/intro.webm", "assets/intro.mp4"];
         let srcIdx = 0;
         video.muted = true;
         video.playsInline = true;
-        video.classList.remove("hidden");
+        video.setAttribute("playsinline", "");
         const loadNext = () => {
           if (srcIdx >= sources.length) {
             video.classList.add("hidden");
@@ -4644,6 +5378,7 @@ const IntroSplash = (() => {
           }
           const onReady = () => {
             video.removeEventListener("canplay", onReady);
+            video.classList.remove("hidden");
             video.play().catch(() => video.classList.add("hidden"));
           };
           video.addEventListener("canplay", onReady);
@@ -4669,7 +5404,10 @@ window.mainJsOk = true;
 /* === app.js === */
 /** Ana uygulama */
 (function () {
-  const APP_VERSION = "v0.9.6";
+  window.I18n?.init();
+  const t = (key, vars) => window.I18n?.t(key, vars) ?? key;
+  const APP_NAME = window.I18n?.APP_NAME || "StaveFlow";
+  const APP_VERSION = "v0.9.7";
   const $ = (sel) => document.querySelector(sel);
 
   function mods() {
@@ -4795,7 +5533,11 @@ window.mainJsOk = true;
   const timeCurrent = $("#timeCurrent");
   const timeTotal = $("#timeTotal");
   const timeRemaining = $("#timeRemaining");
+  const progressTrack = $("#progressTrack");
   const progressFill = $("#progressFill");
+  const progressThumb = $("#progressThumb");
+  const localeSelect = $("#localeSelect");
+  const timeRemainingLabel = $("#timeRemainingLabel");
   const labelMode = $("#labelMode");
   const labelPreset = $("#labelPreset");
   const labelPresetWrap = $("#labelPresetWrap");
@@ -4910,9 +5652,73 @@ window.mainJsOk = true;
     toastTimer = setTimeout(() => toastEl.classList.add("hidden"), 3200);
   }
 
+  function syncLocaleSelect() {
+    if (!localeSelect || !window.I18n) return;
+    if (!localeSelect.dataset.filled) {
+      localeSelect.innerHTML = "";
+      for (const loc of window.I18n.getLocales()) {
+        const opt = document.createElement("option");
+        opt.value = loc.id;
+        opt.textContent = loc.label;
+        localeSelect.appendChild(opt);
+      }
+      localeSelect.dataset.filled = "1";
+    }
+    localeSelect.value = AppSettings.load().locale || "auto";
+  }
+
+  function syncPlayModeSelect() {
+    if (!playModeSelect) return;
+    const modes = window.PlaySurface?.getModes?.() || {};
+    for (const opt of playModeSelect.options) {
+      const m = modes[opt.value];
+      if (m) opt.textContent = `${m.icon} ${m.label}`;
+    }
+  }
+
+  function syncInstrumentPicker() {
+    instrumentPickerModal?.querySelectorAll("[data-mode]").forEach((btn) => {
+      const m = window.PlaySurface?.getModes?.()[btn.dataset.mode];
+      const label = btn.querySelector(".instrument-pick-label");
+      if (label && m) label.textContent = m.label;
+    });
+  }
+
+  function applyAppTranslations() {
+    if (!window.I18n) return;
+    window.I18n.applyDOM();
+    syncLocaleSelect();
+    syncPlayModeSelect();
+    syncInstrumentPicker();
+    const scoreLbl = $(".score-label");
+    if (scoreLbl) scoreLbl.textContent = t("header.score");
+    if (timeRemainingLabel) timeRemainingLabel.textContent = t("header.remaining");
+    try {
+      if (btnPlay && !requireMods().Game.isPlaying()) btnPlay.textContent = t("header.play");
+    } catch {
+      if (btnPlay) btnPlay.textContent = t("header.play");
+    }
+    if (btnAutoPlay) btnAutoPlay.textContent = t("header.autoplay");
+    if (btnStop) btnStop.textContent = t("header.stop");
+    const speedLbl = $(".speed-label");
+    if (speedLbl?.firstChild) speedLbl.firstChild.textContent = `${t("header.speed")} `;
+    document.title = `${APP_NAME} — ${t("app.tagline")}`;
+    const brandEl = document.querySelector(".top-bar h1");
+    if (brandEl) brandEl.textContent = APP_NAME;
+    const introLogo = document.querySelector(".intro-splash-logo");
+    if (introLogo) introLogo.textContent = APP_NAME;
+    updateSettingsForPlayMode(window.PlaySurface?.getMode?.() || "piano");
+    updateHints();
+    updateKeyboardLayoutHint();
+    if (flameLabel) flameLabel.textContent = flameLabelText(Number(flameRange?.value || 100));
+    if (vibratoSensLabel) {
+      vibratoSensLabel.textContent = vibratoSensLabelText(Number(stringVibratoSens?.value || 100));
+    }
+  }
+
   function openModal(editId = null) {
     editingLibraryId = editId;
-    $("#libraryDialogTitle").textContent = editId ? "Kütüphaneyi yeniden adlandır" : "Yeni kütüphane";
+    $("#libraryDialogTitle").textContent = editId ? t("modal.renameLib") : t("modal.newLib");
     libraryNameInput.value = editId ? requireStore().getLibrary(editId)?.name ?? "" : "";
     libraryModal.classList.remove("hidden");
     libraryModal.setAttribute("aria-hidden", "false");
@@ -4964,8 +5770,10 @@ window.mainJsOk = true;
     const detected = window.KeyboardLayout.getDetectedLabel();
     keyboardLayoutHint.textContent =
       keyboardLayout?.value === "auto"
-        ? `Algılanan: ${detected}`
-        : `Seçili: ${keyboardLayout.options[keyboardLayout.selectedIndex]?.text || detected}`;
+        ? t("settings.kb.detected", { name: detected })
+        : t("settings.kb.selected", {
+            name: keyboardLayout.options[keyboardLayout.selectedIndex]?.text || detected,
+          });
   }
 
   function applyKeyboardLayoutSettings(s) {
@@ -4997,10 +5805,10 @@ window.mainJsOk = true;
   }
 
   function vibratoSensLabelText(v) {
-    if (v < 70) return "Hafif";
-    if (v < 130) return "Normal";
-    if (v < 170) return "Güçlü";
-    return "Çok güçlü";
+    if (v < 70) return t("intensity.light");
+    if (v < 130) return t("intensity.normal");
+    if (v < 170) return t("intensity.strong");
+    return t("intensity.max");
   }
 
   function applyInstrumentKeySize(w, h) {
@@ -5061,28 +5869,23 @@ window.mainJsOk = true;
   function updateSettingsForPlayMode(mode) {
     const m = mode || window.PlaySurface?.getMode?.() || "piano";
     document.body.dataset.playMode = m;
-    const tabLabels = { piano: "Klavye", guitar: "Gitar", violin: "Keman" };
-    if (stabKeys) stabKeys.textContent = tabLabels[m] || "Klavye";
-
-    const widthLabels = {
-      piano: "Tuş genişliği",
-      guitar: "Perde hücre genişliği",
-      violin: "Perde hücre genişliği",
-    };
-    const heightLabels = {
-      piano: "Klavye yüksekliği",
-      guitar: "Panel yüksekliği",
-      violin: "Panel yüksekliği",
-    };
-    if (keyWidthDesc) keyWidthDesc.textContent = widthLabels[m] || widthLabels.piano;
-    if (keyHeightDesc) keyHeightDesc.textContent = heightLabels[m] || heightLabels.piano;
+    if (stabKeys) {
+      stabKeys.textContent =
+        m === "guitar" || m === "violin" ? t(`inst.${m}`) : t("settings.tab.keys");
+    }
+    if (keyWidthDesc) {
+      keyWidthDesc.textContent =
+        m === "piano" ? t("settings.keyWidth.piano") : t("settings.keyWidth.fretted");
+    }
+    if (keyHeightDesc) {
+      keyHeightDesc.textContent =
+        m === "piano" ? t("settings.keyHeight.piano") : t("settings.keyHeight.fretted");
+    }
     if (dockDesc) {
-      dockDesc.textContent =
-        m === "piano" ? "Klavye konumu (dikey)" : "Enstrüman konumu (dikey)";
+      dockDesc.textContent = m === "piano" ? t("settings.dock.piano") : t("settings.dock.other");
     }
     if (alignDesc) {
-      alignDesc.textContent =
-        m === "piano" ? "Klavye hizası (yatay)" : "Enstrüman hizası (yatay)";
+      alignDesc.textContent = m === "piano" ? t("settings.align.piano") : t("settings.align.other");
     }
 
     if (pianoAlign && m !== "piano") {
@@ -5097,10 +5900,10 @@ window.mainJsOk = true;
   }
 
   function flameLabelText(v) {
-    if (v < 60) return "Hafif";
-    if (v < 120) return "Normal";
-    if (v < 160) return "Güçlü";
-    return "Alevli!";
+    if (v < 60) return t("intensity.light");
+    if (v < 120) return t("intensity.normal");
+    if (v < 160) return t("intensity.strong");
+    return t("intensity.flame");
   }
 
   function applyPlayMode(mode, opts = {}) {
@@ -5265,7 +6068,7 @@ window.mainJsOk = true;
 
   function setSidebarVisible(visible, save = true) {
     document.body.classList.toggle("sidebar-hidden", !visible);
-    btnToggleSidebar.textContent = visible ? "☰ Menü" : "☰ Menüyü aç";
+    btnToggleSidebar.textContent = visible ? t("header.menu") : t("header.menuOpen");
     if (save) persistSettings({ sidebarVisible: visible });
     setTimeout(() => requireMods().Game.resize(), 120);
   }
@@ -5273,8 +6076,8 @@ window.mainJsOk = true;
   async function toggleFullscreen() {
     if (!window.pianoApi?.toggleFullscreen) return;
     const on = await window.pianoApi.toggleFullscreen();
-    btnFullscreen.textContent = on ? "⛶ Pencere" : "⛶ Tam ekran";
-    toast(on ? "Tam ekran açık (F11 / Esc)" : "Pencere modu");
+    btnFullscreen.textContent = on ? t("header.window") : t("header.fullscreen");
+    toast(on ? t("toast.fullscreenOn") : t("toast.windowMode"));
     setTimeout(() => {
       try {
         requireMods().Game.resize();
@@ -5408,8 +6211,7 @@ window.mainJsOk = true;
     btnImport.disabled = !activeId;
     if (btnImportAudio) btnImportAudio.disabled = !activeId;
     if (btnImport && isWebGuest) {
-      btnImport.title =
-        "MIDI kaydetmek için üye olun (tek seferlik 1 USD). Üye olmadan enstrümanı serbest çalabilirsiniz.";
+      btnImport.title = t("import.memberTitle");
     } else if (btnImport) {
       btnImport.title = "";
     }
@@ -5421,12 +6223,12 @@ window.mainJsOk = true;
     const lib = libId ? LibraryStore.getLibrary(libId) : null;
     const isWeb = !!window.pianoApi?.isWeb;
     libraryHint.textContent = lib
-      ? `Seçili: ${lib.name} — MIDI eklemek için + MIDI`
+      ? t("libs.hintSelected", { name: lib.name })
       : isWeb
         ? window.pianoApi.getSession?.()?.memberId
-          ? "Kütüphane seçin veya yukarıdan ekleyin. Veriler Wix hesabınızda saklanır."
-          : "Misafir modu: MIDI bu tarayıcıda saklanır. Buluta kayıt için Wix üyeliği (tek seferlik 1 USD)."
-        : "Kütüphane seçin veya yukarıdan ekleyin.";
+          ? t("libs.hint")
+          : t("libs.hintGuest")
+        : t("libs.hintDesktop");
     const activeSong = LibraryStore.getActiveSongId();
     let playReady = false;
     try {
@@ -5435,15 +6237,11 @@ window.mainJsOk = true;
       /* */
     }
     if (lib && activeSong && playReady) {
-      songHint.textContent = isWeb
-        ? "▶ Oynat — düşen notalar üstte başlar. Dokunmatik veya bilgisayar klavyesi ile çalın."
-        : "▶ Oynat ile başlayın. Dokunmatik veya klavye ile çalın.";
+      songHint.textContent = t("songs.hintPlay");
     } else if (lib) {
-      songHint.textContent = lib.songs.length
-        ? "Çalmak için listeden bir şarkı seçin."
-        : "Bu kütüphaneye + MIDI ile dosya ekleyin.";
+      songHint.textContent = lib.songs.length ? t("songs.hintPick") : t("songs.hintAddMidi");
     } else {
-      songHint.textContent = "Önce bir kütüphane seçin.";
+      songHint.textContent = t("songs.hintSelectLib");
     }
   }
 
@@ -5455,13 +6253,13 @@ window.mainJsOk = true;
     if (!libs.length) {
       const empty = document.createElement("li");
       empty.className = "hint";
-      empty.textContent = "Henüz kütüphane yok.";
+      empty.textContent = t("libs.empty");
       libraryList.appendChild(empty);
     }
     for (const lib of libs) {
       const li = document.createElement("li");
       li.textContent = lib.name;
-      li.title = "Çift tık: yeniden adlandır";
+      li.title = t("libs.renameTitle");
       li.className = lib.id === activeId ? "active" : "";
       li.addEventListener("click", () => selectLibrary(lib.id));
       li.addEventListener("dblclick", (e) => {
@@ -5502,7 +6300,7 @@ window.mainJsOk = true;
     if (!lib.songs.length) {
       const empty = document.createElement("li");
       empty.className = "hint";
-      empty.textContent = "Henüz şarkı yok.";
+      empty.textContent = t("songs.empty");
       songList.appendChild(empty);
     }
     for (const song of lib.songs) {
@@ -5616,7 +6414,7 @@ window.mainJsOk = true;
     }
     const el = document.createElement("div");
     el.className = `feedback-pop ${type}`;
-    el.textContent = type === "good" ? `+${points}` : "Kaçırdın!";
+    el.textContent = type === "good" ? t("feedback.good", { points }) : t("feedback.miss");
     document.body.appendChild(el);
     setTimeout(() => el.remove(), 650);
   }
@@ -5626,6 +6424,42 @@ window.mainJsOk = true;
     timeTotal.textContent = t.totalText;
     timeRemaining.textContent = t.remainingText;
     progressFill.style.width = `${t.percent}%`;
+    if (progressThumb) progressThumb.style.left = `${t.percent}%`;
+  }
+
+  function seekFromPointer(clientX) {
+    const { Game } = requireMods();
+    const dur = Game.getSongDuration();
+    if (!dur || !progressTrack) return;
+    const rect = progressTrack.getBoundingClientRect();
+    const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    Game.seekTo(pct * dur);
+  }
+
+  function bindProgressSeek() {
+    if (!progressTrack) return;
+    let dragging = false;
+    const onMove = (e) => {
+      if (!dragging) return;
+      seekFromPointer(e.clientX);
+    };
+    const stopDrag = () => {
+      dragging = false;
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", stopDrag);
+    };
+    progressTrack.addEventListener("pointerdown", (e) => {
+      try {
+        if (!requireMods().Game.getSongDuration()) return;
+      } catch {
+        return;
+      }
+      dragging = true;
+      progressTrack.setPointerCapture?.(e.pointerId);
+      seekFromPointer(e.clientX);
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", stopDrag);
+    });
   }
 
   function onScoreChange({ score, combo }) {
@@ -6040,9 +6874,26 @@ window.mainJsOk = true;
 
   applyThemeFromSettings(AppSettings.load());
 
+  localeSelect?.addEventListener("change", () => {
+    const pref = localeSelect.value || "auto";
+    AppSettings.save({ locale: pref });
+    window.I18n.setPreference(pref);
+    applyAppTranslations();
+    renderLibraries();
+    renderSongs();
+  });
+
+  window.addEventListener("staveflow:locale", () => applyAppTranslations());
+
   (async function boot() {
-    if (appVersion) appVersion.textContent = `Surum ${APP_VERSION}`;
+    const savedLoc = AppSettings.load().locale;
+    if (savedLoc) window.I18n.setPreference(savedLoc);
+    else window.I18n.init();
     window.__appVersion = APP_VERSION;
+    window.__appName = APP_NAME;
+    if (appVersion) appVersion.textContent = `${APP_NAME} ${APP_VERSION}`;
+    applyAppTranslations();
+    bindProgressSeek();
     window.__bootStatus = "başlıyor";
     try {
       if (window.IntroSplash?.play) {
@@ -6056,6 +6907,13 @@ window.mainJsOk = true;
         await window.pianoApi.waitForSession(4500);
       }
       await requireStore().load();
+      if (window.StarterLibrary?.ensure) {
+        try {
+          await window.StarterLibrary.ensure(requireStore());
+        } catch (err) {
+          console.warn("Örnek kütüphane:", err);
+        }
+      }
       window.__bootStatus = "kütüphane yüklendi";
       renderLibraries();
       renderSongs();
@@ -6063,11 +6921,11 @@ window.mainJsOk = true;
     } catch (err) {
       window.__bootStatus = "hata: " + err.message;
       if (window.pianoApi?.isWeb) {
-        toast("Misafir modu: enstrümanı kullanabilirsiniz. Bulut kütüphane için üye olun.", false);
+        toast(t("toast.bootGuest"), false);
         renderLibraries();
         updateImportButtons();
       } else {
-        toast(`Kütüphane hatası: ${err.message}`, true);
+        toast(t("toast.bootLibError", { msg: err.message }), true);
         console.error(err);
         return;
       }
@@ -6113,12 +6971,14 @@ window.mainJsOk = true;
       window.__bootStatus = "piyano hazır";
     } catch (err) {
       window.__bootStatus = "piyano hata: " + err.message;
-      toast(`Piyano uyarısı: ${err.message}`, true);
+      toast(t("toast.pianoWarn", { msg: err.message }), true);
       console.error(err);
     }
 
     try {
-      const demo = requireStore().getLibrary("lib-demo");
+      const demo =
+        requireStore().getLibrary("lib-starter") ||
+        requireStore().getLibrary("lib-demo");
       if (demo) {
         requireStore().setActiveLibrary(demo.id);
         renderLibraries();
@@ -6130,7 +6990,7 @@ window.mainJsOk = true;
       }
     } catch (err) {
       window.__bootStatus = "demo hata: " + err.message;
-      toast(`Demo şarkı: ${err.message}`, true);
+      toast(t("toast.demoError", { msg: err.message }), true);
       console.error(err);
     }
   })();
