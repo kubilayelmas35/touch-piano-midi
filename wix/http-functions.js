@@ -8,7 +8,12 @@ import {
   saveLibraries,
   formatError,
 } from "backend/pianoLibraryCore";
-import { pianoUploadMidi } from "backend/pianoMedia.web";
+import {
+  uploadMidiToCms,
+  getMidiFromCms,
+  deleteSongFromCms,
+  loadLibrariesForClient,
+} from "backend/pianoMidiCmsCore";
 
 async function readJson(request) {
   try {
@@ -34,8 +39,7 @@ function jsonErr(message) {
 
 export async function post_pianoGetLibraries(request) {
   try {
-    const memberId = await requireMemberId();
-    const data = await loadLibraries(memberId);
+    const data = await loadLibrariesForClient();
     return jsonOk(data);
   } catch (e) {
     return jsonErr(formatError("post_pianoGetLibraries", e));
@@ -56,43 +60,28 @@ export async function post_pianoSaveLibraries(request) {
 export async function post_pianoUploadMidi(request) {
   try {
     const body = await readJson(request);
-    const entry = await pianoUploadMidi(body);
+    const entry = await uploadMidiToCms(body);
     return jsonOk(entry);
   } catch (e) {
     return jsonErr(formatError("post_pianoUploadMidi", e));
   }
 }
 
+export async function post_pianoGetMidi(request) {
+  try {
+    const body = await readJson(request);
+    const data = await getMidiFromCms(body);
+    return jsonOk(data);
+  } catch (e) {
+    return jsonErr(formatError("post_pianoGetMidi", e));
+  }
+}
+
 export async function post_pianoDeleteSong(request) {
   try {
     const body = await readJson(request);
-    const memberId = await requireMemberId();
-    const data = await loadLibraries(memberId);
-    let removed = false;
-
-    for (const lib of data.libraries) {
-      if (body.libraryId && lib.id !== body.libraryId) continue;
-      const before = lib.songs?.length || 0;
-      lib.songs = (lib.songs || []).filter((s) => {
-        if (body.songId && s.id === body.songId) {
-          removed = true;
-          return false;
-        }
-        if (body.midiUrl && s.midiUrl === body.midiUrl) {
-          removed = true;
-          return false;
-        }
-        return true;
-      });
-      if (lib.songs.length !== before) removed = true;
-    }
-
-    if (!removed) {
-      return jsonErr("Şarkı bulunamadı");
-    }
-
-    await saveLibraries(memberId, data.libraries);
-    return jsonOk({ ok: true });
+    const result = await deleteSongFromCms(body);
+    return jsonOk(result);
   } catch (e) {
     return jsonErr(formatError("post_pianoDeleteSong", e));
   }

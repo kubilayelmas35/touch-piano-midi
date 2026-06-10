@@ -1176,3 +1176,69 @@ body[data-play-mode="violin"] .settings-scope-strings {
 body[data-play-mode="piano"] #btnMoveInstrument {
   opacity: 0.65;
 }
+
+/* Açılış splash */
+#introSplash {
+  position: fixed;
+  inset: 0;
+  z-index: 20000;
+  display: grid;
+  place-items: center;
+  background: #050510;
+  cursor: pointer;
+  transition: opacity 0.5s ease;
+}
+
+#introSplash.hidden {
+  display: none;
+}
+
+#introSplash.intro-fade-out {
+  opacity: 0;
+  pointer-events: none;
+}
+
+#introSplashCanvas,
+#introSplashVideo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+#introSplashVideo.hidden {
+  display: none;
+}
+
+.intro-splash-content {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  pointer-events: none;
+  padding: 1.5rem;
+}
+
+.intro-splash-logo {
+  font-size: clamp(1.8rem, 5vw, 3rem);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #f3e8ff;
+  text-shadow: 0 0 24px rgba(168, 85, 247, 0.65), 0 0 48px rgba(56, 189, 248, 0.35);
+  margin: 0 0 0.35rem;
+}
+
+.intro-splash-tag {
+  margin: 0;
+  color: #c4b5fd;
+  font-size: 0.95rem;
+  opacity: 0.9;
+}
+
+#introSplashSkip {
+  position: absolute;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 3;
+  pointer-events: auto;
+}

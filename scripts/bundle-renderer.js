@@ -23,6 +23,7 @@ const coreFiles = [
   "keyboard-input.js",
   "game.js",
   "library.js",
+  "intro-splash.js",
 ];
 const appFile = "app.js";
 let out = "/* Otomatik birleştirilmiş — npm start öncesi üretilir */\n";
