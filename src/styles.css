@@ -364,6 +364,13 @@ body.sidebar-hidden #btnToggleSidebar {
   padding: 0.35rem;
 }
 
+.settings-panel select option,
+#playModeSelect option,
+#localeSelect option {
+  background: #1a1e28;
+  color: #e8eaef;
+}
+
 .game-area {
   grid-area: main;
   position: relative;

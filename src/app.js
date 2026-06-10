@@ -250,17 +250,28 @@
 
   function syncLocaleSelect() {
     if (!localeSelect || !window.I18n) return;
-    if (!localeSelect.dataset.filled) {
+    const locales = window.I18n.getLocales();
+    if (!locales.length) return;
+    if (localeSelect.options.length !== locales.length) {
       localeSelect.innerHTML = "";
-      for (const loc of window.I18n.getLocales()) {
+      for (const loc of locales) {
         const opt = document.createElement("option");
         opt.value = loc.id;
         opt.textContent = loc.label;
         localeSelect.appendChild(opt);
       }
-      localeSelect.dataset.filled = "1";
+    } else {
+      locales.forEach((loc, i) => {
+        const opt = localeSelect.options[i];
+        if (!opt) return;
+        opt.value = loc.id;
+        opt.textContent = loc.label;
+      });
     }
-    localeSelect.value = AppSettings.load().locale || "auto";
+    const pref = AppSettings.load().locale || "auto";
+    localeSelect.value = [...localeSelect.options].some((o) => o.value === pref)
+      ? pref
+      : "auto";
   }
 
   function syncPlayModeSelect() {
@@ -1499,35 +1510,6 @@
       console.warn("Intro:", err);
     }
     try {
-      if (window.pianoApi?.isWeb && window.pianoApi.waitForSession) {
-        await window.pianoApi.waitForSession(4500);
-      }
-      await requireStore().load();
-      if (window.StarterLibrary?.ensure) {
-        try {
-          await window.StarterLibrary.ensure(requireStore());
-        } catch (err) {
-          console.warn("Örnek kütüphane:", err);
-        }
-      }
-      window.__bootStatus = "kütüphane yüklendi";
-      renderLibraries();
-      renderSongs();
-      updateImportButtons();
-    } catch (err) {
-      window.__bootStatus = "hata: " + err.message;
-      if (window.pianoApi?.isWeb) {
-        toast(t("toast.bootGuest"), false);
-        renderLibraries();
-        updateImportButtons();
-      } else {
-        toast(t("toast.bootLibError", { msg: err.message }), true);
-        console.error(err);
-        return;
-      }
-    }
-
-    try {
       const { PlaySurface, Game, AppSettings } = requireMods();
       Game.init($("#notesCanvas"), {
         onScoreChange,
@@ -1545,31 +1527,79 @@
       window.KeyboardInput?.rebuild?.();
       showInstrumentPickerIfNeeded();
       updateSettingsForPlayMode(PlaySurface.getMode());
-      updateImportButtons();
-      let lastCloudMemberId = window.pianoApi.getSession?.().memberId || null;
-      window.addEventListener("touch-piano:session", async (e) => {
-        const mid = e.detail?.memberId || null;
-        if (mid && mid !== lastCloudMemberId) {
-          lastCloudMemberId = mid;
-          try {
-            await requireStore().reload();
-            renderLibraries();
-            renderSongs();
-          } catch (err) {
-            console.error(err);
-          }
-        } else if (!mid) {
-          lastCloudMemberId = null;
-        }
-        updateImportButtons();
-        updateHints();
-      });
+      applyAppTranslations();
       window.__bootStatus = "piyano hazır";
     } catch (err) {
       window.__bootStatus = "piyano hata: " + err.message;
       toast(t("toast.pianoWarn", { msg: err.message }), true);
       console.error(err);
     }
+
+    let cloudLibError = null;
+    try {
+      if (window.pianoApi?.isWeb && window.pianoApi.waitForSession) {
+        await window.pianoApi.waitForSession(4500);
+      }
+      try {
+        await requireStore().load();
+      } catch (loadErr) {
+        cloudLibError = loadErr.message;
+        if (!window.pianoApi?.isWeb) throw loadErr;
+      }
+      if (window.StarterLibrary?.ensure) {
+        try {
+          await window.StarterLibrary.ensure(requireStore());
+        } catch (err) {
+          console.warn("Örnek kütüphane:", err);
+        }
+      }
+      window.__bootStatus = "kütüphane yüklendi";
+      renderLibraries();
+      renderSongs();
+      updateImportButtons();
+    } catch (err) {
+      window.__bootStatus = "hata: " + err.message;
+      if (window.pianoApi?.isWeb) {
+        cloudLibError = cloudLibError || err.message;
+        renderLibraries();
+        updateImportButtons();
+      } else {
+        toast(t("toast.bootLibError", { msg: err.message }), true);
+        console.error(err);
+        return;
+      }
+    }
+
+    if (cloudLibError) {
+      if (window.pianoApi?.isMember?.()) {
+        toast(t("toast.cloudLibError", { msg: cloudLibError }), true);
+      } else if (window.pianoApi?.isWeb) {
+        toast(t("toast.bootGuest"), false);
+      }
+    }
+
+    let lastCloudMemberId = window.pianoApi.getSession?.().memberId || null;
+    window.addEventListener("touch-piano:session", async (e) => {
+      const mid = e.detail?.memberId || null;
+      if (mid && mid !== lastCloudMemberId) {
+        lastCloudMemberId = mid;
+        try {
+          await requireStore().reload();
+          if (window.StarterLibrary?.ensure) {
+            await window.StarterLibrary.ensure(requireStore());
+          }
+          renderLibraries();
+          renderSongs();
+        } catch (err) {
+          console.error(err);
+          toast(t("toast.cloudLibError", { msg: err.message }), true);
+        }
+      } else if (!mid) {
+        lastCloudMemberId = null;
+      }
+      updateImportButtons();
+      updateHints();
+    });
 
     try {
       const demo =
@@ -1589,5 +1619,18 @@
       toast(t("toast.demoError", { msg: err.message }), true);
       console.error(err);
     }
+
+    applyAppTranslations();
+    scheduleInstrumentLayoutSync();
+    setTimeout(scheduleInstrumentLayoutSync, 150);
+    setTimeout(() => {
+      try {
+        window.dispatchEvent(new Event("resize"));
+        requireMods().Game.resize();
+      } catch {
+        /* */
+      }
+    }, 400);
+    window.dispatchEvent(new CustomEvent("staveflow:booted"));
   })();
 })();

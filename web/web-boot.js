@@ -27,6 +27,7 @@
     syncEmbedHeight();
   }
   setTimeout(syncEmbedHeight, 250);
+  window.addEventListener("staveflow:booted", syncEmbedHeight);
 
   const banner = document.getElementById("authBanner");
   if (!banner || !window.pianoApi?.isWeb) return;
