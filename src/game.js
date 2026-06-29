@@ -251,8 +251,17 @@ const Game = (() => {
   function getHitY() {
     const area = canvas?.parentElement;
     if (!area) return 400;
-    const mode = window.PlaySurface?.getMode?.() || "piano";
+    const mode = window.PlaySurface?.getMode?.() || document.body?.dataset?.playMode || "piano";
     const ar = area.getBoundingClientRect();
+
+    if (mode === "guitar" || mode === "violin") {
+      const footer = document.getElementById("instrumentFooter");
+      const fr = footer?.getBoundingClientRect();
+      if (fr && fr.height > 8) {
+        const y = Math.round(fr.top - ar.top - 3);
+        return Math.max(56, Math.min(area.clientHeight - 6, y));
+      }
+    }
 
     let target = getPlaySurfaceEl();
     if (mode === "guitar") {
@@ -620,8 +629,6 @@ const Game = (() => {
   function processAutoPlay(t) {
     if (!autoPlayMode || !playing) return;
     const inst = playInstrumentApi();
-    const sound = window.PlaySurface?.getModes?.()?.[window.PlaySurface.getMode()]?.sound;
-    if (sound) window.AudioEngine?.setInstrument?.(sound);
     for (const n of notes) {
       if (!n._autoStarted && t >= n.time) {
         const late = t - n.time;
