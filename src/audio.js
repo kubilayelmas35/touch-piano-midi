@@ -46,9 +46,17 @@ const AudioEngine = (() => {
   }
 
   /** Gitar/kemanda çalma modu sesi; piyanoda ayarlardaki enstrüman seçimi */
+  function playMode() {
+    const fromSurface = window.PlaySurface?.getMode?.();
+    if (fromSurface) return fromSurface;
+    const fromDom = document.body?.dataset?.playMode;
+    if (fromDom === "guitar" || fromDom === "violin" || fromDom === "piano") return fromDom;
+    return "piano";
+  }
+
   function effectiveInstrument(opts = {}) {
     if (opts.instrument && INSTRUMENTS[opts.instrument]) return opts.instrument;
-    const mode = window.PlaySurface?.getMode?.() || "piano";
+    const mode = playMode();
     if (mode === "guitar" || mode === "violin") return mode;
     return instrumentId;
   }
@@ -56,9 +64,9 @@ const AudioEngine = (() => {
   function instrumentGain(id) {
     switch (id) {
       case "guitar":
-        return 1.62;
+        return 1.85;
       case "violin":
-        return 1.48;
+        return 1.72;
       case "flute":
         return 1.12;
       case "brass":
@@ -219,6 +227,147 @@ const AudioEngine = (() => {
     }
   }
 
+  /** Karplus-Strong tel simülasyonu — piyanodan tamamen farklı pena/tel karakteri */
+  function buildGuitarKarplus(ac, freq, vol, velocity) {
+    const t = ac.currentTime;
+    const period = 1 / freq;
+    const n = Math.max(2, Math.round(ac.sampleRate * period));
+    const exciteBuf = ac.createBuffer(1, n, ac.sampleRate);
+    const exciteData = exciteBuf.getChannelData(0);
+    for (let i = 0; i < n; i++) {
+      exciteData[i] = (Math.random() * 2 - 1) * (1 - (i / n) * 0.65);
+    }
+
+    const master = ac.createGain();
+    const peak = Math.min(0.98, vol * 0.95);
+    const decay = 0.55 + velocity * 1.35;
+    master.gain.setValueAtTime(peak, t);
+    master.gain.exponentialRampToValueAtTime(0.0001, t + decay);
+    master.connect(ac.destination);
+
+    const delay = ac.createDelay(4);
+    delay.delayTime.setValueAtTime(period, t);
+
+    const damp = ac.createBiquadFilter();
+    damp.type = "lowpass";
+    damp.frequency.setValueAtTime(Math.min(7500, 900 + velocity * 5200), t);
+    damp.Q.value = 0.55;
+
+    const feedback = ac.createGain();
+    const fb = 0.965 + velocity * 0.028;
+    feedback.gain.setValueAtTime(fb, t);
+    feedback.gain.setValueAtTime(fb, t + decay * 0.55);
+    feedback.gain.exponentialRampToValueAtTime(0.001, t + decay);
+
+    const excite = ac.createBufferSource();
+    excite.buffer = exciteBuf;
+    excite.connect(delay);
+    delay.connect(damp);
+    damp.connect(master);
+    damp.connect(feedback);
+    feedback.connect(delay);
+    excite.start(t);
+    excite.stop(t + period * 1.25);
+
+    return {
+      oscs: [excite],
+      extraStops: [],
+      master,
+      filter: damp,
+      lfo: null,
+      lfoGain: null,
+      feedback,
+      delay,
+      baseFreq: freq,
+      maxVibratoDepth: freq * 0.008,
+      sustainGain: Math.max(0.0003, peak * 0.12),
+      started: t,
+      peak,
+    };
+  }
+
+  /** Yaylı keman — detune saw + yay gürültüsü, yavaş atak */
+  function buildViolinBow(ac, freq, vol, velocity) {
+    const t = ac.currentTime;
+    const master = ac.createGain();
+    const peak = Math.min(0.98, vol * 0.88);
+    master.gain.setValueAtTime(0.0001, t);
+    master.gain.exponentialRampToValueAtTime(peak, t + 0.07);
+    master.gain.linearRampToValueAtTime(peak * 0.78, t + 0.28);
+    master.connect(ac.destination);
+
+    const filter = ac.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.value = 4200 + velocity * 2600;
+    filter.Q.value = 1.1;
+    filter.connect(master);
+
+    const body = ac.createBiquadFilter();
+    body.type = "peaking";
+    body.frequency.value = Math.min(1100, Math.max(260, freq * 0.9));
+    body.Q.value = 2.4;
+    body.gain.value = 9;
+    body.connect(filter);
+
+    const oscNodes = [];
+    for (const cents of [-9, -3, 0, 3, 9, 16]) {
+      const osc = ac.createOscillator();
+      osc.type = "sawtooth";
+      osc.frequency.value = freq;
+      osc.detune.value = cents;
+      const g = ac.createGain();
+      g.gain.value = 0.17;
+      osc.connect(g);
+      g.connect(body);
+      osc.start(t);
+      oscNodes.push(osc);
+    }
+
+    const noiseLen = Math.floor(ac.sampleRate * 0.25);
+    const noiseBuf = ac.createBuffer(1, noiseLen, ac.sampleRate);
+    const nd = noiseBuf.getChannelData(0);
+    for (let i = 0; i < noiseLen; i++) nd[i] = Math.random() * 2 - 1;
+    const noise = ac.createBufferSource();
+    noise.buffer = noiseBuf;
+    noise.loop = true;
+    const noiseF = ac.createBiquadFilter();
+    noiseF.type = "bandpass";
+    noiseF.frequency.value = Math.min(5500, freq * 2.4);
+    noiseF.Q.value = 1.5;
+    const noiseG = ac.createGain();
+    noiseG.gain.value = vol * 0.18 * (0.45 + velocity * 0.55);
+    noise.connect(noiseF);
+    noiseF.connect(noiseG);
+    noiseG.connect(body);
+    noise.start(t);
+    oscNodes.push(noise);
+
+    const lfo = ac.createOscillator();
+    const lfoGain = ac.createGain();
+    lfo.frequency.value = 5.2 + velocity * 1.4;
+    lfoGain.gain.value = freq * 0.018;
+    lfo.connect(lfoGain);
+    for (const osc of oscNodes.slice(0, 6)) {
+      lfoGain.connect(osc.frequency);
+    }
+    lfo.start(t);
+    oscNodes.push(lfo);
+
+    return {
+      oscs: oscNodes,
+      extraStops: [],
+      master,
+      filter,
+      lfo,
+      lfoGain,
+      baseFreq: freq,
+      maxVibratoDepth: freq * 0.06,
+      sustainGain: Math.max(0.0003, peak * 0.78),
+      started: t,
+      peak,
+    };
+  }
+
   function buildVoice(ac, freq, vol, velocity, cfg) {
     const t = ac.currentTime;
     const master = ac.createGain();
@@ -326,6 +475,10 @@ const AudioEngine = (() => {
       const now = Math.max(0.0001, voice.master.gain.value);
       voice.master.gain.setValueAtTime(now, t);
       voice.master.gain.exponentialRampToValueAtTime(0.0001, t + release);
+      if (voice.feedback) {
+        voice.feedback.gain.cancelScheduledValues(t);
+        voice.feedback.gain.setTargetAtTime(0.0001, t, 0.018);
+      }
       const stopAt = t + release + 0.08;
       for (const osc of voice.oscs) {
         try {
@@ -374,10 +527,17 @@ const AudioEngine = (() => {
     const freq = midiToFreq(midi);
     const vol = Math.min(
       0.98,
-      velocity * 0.42 * loudnessCompensation(freq) * instrumentGain(inst)
+      velocity * 0.44 * loudnessCompensation(freq) * instrumentGain(inst)
     );
-    const cfg = voiceConfig(inst);
-    const voice = buildVoice(ac, freq, vol, velocity, cfg);
+    let voice;
+    if (inst === "guitar") {
+      voice = buildGuitarKarplus(ac, freq, vol, velocity);
+    } else if (inst === "violin") {
+      voice = buildViolinBow(ac, freq, vol, velocity);
+    } else {
+      const cfg = voiceConfig(inst);
+      voice = buildVoice(ac, freq, vol, velocity, cfg);
+    }
     const id = nextVoiceId++;
     voices.set(id, { midi, voice, instrument: inst });
     return id;

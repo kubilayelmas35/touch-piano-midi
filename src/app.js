@@ -3,7 +3,7 @@
   window.I18n?.init();
   const t = (key, vars) => window.I18n?.t(key, vars) ?? key;
   const APP_NAME = window.I18n?.APP_NAME || "StaveFlow";
-  const APP_VERSION = "v0.9.10";
+  const APP_VERSION = "v0.9.11";
   const $ = (sel) => document.querySelector(sel);
 
   function mods() {
@@ -559,7 +559,7 @@
     syncFrettedSizeSliders({ ...window.AppSettings.load(), ...partial });
     window.Guitar?.applyLayout?.();
     window.Violin?.applyLayout?.();
-    setTimeout(() => requireMods().Game.resize(), 60);
+    scheduleInstrumentLayoutSync();
   }
 
   function updateSettingsForPlayMode(mode) {

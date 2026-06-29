@@ -164,6 +164,11 @@ function createFrettedInstrument(config) {
           footerEl.style.minHeight = "0";
           footerEl.style.maxHeight = `${nextH}px`;
         }
+        requestAnimationFrame(() => {
+          if (window.Game?.isReady?.()) {
+            window.Game.resize();
+          }
+        });
       }
 
       function applyDims(nextRow, nextStr, nextCell, nextPluck) {
@@ -235,7 +240,7 @@ function createFrettedInstrument(config) {
 
     function applySize() {
       applySizeVars();
-      if (window.Game?.isReady?.()) window.Game.resize();
+      if (!wrapEl && window.Game?.isReady?.()) window.Game.resize();
     }
 
     if (!window.__frettedLayoutResizeBound) {
