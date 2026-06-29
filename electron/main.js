@@ -40,9 +40,7 @@ async function seedDemoLibrary() {
   }
 
   const hasDemo = data.libraries.some((l) => l.id === DEMO_LIB_ID);
-  const midiSrc = fs.existsSync(SEED_MIDI)
-    ? SEED_MIDI
-    : "F:\\İndirilenler\\bach_846.mid";
+  const midiSrc = SEED_MIDI;
 
   if (!fs.existsSync(midiSrc)) {
     console.warn("Demo MIDI bulunamadı:", midiSrc);
@@ -80,7 +78,7 @@ async function seedDemoLibrary() {
   console.log("Demo kütüphane hazır:", LIBRARIES_FILE);
 }
 
-function createWindow() {
+function createWindow(opts = {}) {
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -96,18 +94,20 @@ function createWindow() {
     },
   });
 
-  win.loadFile(path.join(__dirname, "..", "src", "index.html"));
+  win.loadFile(path.join(__dirname, "..", "src", "index.html"), {
+    query: opts.smoke ? { smoke: "1" } : {},
+  });
   return win;
 }
 
 async function runSmokeTest() {
   await ensureDataDir();
   await seedDemoLibrary();
-  const win = createWindow();
+  const win = createWindow({ smoke: true });
   await new Promise((resolve) => {
     win.webContents.once("did-finish-load", resolve);
   });
-  await new Promise((r) => setTimeout(r, 2000));
+  await new Promise((r) => setTimeout(r, 5500));
   const state = await win.webContents.executeJavaScript(`({
     Piano: !!window.Piano,
     keys: document.querySelectorAll(".piano-keys .key").length,

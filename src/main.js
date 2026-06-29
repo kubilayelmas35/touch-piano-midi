@@ -65,7 +65,9 @@ const I18n = (() => {
     "libs.renameTitle": "Double-click: rename",
     "songs.title": "Songs",
     "songs.midi": "+ MIDI",
+    "songs.audio": "♫ MP3→MIDI",
     "songs.hintWeb": "Web: ~15 MB per MIDI. Desktop for MP3→MIDI (<code>npm start</code>). Select a song then <strong>▶ Play</strong>.",
+    "songs.hintAudio": "MP3→MIDI: best with a single instrument or vocal track.",
     "songs.hintSelectLib": "Select a library first.",
     "songs.hintPick": "Pick a song from the list to play.",
     "songs.hintAddMidi": "Add files with + MIDI to this library.",
@@ -237,6 +239,8 @@ const I18n = (() => {
     "starter.lib": "Sample tracks (royalty-free)",
     "starter.song": "Bach — Prelude BWV 846",
     "import.memberTitle": "Sign up to save MIDI (one-time $1 USD). You can still play without an account.",
+    "audioImport.title": "Converting audio to MIDI",
+    "audioImport.preparing": "Preparing…",
   };
 
   const tr = {
@@ -284,8 +288,10 @@ const I18n = (() => {
     "libs.renameTitle": "Çift tık: yeniden adlandır",
     "songs.title": "Şarkılar",
     "songs.midi": "+ MIDI",
+    "songs.audio": "♫ MP3→MIDI",
     "songs.hintWeb":
       "Web: MIDI parça başına ~15 MB. MP3→MIDI için masaüstü (<code>npm start</code>). Şarkı seçince <strong>▶ Oynat</strong>.",
+    "songs.hintAudio": "MP3→MIDI: tek enstrüman veya vokal en iyi sonucu verir.",
     "songs.hintSelectLib": "Önce bir kütüphane seçin.",
     "songs.hintPick": "Listeden bir şarkı seçin.",
     "songs.hintAddMidi": "Bu kütüphaneye + MIDI ile dosya ekleyin.",
@@ -446,6 +452,8 @@ const I18n = (() => {
     "starter.lib": "Örnek Parçalar (telifsiz)",
     "starter.song": "Bach — Prelude BWV 846",
     "import.memberTitle": "MIDI kaydetmek için üye olun (tek seferlik 1 USD). Hesapsız da çalabilirsiniz.",
+    "audioImport.title": "Ses → MIDI dönüştürülüyor",
+    "audioImport.preparing": "Hazırlanıyor…",
   };
 
   const de = {
@@ -6144,8 +6152,6 @@ window.mainJsOk = true;
     }
     if (btnAutoPlay) btnAutoPlay.textContent = t("header.autoplay");
     if (btnStop) btnStop.textContent = t("header.stop");
-    const speedLbl = $(".speed-label");
-    if (speedLbl?.firstChild) speedLbl.firstChild.textContent = `${t("header.speed")} `;
     document.title = `${APP_NAME} — ${t("app.tagline")}`;
     const brandEl = document.querySelector(".top-bar h1");
     if (brandEl) brandEl.textContent = APP_NAME;
@@ -6175,6 +6181,15 @@ window.mainJsOk = true;
     if (trackSelect?.disabled && trackSelect.options[0]?.value === "") {
       trackSelect.options[0].textContent = t("settings.trackEmpty");
     }
+    syncPlatformUI();
+  }
+
+  function syncPlatformUI() {
+    const desktop = !!window.pianoApi?.isDesktop;
+    document.body.classList.toggle("is-desktop", desktop);
+    btnImportAudio?.classList.toggle("hidden", !desktop);
+    document.querySelector(".songs-hint-audio")?.classList.toggle("hidden", !desktop);
+    document.querySelector(".songs-hint-web")?.classList.toggle("hidden", desktop);
   }
 
   function openModal(editId = null) {
@@ -6747,6 +6762,7 @@ window.mainJsOk = true;
   }
 
   function showAudioImportProgress(show) {
+    if (!audioImportOverlay) return;
     audioImportOverlay.classList.toggle("hidden", !show);
     if (!show) {
       audioImportBarFill.style.width = "0%";
@@ -6833,13 +6849,13 @@ window.mainJsOk = true;
       }
 
       trackSelect.innerHTML = "";
-      parsed.tracks.forEach((t, i) => {
+      parsed.tracks.forEach((track, i) => {
         const opt = document.createElement("option");
         opt.value = String(i);
-        const inst = t.instrument ? ` — ${t.instrument}` : "";
+        const inst = track.instrument ? ` — ${track.instrument}` : "";
         opt.textContent = t("songs.trackOption", {
-          name: t.name,
-          count: t.noteCount,
+          name: track.name,
+          count: track.noteCount,
           inst,
         });
         trackSelect.appendChild(opt);
@@ -7367,6 +7383,7 @@ window.mainJsOk = true;
   window.addEventListener("staveflow:locale", () => applyAppTranslations());
 
   (async function boot() {
+    const smokeBoot = new URLSearchParams(window.location.search).has("smoke");
     const savedLoc = AppSettings.load().locale;
     if (savedLoc) window.I18n.setPreference(savedLoc);
     else window.I18n.init();
@@ -7374,15 +7391,56 @@ window.mainJsOk = true;
     window.__appName = APP_NAME;
     if (appVersion) appVersion.textContent = `${APP_NAME} ${APP_VERSION}`;
     applyAppTranslations();
+    syncPlatformUI();
     bindProgressSeek();
     window.__bootStatus = "başlıyor";
-    try {
-      if (window.IntroSplash?.play) {
-        await window.IntroSplash.play();
-      }
-    } catch (err) {
-      console.warn("Intro:", err);
+
+    if (smokeBoot) {
+      AppSettings.save({ instrumentPromptDone: true });
     }
+
+    let cloudLibError = null;
+    const libraryBootPromise = (async () => {
+      try {
+        if (window.pianoApi?.isWeb && window.pianoApi.waitForSession) {
+          await window.pianoApi.waitForSession(4500);
+        }
+        try {
+          await requireStore().load();
+        } catch (loadErr) {
+          cloudLibError = loadErr.message;
+          if (!window.pianoApi?.isWeb) throw loadErr;
+        }
+        if (window.StarterLibrary?.ensure) {
+          try {
+            await window.StarterLibrary.ensure(requireStore());
+          } catch (err) {
+            console.warn("Örnek kütüphane:", err);
+          }
+        }
+        return true;
+      } catch (err) {
+        window.__bootStatus = "hata: " + err.message;
+        if (window.pianoApi?.isWeb) {
+          cloudLibError = cloudLibError || err.message;
+          return false;
+        }
+        toast(t("toast.bootLibError", { msg: err.message }), true);
+        console.error(err);
+        return false;
+      }
+    })();
+
+    if (!smokeBoot) {
+      try {
+        if (window.IntroSplash?.play) {
+          await window.IntroSplash.play();
+        }
+      } catch (err) {
+        console.warn("Intro:", err);
+      }
+    }
+
     try {
       const { PlaySurface, Game, AppSettings } = requireMods();
       Game.init($("#notesCanvas"), {
@@ -7399,7 +7457,7 @@ window.mainJsOk = true;
       scheduleInstrumentLayoutSync();
       window.KeyboardInput?.bind?.();
       window.KeyboardInput?.rebuild?.();
-      showInstrumentPickerIfNeeded();
+      if (!smokeBoot) showInstrumentPickerIfNeeded();
       updateSettingsForPlayMode(PlaySurface.getMode());
       applyAppTranslations();
       window.__bootStatus = "piyano hazır";
@@ -7409,39 +7467,17 @@ window.mainJsOk = true;
       console.error(err);
     }
 
-    let cloudLibError = null;
-    try {
-      if (window.pianoApi?.isWeb && window.pianoApi.waitForSession) {
-        await window.pianoApi.waitForSession(4500);
-      }
-      try {
-        await requireStore().load();
-      } catch (loadErr) {
-        cloudLibError = loadErr.message;
-        if (!window.pianoApi?.isWeb) throw loadErr;
-      }
-      if (window.StarterLibrary?.ensure) {
-        try {
-          await window.StarterLibrary.ensure(requireStore());
-        } catch (err) {
-          console.warn("Örnek kütüphane:", err);
-        }
-      }
+    const libOk = await libraryBootPromise;
+    if (libOk) {
       window.__bootStatus = "kütüphane yüklendi";
       renderLibraries();
       renderSongs();
       updateImportButtons();
-    } catch (err) {
-      window.__bootStatus = "hata: " + err.message;
-      if (window.pianoApi?.isWeb) {
-        cloudLibError = cloudLibError || err.message;
-        renderLibraries();
-        updateImportButtons();
-      } else {
-        toast(t("toast.bootLibError", { msg: err.message }), true);
-        console.error(err);
-        return;
-      }
+    } else if (window.pianoApi?.isWeb) {
+      renderLibraries();
+      updateImportButtons();
+    } else if (!libOk) {
+      return;
     }
 
     if (cloudLibError) {

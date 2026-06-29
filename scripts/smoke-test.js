@@ -1,6 +1,11 @@
 const { app, BrowserWindow } = require("electron");
 const path = require("path");
 
+if (!app) {
+  console.error("smoke-test.js must run via: npx electron scripts/smoke-test.js");
+  process.exit(1);
+}
+
 app.whenReady().then(async () => {
   const win = new BrowserWindow({
     show: false,
@@ -17,8 +22,10 @@ app.whenReady().then(async () => {
     logs.push({ level, msg });
   });
 
-  await win.loadFile(path.join(__dirname, "..", "src", "index.html"));
-  await new Promise((r) => setTimeout(r, 2500));
+  await win.loadFile(path.join(__dirname, "..", "src", "index.html"), {
+    query: { smoke: "1" },
+  });
+  await new Promise((r) => setTimeout(r, 5500));
 
   const state = await win.webContents.executeJavaScript(`({
     mainJsOk: !!window.mainJsOk,
@@ -42,5 +49,5 @@ app.whenReady().then(async () => {
     errors.forEach((e) => console.log(" ", e.msg));
   }
 
-  app.exit(state.Piano && state.keyCount > 0 && state.libCount > 0 ? 0 : 1);
+  app.exit(state.Piano && state.keyCount > 0 && state.libCount > 0 && state.notes ? 0 : 1);
 });

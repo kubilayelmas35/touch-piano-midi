@@ -147,8 +147,10 @@
     <section class="panel panel-inset" id="songsPanel">
       <div class="panel-head panel-head-end">
         <button type="button" id="btnImportMidi" class="btn small" disabled data-i18n="songs.midi">+ MIDI</button>
+        <button type="button" id="btnImportAudio" class="btn small hidden" disabled data-i18n="songs.audio">♫ MP3→MIDI</button>
       </div>
-      <p class="hint small-hint" data-i18n-html="songs.hintWeb">Web: ~15 MB per MIDI…</p>
+      <p class="hint small-hint songs-hint-web" data-i18n-html="songs.hintWeb">Web: ~15 MB per MIDI…</p>
+      <p class="hint small-hint songs-hint-audio hidden" data-i18n="songs.hintAudio">MP3→MIDI: best with single instrument or vocal.</p>
       <ul id="songList" class="list"></ul>
       <p id="songHint" class="hint"></p>
     </section>
@@ -500,6 +502,15 @@
         <button type="button" class="btn" id="labelAssignCancel" data-i18n="modal.cancel">Cancel</button>
         <button type="button" class="btn primary" id="labelAssignSave" data-i18n="modal.save">Save</button>
       </div>
+    </div>
+  </div>
+
+  <div id="audioImportOverlay" class="audio-import-overlay hidden" aria-live="polite">
+    <div class="audio-import-card">
+      <h3 data-i18n="audioImport.title">Converting audio to MIDI</h3>
+      <p id="audioImportFile" class="audio-import-file"></p>
+      <div class="audio-import-bar"><div id="audioImportBarFill"></div></div>
+      <p id="audioImportStatus" class="audio-import-status" data-i18n="audioImport.preparing">Preparing…</p>
     </div>
   </div>
 

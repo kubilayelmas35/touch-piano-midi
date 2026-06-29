@@ -337,6 +337,16 @@ body.sidebar-hidden #btnToggleSidebar {
 
 .panel-head-end {
   justify-content: flex-end;
+  gap: 0.35rem;
+}
+
+body:not(.is-desktop) #btnImportAudio,
+body:not(.is-desktop) .songs-hint-audio {
+  display: none !important;
+}
+
+body.is-desktop .songs-hint-web {
+  display: none;
 }
 
 .sidebar-version {

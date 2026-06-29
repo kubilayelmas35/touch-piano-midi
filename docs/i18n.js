@@ -62,7 +62,9 @@ const I18n = (() => {
     "libs.renameTitle": "Double-click: rename",
     "songs.title": "Songs",
     "songs.midi": "+ MIDI",
+    "songs.audio": "♫ MP3→MIDI",
     "songs.hintWeb": "Web: ~15 MB per MIDI. Desktop for MP3→MIDI (<code>npm start</code>). Select a song then <strong>▶ Play</strong>.",
+    "songs.hintAudio": "MP3→MIDI: best with a single instrument or vocal track.",
     "songs.hintSelectLib": "Select a library first.",
     "songs.hintPick": "Pick a song from the list to play.",
     "songs.hintAddMidi": "Add files with + MIDI to this library.",
@@ -234,6 +236,8 @@ const I18n = (() => {
     "starter.lib": "Sample tracks (royalty-free)",
     "starter.song": "Bach — Prelude BWV 846",
     "import.memberTitle": "Sign up to save MIDI (one-time $1 USD). You can still play without an account.",
+    "audioImport.title": "Converting audio to MIDI",
+    "audioImport.preparing": "Preparing…",
   };
 
   const tr = {
@@ -281,8 +285,10 @@ const I18n = (() => {
     "libs.renameTitle": "Çift tık: yeniden adlandır",
     "songs.title": "Şarkılar",
     "songs.midi": "+ MIDI",
+    "songs.audio": "♫ MP3→MIDI",
     "songs.hintWeb":
       "Web: MIDI parça başına ~15 MB. MP3→MIDI için masaüstü (<code>npm start</code>). Şarkı seçince <strong>▶ Oynat</strong>.",
+    "songs.hintAudio": "MP3→MIDI: tek enstrüman veya vokal en iyi sonucu verir.",
     "songs.hintSelectLib": "Önce bir kütüphane seçin.",
     "songs.hintPick": "Listeden bir şarkı seçin.",
     "songs.hintAddMidi": "Bu kütüphaneye + MIDI ile dosya ekleyin.",
@@ -443,6 +449,8 @@ const I18n = (() => {
     "starter.lib": "Örnek Parçalar (telifsiz)",
     "starter.song": "Bach — Prelude BWV 846",
     "import.memberTitle": "MIDI kaydetmek için üye olun (tek seferlik 1 USD). Hesapsız da çalabilirsiniz.",
+    "audioImport.title": "Ses → MIDI dönüştürülüyor",
+    "audioImport.preparing": "Hazırlanıyor…",
   };
 
   const de = {
