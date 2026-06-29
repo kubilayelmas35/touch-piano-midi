@@ -936,7 +936,17 @@ body[data-play-mode="piano"] .instrument-footer {
 body[data-play-mode="guitar"] .instrument-footer,
 body[data-play-mode="violin"] .instrument-footer {
   min-height: 0;
+  height: auto;
+  max-height: var(--footer-row-h, auto);
   justify-content: flex-start;
+  align-self: start;
+}
+
+body.piano-dock-middle[data-play-mode="guitar"] .instrument-footer,
+body.piano-dock-middle[data-play-mode="violin"] .instrument-footer {
+  align-self: end;
+  height: auto;
+  max-height: var(--footer-row-h, min(46vh, 440px));
 }
 
 .instrument-panel.hidden {
@@ -1006,7 +1016,7 @@ body[data-play-mode="violin"] .instrument-footer {
 .violin-wrap {
   position: relative;
   width: 100%;
-  height: 100%;
+  height: auto;
   min-height: 0;
   overflow: visible;
 }
