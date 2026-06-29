@@ -107,8 +107,10 @@ const PlaySurface = (() => {
     noteDownCb = noteDown;
     noteUpCb = noteUp;
     const s = window.AppSettings?.load?.() || {};
-    setMode(s.playMode || "piano", { force: true, syncSound: false });
-    if (s.instrumentId) window.AudioEngine?.setInstrument?.(s.instrumentId);
+    const m = s.playMode || "piano";
+    setMode(m, { force: true, syncSound: false });
+    const sound = MODES[m]?.sound || "piano";
+    window.AudioEngine?.setInstrument?.(sound);
     activeModule()?.applyLayout?.();
     requestAnimationFrame(() => {
       activeModule()?.applyLayout?.();

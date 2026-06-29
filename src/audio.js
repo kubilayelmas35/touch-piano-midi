@@ -45,6 +45,13 @@ const AudioEngine = (() => {
     if (INSTRUMENTS[id]) instrumentId = id;
   }
 
+  /** Gitar/kemanda çalma modu sesi; piyanoda ayarlardaki enstrüman seçimi */
+  function effectiveInstrument() {
+    const mode = window.PlaySurface?.getMode?.() || "piano";
+    if (mode === "guitar" || mode === "violin") return mode;
+    return instrumentId;
+  }
+
   function getInstruments() {
     return Object.entries(INSTRUMENTS).map(([id, meta]) => ({
       id,
@@ -82,37 +89,45 @@ const AudioEngine = (() => {
     switch (id) {
       case "violin":
         return {
-          oscs: [{ type: "sawtooth", gain: 0.42 }, { type: "sine", ratio: 2, gain: 0.12 }],
-          peak: 0.42,
-          attack: 0.07,
-          sustain: 0.34,
-          decay1: 0.45,
-          decay2: 2.6,
-          tail: 0.06,
+          oscs: [
+            { type: "sawtooth", gain: 0.5 },
+            { type: "sine", ratio: 2, gain: 0.16 },
+            { type: "triangle", ratio: 3, gain: 0.06 },
+          ],
+          peak: 0.46,
+          attack: 0.045,
+          sustain: 0.26,
+          decay1: 0.38,
+          decay2: 2.4,
+          tail: 0.05,
           filterType: "lowpass",
-          filterStart: 2400,
-          filterEnd: 900,
-          filterVel: 1400,
-          filterQ: 1.8,
-          vibratoHz: 5.5,
-          vibratoDepth: 0.007,
+          filterStart: 3000,
+          filterEnd: 1100,
+          filterVel: 1600,
+          filterQ: 2.1,
+          vibratoHz: 5.8,
+          vibratoDepth: 0.009,
         };
       case "guitar":
         return {
-          oscs: [{ type: "triangle", gain: 0.55 }, { type: "sine", ratio: 2, gain: 0.08 }],
-          peak: 0.48,
-          attack: 0.004,
-          sustain: 0.2,
-          decay1: 0.18,
-          decay2: 1.35,
-          tail: 0.08,
+          oscs: [
+            { type: "triangle", gain: 0.58 },
+            { type: "sawtooth", gain: 0.14 },
+            { type: "sine", ratio: 2, gain: 0.05 },
+          ],
+          peak: 0.54,
+          attack: 0.0015,
+          sustain: 0.1,
+          decay1: 0.06,
+          decay2: 0.72,
+          tail: 0.02,
           filterType: "bandpass",
-          filterStart: 1800,
-          filterEnd: 600,
-          filterVel: 800,
-          filterQ: 1.2,
+          filterStart: 2400,
+          filterEnd: 420,
+          filterVel: 520,
+          filterQ: 2.8,
           vibratoHz: 5.5,
-          vibratoDepth: 0.004,
+          vibratoDepth: 0.005,
         };
       case "flute":
         return {
@@ -251,7 +266,8 @@ const AudioEngine = (() => {
     const voice = entry.voice;
     const ac = ensure();
     const t = ac.currentTime;
-    const scale = INSTRUMENTS[instrumentId]?.sustainScale ?? 1;
+    const inst = entry.instrument || effectiveInstrument();
+    const scale = INSTRUMENTS[inst]?.sustainScale ?? 1;
     const base = silent ? 0.001 : Math.max(0.001, (sustainMs / 1000) * scale);
     const release =
       releaseOverride != null ? releaseOverride : Math.min(SUSTAIN_MS_MAX / 1000 + 0.5, base);
@@ -298,12 +314,13 @@ const AudioEngine = (() => {
     const ac = ensure();
     if (!opts.poly) noteOffMidi(midi, true);
 
+    const inst = effectiveInstrument();
     const freq = midiToFreq(midi);
     const vol = Math.min(0.92, velocity * 0.38 * loudnessCompensation(freq));
-    const cfg = voiceConfig(instrumentId);
+    const cfg = voiceConfig(inst);
     const voice = buildVoice(ac, freq, vol, velocity, cfg);
     const id = nextVoiceId++;
-    voices.set(id, { midi, voice });
+    voices.set(id, { midi, voice, instrument: inst });
     return id;
   }
 
@@ -312,7 +329,9 @@ const AudioEngine = (() => {
   }
 
   function noteOffPluck(voiceId) {
-    const scale = INSTRUMENTS[instrumentId]?.sustainScale ?? 1;
+    const entry = voices.get(voiceId);
+    const inst = entry?.instrument || effectiveInstrument();
+    const scale = INSTRUMENTS[inst]?.sustainScale ?? 1;
     const rel =
       sustainMs <= 0
         ? 0.001

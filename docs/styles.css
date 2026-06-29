@@ -1053,9 +1053,9 @@ body[data-play-mode="violin"] .instrument-footer {
   height: 4px;
   background: linear-gradient(90deg, #6b5344, #e8d4b8, #fff8e8, #e8d4b8, #6b5344);
   border-radius: 2px;
-  z-index: 2;
+  z-index: 0;
   pointer-events: none;
-  box-shadow: 0 0 6px rgba(232, 212, 168, 0.45);
+  box-shadow: 0 0 4px rgba(232, 212, 168, 0.25);
 }
 
 .guitar-fret-cells,
@@ -1063,7 +1063,7 @@ body[data-play-mode="violin"] .instrument-footer {
   display: grid;
   gap: 2px;
   position: relative;
-  z-index: 1;
+  z-index: 2;
   height: 100%;
   align-items: stretch;
 }
@@ -1132,9 +1132,20 @@ body[data-play-mode="violin"] .settings-scope-strings {
   box-sizing: border-box;
   border: 1px solid #3a4050;
   border-radius: 4px;
-  background: rgba(26, 30, 40, 0.55);
+  background: rgba(26, 30, 40, 0.72);
   cursor: pointer;
   touch-action: none;
+  position: relative;
+  z-index: 2;
+}
+
+.guitar-cell.active-touch,
+.guitar-cell.fret-held,
+.guitar-cell.active,
+.guitar-cell.hit-target,
+.violin-cell.active,
+.violin-cell.hit-target {
+  z-index: 4;
 }
 
 .guitar-cell.active-touch {
