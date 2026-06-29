@@ -6,7 +6,7 @@ const AppSettings = (() => {
     keyWidth: 48,
     keyHeight: 160,
     dynamicPressure: true,
-    sustainEnabled: true,
+    sustainMs: 550,
     timingWindow: 200,
     speed: 100,
     labelMode: "note",
@@ -56,7 +56,12 @@ const AppSettings = (() => {
     try {
       const raw = localStorage.getItem(KEY);
       if (!raw) return { ...defaults };
-      return { ...defaults, ...JSON.parse(raw) };
+      const data = { ...defaults, ...JSON.parse(raw) };
+      if (data.sustainMs == null || !Number.isFinite(data.sustainMs)) {
+        data.sustainMs = data.sustainEnabled === false ? 0 : 550;
+      }
+      data.sustainMs = Math.max(0, Math.min(5000, Math.round(data.sustainMs)));
+      return data;
     } catch {
       return { ...defaults };
     }

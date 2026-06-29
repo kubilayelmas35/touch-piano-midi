@@ -391,10 +391,11 @@
           <span data-i18n="settings.dynamic">Dynamic pressure</span>
           <input type="checkbox" id="dynamicPressure" checked />
         </label>
-        <label class="field toggle-row">
-          <span data-i18n="settings.sustain">Sustain (soft release)</span>
-          <input type="checkbox" id="sustainEnabled" checked />
+        <label class="field">
+          <span data-i18n="settings.sustain">Sustain release</span>: <span id="sustainLabel">550 ms</span>
+          <input type="range" id="sustainRange" min="0" max="5000" step="10" value="550" />
         </label>
+        <p class="hint small-hint" data-i18n="settings.sustainHint">0 = instant cut. Higher = longer soft fade after release.</p>
         <label class="field">
           <span data-i18n="settings.timing">Timing window</span>: <span id="timingLabel">200 ms</span>
           <input type="range" id="timingWindow" min="80" max="400" value="200" />

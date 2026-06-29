@@ -155,7 +155,8 @@ const I18n = (() => {
     "settings.kb.detected": "Detected: {name}",
     "settings.kb.selected": "Selected: {name}",
     "settings.dynamic": "Dynamic pressure",
-    "settings.sustain": "Sustain (soft release)",
+    "settings.sustain": "Sustain release",
+    "settings.sustainHint": "0 = instant cut. Higher = longer soft fade after release.",
     "settings.timing": "Timing window",
     "settings.touchHint": "Touch: multi-finger gestures disabled.",
     "inst.piano": "Piano",
@@ -225,8 +226,7 @@ const I18n = (() => {
     "toast.flameStyle": "Note style: {name}",
     "toast.dynamicOn": "Dynamic pressure on.",
     "toast.dynamicOff": "Fixed volume.",
-    "toast.sustainOn": "Sustain on — sound fades softly on release.",
-    "toast.sustainOff": "Sustain off — sound cuts off immediately.",
+    "toast.sustainMs": "Sustain: {ms} ms",
     "toast.moveHintPiano": "Piano position: Settings → Keyboard → position / alignment.",
     "toast.sound": "Sound: {name}",
     "toast.instrumentRefreshFail": "Instrument changed; some settings could not refresh: {msg}",
@@ -375,7 +375,8 @@ const I18n = (() => {
     "settings.kb.qwertz": "QWERTZ (Almanca)",
     "settings.kb.azerty": "AZERTY (Fransızca)",
     "settings.dynamic": "Dinamik basınç",
-    "settings.sustain": "Sustain (yumuşak bırakış)",
+    "settings.sustain": "Sustain (bırakış süresi)",
+    "settings.sustainHint": "0 = anında kesilir. Yüksek değer = bırakınca daha uzun yumuşak sönüm.",
     "settings.timing": "Zaman toleransı",
     "settings.touchHint": "Dokunmatik: çok parmaklı jestler kapatıldı.",
     "inst.piano": "Piyano",
@@ -417,8 +418,7 @@ const I18n = (() => {
     "toast.flameStyle": "Nota stili: {name}",
     "toast.dynamicOn": "Dinamik basınç açık.",
     "toast.dynamicOff": "Sabit ses şiddeti.",
-    "toast.sustainOn": "Sustain açık — bırakınca ses yumuşak söner.",
-    "toast.sustainOff": "Sustain kapalı — bırakınca ses hemen kesilir.",
+    "toast.sustainMs": "Sustain: {ms} ms",
     "toast.moveHintPiano": "Piyano konumu: Ayarlar → Klavye → konum / hiza.",
     "toast.sound": "Ses: {name}",
     "toast.instrumentRefreshFail": "Enstrüman değişti; bazı ayarlar yenilenemedi: {msg}",
@@ -845,7 +845,7 @@ const AppSettings = (() => {
     keyWidth: 48,
     keyHeight: 160,
     dynamicPressure: true,
-    sustainEnabled: true,
+    sustainMs: 550,
     timingWindow: 200,
     speed: 100,
     labelMode: "note",
@@ -895,7 +895,12 @@ const AppSettings = (() => {
     try {
       const raw = localStorage.getItem(KEY);
       if (!raw) return { ...defaults };
-      return { ...defaults, ...JSON.parse(raw) };
+      const data = { ...defaults, ...JSON.parse(raw) };
+      if (data.sustainMs == null || !Number.isFinite(data.sustainMs)) {
+        data.sustainMs = data.sustainEnabled === false ? 0 : 550;
+      }
+      data.sustainMs = Math.max(0, Math.min(5000, Math.round(data.sustainMs)));
+      return data;
     } catch {
       return { ...defaults };
     }
@@ -1015,10 +1020,8 @@ const AudioEngine = (() => {
   let nextVoiceId = 1;
 
   let dynamicPressure = true;
-  let sustainEnabled = true;
+  let sustainMs = 550;
   let instrumentId = "piano";
-  const RELEASE_FAST = 0.05;
-  const RELEASE_SLOW = 0.55;
 
   const INSTRUMENTS = {
     piano: { label: "Piyano", sustainScale: 1 },
@@ -1043,8 +1046,12 @@ const AudioEngine = (() => {
     dynamicPressure = !!on;
   }
 
-  function setSustain(on) {
-    sustainEnabled = !!on;
+  function setSustainMs(ms) {
+    sustainMs = Math.max(0, Math.min(5000, Math.round(Number(ms) || 0)));
+  }
+
+  function getSustainMs() {
+    return sustainMs;
   }
 
   function setInstrument(id) {
@@ -1258,9 +1265,9 @@ const AudioEngine = (() => {
     const ac = ensure();
     const t = ac.currentTime;
     const scale = INSTRUMENTS[instrumentId]?.sustainScale ?? 1;
-    const base = silent ? 0.001 : sustainEnabled ? RELEASE_SLOW : RELEASE_FAST;
+    const base = silent ? 0.001 : Math.max(0.001, (sustainMs / 1000) * scale);
     const release =
-      releaseOverride != null ? releaseOverride : Math.min(1.2, base * scale);
+      releaseOverride != null ? releaseOverride : Math.min(5.5, base);
 
     try {
       voice.master.gain.cancelScheduledValues(t);
@@ -1379,7 +1386,8 @@ const AudioEngine = (() => {
     setLiveVibrato,
     setLiveGain,
     setDynamicPressure,
-    setSustain,
+    setSustainMs,
+    getSustainMs,
     setInstrument,
     getInstruments,
     velocityFromPointer,
@@ -5885,7 +5893,8 @@ window.mainJsOk = true;
   const guitarPluckWidthLabel = $("#guitarPluckWidthLabel");
   const appVersion = $("#appVersion");
   const dynamicPressure = $("#dynamicPressure");
-  const sustainEnabled = $("#sustainEnabled");
+  const sustainRange = $("#sustainRange");
+  const sustainLabel = $("#sustainLabel");
   const speedRange = $("#speedRange");
   const speedLabel = $("#speedLabel");
   const timingWindow = $("#timingWindow");
@@ -6457,7 +6466,9 @@ window.mainJsOk = true;
     keyWidthLabel.textContent = `${s.keyWidth} px`;
     keyHeightLabel.textContent = `${s.keyHeight} px`;
     dynamicPressure.checked = s.dynamicPressure;
-    sustainEnabled.checked = s.sustainEnabled;
+    const sustainMs = Math.max(0, Math.min(5000, Math.round(s.sustainMs ?? 550)));
+    if (sustainRange) sustainRange.value = String(sustainMs);
+    if (sustainLabel) sustainLabel.textContent = `${sustainMs} ms`;
     timingWindow.value = String(s.timingWindow);
     timingLabel.textContent = `${s.timingWindow} ms`;
     speedRange.value = String(s.speed);
@@ -6470,7 +6481,7 @@ window.mainJsOk = true;
     keyboardEnabled.checked = s.keyboardEnabled !== false;
 
     AudioEngine.setDynamicPressure(s.dynamicPressure);
-    AudioEngine.setSustain(s.sustainEnabled);
+    AudioEngine.setSustainMs(sustainMs);
     const playMode = s.playMode || "piano";
     const modeSound = window.PlaySurface?.getModes?.()?.[playMode]?.sound || s.instrumentId || "piano";
     AudioEngine.setInstrument(modeSound);
@@ -7148,10 +7159,15 @@ window.mainJsOk = true;
     toast(dynamicPressure.checked ? t("toast.dynamicOn") : t("toast.dynamicOff"));
   });
 
-  sustainEnabled.addEventListener("change", () => {
-    requireMods().AudioEngine.setSustain(sustainEnabled.checked);
-    persistSettings({ sustainEnabled: sustainEnabled.checked });
-    toast(sustainEnabled.checked ? t("toast.sustainOn") : t("toast.sustainOff"));
+  sustainRange?.addEventListener("input", () => {
+    const ms = Number(sustainRange.value);
+    if (sustainLabel) sustainLabel.textContent = `${ms} ms`;
+    requireMods().AudioEngine.setSustainMs(ms);
+    persistSettings({ sustainMs: ms });
+  });
+
+  sustainRange?.addEventListener("change", () => {
+    toast(t("toast.sustainMs", { ms: Number(sustainRange.value) }));
   });
 
   speedRange.addEventListener("input", () => {

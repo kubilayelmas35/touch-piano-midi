@@ -109,7 +109,8 @@
   const guitarPluckWidthLabel = $("#guitarPluckWidthLabel");
   const appVersion = $("#appVersion");
   const dynamicPressure = $("#dynamicPressure");
-  const sustainEnabled = $("#sustainEnabled");
+  const sustainRange = $("#sustainRange");
+  const sustainLabel = $("#sustainLabel");
   const speedRange = $("#speedRange");
   const speedLabel = $("#speedLabel");
   const timingWindow = $("#timingWindow");
@@ -681,7 +682,9 @@
     keyWidthLabel.textContent = `${s.keyWidth} px`;
     keyHeightLabel.textContent = `${s.keyHeight} px`;
     dynamicPressure.checked = s.dynamicPressure;
-    sustainEnabled.checked = s.sustainEnabled;
+    const sustainMs = Math.max(0, Math.min(5000, Math.round(s.sustainMs ?? 550)));
+    if (sustainRange) sustainRange.value = String(sustainMs);
+    if (sustainLabel) sustainLabel.textContent = `${sustainMs} ms`;
     timingWindow.value = String(s.timingWindow);
     timingLabel.textContent = `${s.timingWindow} ms`;
     speedRange.value = String(s.speed);
@@ -694,7 +697,7 @@
     keyboardEnabled.checked = s.keyboardEnabled !== false;
 
     AudioEngine.setDynamicPressure(s.dynamicPressure);
-    AudioEngine.setSustain(s.sustainEnabled);
+    AudioEngine.setSustainMs(sustainMs);
     const playMode = s.playMode || "piano";
     const modeSound = window.PlaySurface?.getModes?.()?.[playMode]?.sound || s.instrumentId || "piano";
     AudioEngine.setInstrument(modeSound);
@@ -1372,10 +1375,15 @@
     toast(dynamicPressure.checked ? t("toast.dynamicOn") : t("toast.dynamicOff"));
   });
 
-  sustainEnabled.addEventListener("change", () => {
-    requireMods().AudioEngine.setSustain(sustainEnabled.checked);
-    persistSettings({ sustainEnabled: sustainEnabled.checked });
-    toast(sustainEnabled.checked ? t("toast.sustainOn") : t("toast.sustainOff"));
+  sustainRange?.addEventListener("input", () => {
+    const ms = Number(sustainRange.value);
+    if (sustainLabel) sustainLabel.textContent = `${ms} ms`;
+    requireMods().AudioEngine.setSustainMs(ms);
+    persistSettings({ sustainMs: ms });
+  });
+
+  sustainRange?.addEventListener("change", () => {
+    toast(t("toast.sustainMs", { ms: Number(sustainRange.value) }));
   });
 
   speedRange.addEventListener("input", () => {
