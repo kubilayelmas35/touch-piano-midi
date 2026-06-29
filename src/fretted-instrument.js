@@ -108,23 +108,21 @@ function createFrettedInstrument(config) {
       const n = DISPLAY_STRINGS.length;
       const fretHeader = 34;
       const cardHead = 52;
-      const chromePad = 170;
+      const cardPad = 24;
       const rowGaps = Math.max(0, n - 1) * 2;
       const strGaps = Math.max(0, n - 1) * 3 + 18;
 
       const baseNeckInner = fretHeader + n * requestedRow + rowGaps;
       const basePluckInner = n * requestedStr + strGaps;
-      const baseUsedH = cardHead + Math.max(baseNeckInner, basePluckInner) + chromePad;
+      const baseContentH = cardHead + Math.max(baseNeckInner, basePluckInner) + cardPad;
 
       const chrome = measureLayoutChrome();
       const maxFooter = Math.max(140, window.innerHeight - chrome);
-      const heightScale = Math.min(1, maxFooter / Math.max(1, baseUsedH));
+      const heightScale = Math.min(1, maxFooter / Math.max(1, baseContentH));
       let rowPx = Math.max(6, Math.floor(requestedRow * heightScale));
       let strPx = Math.max(6, Math.floor(requestedStr * heightScale));
 
-      // Fit only by available footer height; do not lock to previous card size.
-      const contentPad = 108;
-      const availColumnH = Math.max(64, maxFooter - contentPad);
+      const availColumnH = Math.max(64, maxFooter - cardHead - cardPad);
       const fitRowPx = Math.floor((availColumnH - fretHeader - rowGaps) / Math.max(1, n));
       const fitStrPx = Math.floor((availColumnH - strGaps) / Math.max(1, n));
       rowPx = Math.max(6, Math.min(rowPx, fitRowPx));
@@ -132,8 +130,8 @@ function createFrettedInstrument(config) {
 
       const neckInner = fretHeader + n * rowPx + rowGaps;
       const pluckInner = n * strPx + strGaps;
-      const usedH = cardHead + Math.max(neckInner, pluckInner) + chromePad;
-      const footerH = Math.min(usedH, maxFooter);
+      const contentH = cardHead + Math.max(neckInner, pluckInner) + cardPad;
+      const footerH = Math.min(contentH, maxFooter);
 
       let pluckPx = Math.max(80, pluckW);
       let cellPx = requestedCell;
@@ -145,6 +143,12 @@ function createFrettedInstrument(config) {
         footerEl.style.height = `${footerH}px`;
         footerEl.style.minHeight = `${footerH}px`;
         footerEl.style.maxHeight = `${footerH}px`;
+      }
+
+      if (wrapEl) {
+        wrapEl.style.height = `${footerH}px`;
+        wrapEl.style.minHeight = "0";
+        wrapEl.style.maxHeight = `${footerH}px`;
       }
 
       function applyDims(nextRow, nextStr, nextCell, nextPluck) {
@@ -162,9 +166,9 @@ function createFrettedInstrument(config) {
           el.style.setProperty(pluckMinVar, pluck);
         }
         if (wrapEl) {
-          wrapEl.style.height = "100%";
+          wrapEl.style.height = `${footerH}px`;
           wrapEl.style.minHeight = "0";
-          wrapEl.style.maxHeight = "100%";
+          wrapEl.style.maxHeight = `${footerH}px`;
           DISPLAY_STRINGS.forEach((s, i) => {
             wrapEl.style.setProperty(`--str-thick-${i}`, `${STRING_THICK[i]}px`);
           });

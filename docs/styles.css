@@ -936,6 +936,7 @@ body[data-play-mode="piano"] .instrument-footer {
 body[data-play-mode="guitar"] .instrument-footer,
 body[data-play-mode="violin"] .instrument-footer {
   min-height: 0;
+  justify-content: flex-start;
 }
 
 .instrument-panel.hidden {
