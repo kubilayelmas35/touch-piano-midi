@@ -177,6 +177,11 @@
         const id = tab.dataset.tab;
         tabs.forEach((t) => t.classList.toggle("active", t === tab));
         panels.forEach((p) => p.classList.toggle("active", p.dataset.panel === id));
+        try {
+          requireMods().Game.silenceHeldVoices?.();
+        } catch {
+          /* */
+        }
       });
     });
   }
@@ -195,6 +200,11 @@
           t.setAttribute("aria-selected", on ? "true" : "false");
         });
         panels.forEach((p) => p.classList.toggle("active", p.dataset.sidebarPanel === id));
+        try {
+          requireMods().Game.silenceHeldVoices?.();
+        } catch {
+          /* */
+        }
         try {
           localStorage.setItem("staveflow-sidebar-tab", id);
         } catch {
@@ -1348,6 +1358,8 @@
   });
 
   instrumentSelect?.addEventListener("change", () => {
+    const mode = window.PlaySurface?.getMode?.() || "piano";
+    if (mode === "guitar" || mode === "violin") return;
     const id = instrumentSelect.value;
     requireMods().AudioEngine.setInstrument(id);
     persistSettings({ instrumentId: id });

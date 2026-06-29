@@ -3,6 +3,7 @@ const Game = (() => {
   const NOTE_HEIGHT_PX = 14;
   const LOOKAHEAD_SEC = 3;
   const HIT_LINE_FALLBACK = 0.88;
+  const AUTO_PLAY_CATCHUP_SEC = 0.12;
 
   let canvas, ctx;
   let notes = [];
@@ -160,6 +161,23 @@ const Game = (() => {
       setTimeout(() => resize(), 50);
       setTimeout(() => resize(), 400);
     });
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        silenceHeldVoices();
+        return;
+      }
+      lastFrameT = currentTime();
+    });
+    window.addEventListener("blur", () => {
+      if (autoPlayMode && playing) silenceHeldVoices();
+    });
+  }
+
+  function silenceHeldVoices() {
+    window.AudioEngine?.stopAll?.();
+    window.PlaySurface?.releaseAll?.();
+    window.KeyboardInput?.releaseAll?.();
+    if (playing || pausedAt) lastFrameT = currentTime();
   }
 
   function setFlameIntensity(level) {
@@ -606,6 +624,13 @@ const Game = (() => {
     if (sound) window.AudioEngine?.setInstrument?.(sound);
     for (const n of notes) {
       if (!n._autoStarted && t >= n.time) {
+        const late = t - n.time;
+        if (late > AUTO_PLAY_CATCHUP_SEC) {
+          n._autoStarted = true;
+          n._autoEnded = t >= n.time + n.duration;
+          if (late <= n.duration + 0.05) n.hit = true;
+          continue;
+        }
         n._autoStarted = true;
         const vel = Math.max(0.2, Math.min(1, n.velocity ?? 0.75));
         inst?.pressKey?.(n.midi, vel);
@@ -877,6 +902,7 @@ const Game = (() => {
     isPlaying: () => playing,
     hasNotes: () => notes.length > 0,
     isReady,
+    silenceHeldVoices,
     resize: () => {
       resize();
       updateKeyPositions();

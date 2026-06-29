@@ -29,13 +29,13 @@ const I18n = (() => {
     "intro.tag": "Piano · Guitar · Violin — play with MIDI",
     "intro.hint": "Tap anywhere or Skip",
     "intro.skip": "Skip",
-    "auth.connecting": "Connecting to Wix account… Please sign in on the site.",
-    "auth.member": "Signed in{email}. Your libraries are saved in the cloud.",
+    "auth.connecting": "Connecting to StaveFlow account… Please sign in on the site.",
+    "auth.member": "Signed in{email}. Your libraries are saved to your StaveFlow account.",
     "auth.guest": "Guest mode — play freely. MIDI is stored in this browser; sign up for cloud sync (one-time $1 USD).",
-    "auth.embedOnly": "Open this player from your Wix Piano page. GitHub Pages works in guest mode; Wix is required for cloud sync.",
-    "auth.guestShort": "Guest mode — sign up on Wix to save MIDI (one-time $1 USD).",
-    "auth.bridgeFail": "Could not connect to Wix bridge.",
-    "apiError.web": "Player failed to load. Open from your Wix <strong>Piano</strong> page or check configuration.",
+    "auth.embedOnly": "Open this player from your StaveFlow page. GitHub Pages works in guest mode; a StaveFlow account is required for cloud sync.",
+    "auth.guestShort": "Guest mode — sign up for a StaveFlow account to save MIDI (one-time $1 USD).",
+    "auth.bridgeFail": "Could not connect to StaveFlow cloud.",
+    "apiError.web": "Player failed to load. Open from your StaveFlow page or check configuration.",
     "apiError.desktop": "Main app failed to load. Run: <code>npm start</code>",
     "header.score": "Score",
     "header.remaining": "Left:",
@@ -57,8 +57,8 @@ const I18n = (() => {
     "libs.title": "Libraries",
     "libs.new": "New library name",
     "libs.add": "Add",
-    "libs.hint": "Select or add a library above. Files are saved to your Wix account.",
-    "libs.hintGuest": "Guest mode: MIDI stays in this browser. Wix membership for cloud (one-time $1 USD).",
+    "libs.hint": "Select or add a library above. Files are saved to your StaveFlow account.",
+    "libs.hintGuest": "Guest mode: MIDI stays in this browser. StaveFlow account for cloud (one-time $1 USD).",
     "libs.hintDesktop": "Select or add a library above.",
     "libs.hintSelected": "Selected: {name} — use + MIDI to add files",
     "libs.empty": "No libraries yet.",
@@ -250,16 +250,16 @@ const I18n = (() => {
     "intro.tag": "Piyano · Gitar · Keman — MIDI ile çal",
     "intro.hint": "Dokunun veya Atla",
     "intro.skip": "Atla",
-    "auth.connecting": "Wix hesabına bağlanılıyor… Siteye giriş yaptığınızdan emin olun.",
-    "auth.member": "Giriş yapıldı{email}. Kütüphaneleriniz bulutta saklanır.",
+    "auth.connecting": "StaveFlow hesabına bağlanılıyor… Siteye giriş yaptığınızdan emin olun.",
+    "auth.member": "StaveFlow hesabına bağlandı{email}. Kütüphaneleriniz bulutta saklanır.",
     "auth.guest":
       "Misafir modu — serbest çalın. MIDI bu tarayıcıda saklanır; buluta kayıt için üye olun (tek seferlik 1 USD).",
     "auth.embedOnly":
-      "Oynatıcıyı Wix Piyano sayfanızdan açın. GitHub Pages misafir modunda çalışır; bulut için Wix gerekir.",
-    "auth.guestShort": "Misafir modu — MIDI kaydetmek için Wix üyeliği (tek seferlik 1 USD).",
-    "auth.bridgeFail": "Wix köprüsüne bağlanılamadı.",
+      "Oynatıcıyı StaveFlow sayfanızdan açın. GitHub Pages misafir modunda çalışır; bulut için StaveFlow hesabı gerekir.",
+    "auth.guestShort": "Misafir modu — MIDI kaydetmek için StaveFlow hesabı (tek seferlik 1 USD).",
+    "auth.bridgeFail": "StaveFlow bulut bağlantısı kurulamadı.",
     "apiError.web":
-      "Oynatıcı yüklenemedi. Wix sitenizdeki <strong>Piyano</strong> sayfasından açın veya yapılandırmayı kontrol edin.",
+      "Oynatıcı yüklenemedi. StaveFlow sayfanızdan açın veya yapılandırmayı kontrol edin.",
     "header.score": "Puan",
     "header.remaining": "Kalan:",
     "header.play": "▶ Oynat (sen çal)",
@@ -280,9 +280,9 @@ const I18n = (() => {
     "libs.title": "Kütüphaneler",
     "libs.new": "Yeni kütüphane adı",
     "libs.add": "Ekle",
-    "libs.hint": "Kütüphane seçin veya yukarıdan ekleyin. Dosyalar Wix hesabınıza kaydedilir.",
+    "libs.hint": "Kütüphane seçin veya yukarıdan ekleyin. Dosyalar StaveFlow hesabınıza kaydedilir.",
     "libs.hintGuest":
-      "Misafir modu: MIDI bu tarayıcıda saklanır. Buluta kayıt için Wix üyeliği (tek seferlik 1 USD).",
+      "Misafir modu: MIDI bu tarayıcıda saklanır. Buluta kayıt için StaveFlow hesabı (tek seferlik 1 USD).",
     "libs.hintDesktop": "Kütüphane seçin veya yukarıdan ekleyin.",
     "libs.hintSelected": "Seçili: {name} — + MIDI ile dosya ekleyin",
     "libs.empty": "Henüz kütüphane yok.",
@@ -453,7 +453,7 @@ const I18n = (() => {
     "modal.assignSet": "Tuş → \"{ch}\"",
     "starter.lib": "Örnek Parçalar (telifsiz)",
     "starter.song": "Bach — Prelude BWV 846",
-    "import.memberTitle": "MIDI kaydetmek için üye olun (tek seferlik 1 USD). Hesapsız da çalabilirsiniz.",
+    "import.memberTitle": "MIDI kaydetmek için StaveFlow hesabı gerekir (tek seferlik 1 USD). Hesapsız da çalabilirsiniz.",
     "audioImport.title": "Ses → MIDI dönüştürülüyor",
     "audioImport.preparing": "Hazırlanıyor…",
   };
@@ -478,8 +478,8 @@ const I18n = (() => {
     "libs.title": "Bibliotheken",
     "libs.add": "Hinzufügen",
     "libs.new": "Neuer Bibliotheksname",
-    "libs.hint": "Bibliothek wählen oder oben hinzufügen. Dateien werden in Ihrem Wix-Konto gespeichert.",
-    "libs.hintGuest": "Gastmodus: MIDI bleibt in diesem Browser. Wix-Mitgliedschaft für Cloud (einmalig 1 USD).",
+    "libs.hint": "Bibliothek wählen oder oben hinzufügen. Dateien werden in Ihrem StaveFlow-Konto gespeichert.",
+    "libs.hintGuest": "Gastmodus: MIDI bleibt in diesem Browser. StaveFlow-Konto für Cloud (einmalig 1 USD).",
     "songs.title": "Stücke",
     "songs.hintSelectLib": "Zuerst eine Bibliothek wählen.",
     "songs.hintPlay": "▶ Abspielen — Noten fallen von oben. Tippen oder Tastatur.",
@@ -527,7 +527,7 @@ const I18n = (() => {
     "libs.title": "Bibliothèques",
     "libs.add": "Ajouter",
     "libs.new": "Nom de bibliothèque",
-    "libs.hint": "Choisissez ou ajoutez une bibliothèque. Fichiers enregistrés sur votre compte Wix.",
+    "libs.hint": "Choisissez ou ajoutez une bibliothèque. Fichiers enregistrés sur votre compte StaveFlow.",
     "songs.title": "Morceaux",
     "songs.hintSelectLib": "Choisissez d'abord une bibliothèque.",
     "songs.hintPlay": "▶ Jouer — les notes tombent du haut. Touchez ou clavier.",
@@ -998,6 +998,10 @@ const AppSettings = (() => {
         data.sustainMs = data.sustainEnabled === false ? 0 : 550;
       }
       data.sustainMs = Math.max(0, Math.min(10000, Math.round(data.sustainMs)));
+      const mode = data.playMode || "piano";
+      if (mode === "guitar" || mode === "violin") {
+        data.instrumentId = mode;
+      }
       return data;
     } catch {
       return { ...defaults };
@@ -1157,6 +1161,13 @@ const AudioEngine = (() => {
     if (INSTRUMENTS[id]) instrumentId = id;
   }
 
+  /** Gitar/kemanda çalma modu sesi; piyanoda ayarlardaki enstrüman seçimi */
+  function effectiveInstrument() {
+    const mode = window.PlaySurface?.getMode?.() || "piano";
+    if (mode === "guitar" || mode === "violin") return mode;
+    return instrumentId;
+  }
+
   function getInstruments() {
     return Object.entries(INSTRUMENTS).map(([id, meta]) => ({
       id,
@@ -1194,37 +1205,45 @@ const AudioEngine = (() => {
     switch (id) {
       case "violin":
         return {
-          oscs: [{ type: "sawtooth", gain: 0.42 }, { type: "sine", ratio: 2, gain: 0.12 }],
-          peak: 0.42,
-          attack: 0.07,
-          sustain: 0.34,
-          decay1: 0.45,
-          decay2: 2.6,
-          tail: 0.06,
+          oscs: [
+            { type: "sawtooth", gain: 0.5 },
+            { type: "sine", ratio: 2, gain: 0.16 },
+            { type: "triangle", ratio: 3, gain: 0.06 },
+          ],
+          peak: 0.46,
+          attack: 0.045,
+          sustain: 0.26,
+          decay1: 0.38,
+          decay2: 2.4,
+          tail: 0.05,
           filterType: "lowpass",
-          filterStart: 2400,
-          filterEnd: 900,
-          filterVel: 1400,
-          filterQ: 1.8,
-          vibratoHz: 5.5,
-          vibratoDepth: 0.007,
+          filterStart: 3000,
+          filterEnd: 1100,
+          filterVel: 1600,
+          filterQ: 2.1,
+          vibratoHz: 5.8,
+          vibratoDepth: 0.009,
         };
       case "guitar":
         return {
-          oscs: [{ type: "triangle", gain: 0.55 }, { type: "sine", ratio: 2, gain: 0.08 }],
-          peak: 0.48,
-          attack: 0.004,
-          sustain: 0.2,
-          decay1: 0.18,
-          decay2: 1.35,
-          tail: 0.08,
+          oscs: [
+            { type: "triangle", gain: 0.58 },
+            { type: "sawtooth", gain: 0.14 },
+            { type: "sine", ratio: 2, gain: 0.05 },
+          ],
+          peak: 0.54,
+          attack: 0.0015,
+          sustain: 0.1,
+          decay1: 0.06,
+          decay2: 0.72,
+          tail: 0.02,
           filterType: "bandpass",
-          filterStart: 1800,
-          filterEnd: 600,
-          filterVel: 800,
-          filterQ: 1.2,
+          filterStart: 2400,
+          filterEnd: 420,
+          filterVel: 520,
+          filterQ: 2.8,
           vibratoHz: 5.5,
-          vibratoDepth: 0.004,
+          vibratoDepth: 0.005,
         };
       case "flute":
         return {
@@ -1363,7 +1382,8 @@ const AudioEngine = (() => {
     const voice = entry.voice;
     const ac = ensure();
     const t = ac.currentTime;
-    const scale = INSTRUMENTS[instrumentId]?.sustainScale ?? 1;
+    const inst = entry.instrument || effectiveInstrument();
+    const scale = INSTRUMENTS[inst]?.sustainScale ?? 1;
     const base = silent ? 0.001 : Math.max(0.001, (sustainMs / 1000) * scale);
     const release =
       releaseOverride != null ? releaseOverride : Math.min(SUSTAIN_MS_MAX / 1000 + 0.5, base);
@@ -1410,12 +1430,13 @@ const AudioEngine = (() => {
     const ac = ensure();
     if (!opts.poly) noteOffMidi(midi, true);
 
+    const inst = effectiveInstrument();
     const freq = midiToFreq(midi);
     const vol = Math.min(0.92, velocity * 0.38 * loudnessCompensation(freq));
-    const cfg = voiceConfig(instrumentId);
+    const cfg = voiceConfig(inst);
     const voice = buildVoice(ac, freq, vol, velocity, cfg);
     const id = nextVoiceId++;
-    voices.set(id, { midi, voice });
+    voices.set(id, { midi, voice, instrument: inst });
     return id;
   }
 
@@ -1424,7 +1445,9 @@ const AudioEngine = (() => {
   }
 
   function noteOffPluck(voiceId) {
-    const scale = INSTRUMENTS[instrumentId]?.sustainScale ?? 1;
+    const entry = voices.get(voiceId);
+    const inst = entry?.instrument || effectiveInstrument();
+    const scale = INSTRUMENTS[inst]?.sustainScale ?? 1;
     const rel =
       sustainMs <= 0
         ? 0.001
@@ -3920,8 +3943,10 @@ const PlaySurface = (() => {
     noteDownCb = noteDown;
     noteUpCb = noteUp;
     const s = window.AppSettings?.load?.() || {};
-    setMode(s.playMode || "piano", { force: true, syncSound: false });
-    if (s.instrumentId) window.AudioEngine?.setInstrument?.(s.instrumentId);
+    const m = s.playMode || "piano";
+    setMode(m, { force: true, syncSound: false });
+    const sound = MODES[m]?.sound || "piano";
+    window.AudioEngine?.setInstrument?.(sound);
     activeModule()?.applyLayout?.();
     requestAnimationFrame(() => {
       activeModule()?.applyLayout?.();
@@ -4575,6 +4600,7 @@ const Game = (() => {
   const NOTE_HEIGHT_PX = 14;
   const LOOKAHEAD_SEC = 3;
   const HIT_LINE_FALLBACK = 0.88;
+  const AUTO_PLAY_CATCHUP_SEC = 0.12;
 
   let canvas, ctx;
   let notes = [];
@@ -4732,6 +4758,23 @@ const Game = (() => {
       setTimeout(() => resize(), 50);
       setTimeout(() => resize(), 400);
     });
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        silenceHeldVoices();
+        return;
+      }
+      lastFrameT = currentTime();
+    });
+    window.addEventListener("blur", () => {
+      if (autoPlayMode && playing) silenceHeldVoices();
+    });
+  }
+
+  function silenceHeldVoices() {
+    window.AudioEngine?.stopAll?.();
+    window.PlaySurface?.releaseAll?.();
+    window.KeyboardInput?.releaseAll?.();
+    if (playing || pausedAt) lastFrameT = currentTime();
   }
 
   function setFlameIntensity(level) {
@@ -5178,6 +5221,13 @@ const Game = (() => {
     if (sound) window.AudioEngine?.setInstrument?.(sound);
     for (const n of notes) {
       if (!n._autoStarted && t >= n.time) {
+        const late = t - n.time;
+        if (late > AUTO_PLAY_CATCHUP_SEC) {
+          n._autoStarted = true;
+          n._autoEnded = t >= n.time + n.duration;
+          if (late <= n.duration + 0.05) n.hit = true;
+          continue;
+        }
         n._autoStarted = true;
         const vel = Math.max(0.2, Math.min(1, n.velocity ?? 0.75));
         inst?.pressKey?.(n.midi, vel);
@@ -5449,6 +5499,7 @@ const Game = (() => {
     isPlaying: () => playing,
     hasNotes: () => notes.length > 0,
     isReady,
+    silenceHeldVoices,
     resize: () => {
       resize();
       updateKeyPositions();
@@ -6157,6 +6208,11 @@ window.mainJsOk = true;
         const id = tab.dataset.tab;
         tabs.forEach((t) => t.classList.toggle("active", t === tab));
         panels.forEach((p) => p.classList.toggle("active", p.dataset.panel === id));
+        try {
+          requireMods().Game.silenceHeldVoices?.();
+        } catch {
+          /* */
+        }
       });
     });
   }
@@ -6175,6 +6231,11 @@ window.mainJsOk = true;
           t.setAttribute("aria-selected", on ? "true" : "false");
         });
         panels.forEach((p) => p.classList.toggle("active", p.dataset.sidebarPanel === id));
+        try {
+          requireMods().Game.silenceHeldVoices?.();
+        } catch {
+          /* */
+        }
         try {
           localStorage.setItem("staveflow-sidebar-tab", id);
         } catch {

@@ -61,6 +61,10 @@ const AppSettings = (() => {
         data.sustainMs = data.sustainEnabled === false ? 0 : 550;
       }
       data.sustainMs = Math.max(0, Math.min(10000, Math.round(data.sustainMs)));
+      const mode = data.playMode || "piano";
+      if (mode === "guitar" || mode === "violin") {
+        data.instrumentId = mode;
+      }
       return data;
     } catch {
       return { ...defaults };
