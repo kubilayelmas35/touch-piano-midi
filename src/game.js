@@ -147,10 +147,14 @@ const Game = (() => {
       for (const el of observeTargets) ro.observe(el);
     }
     window.addEventListener("touch-piano:play-mode", () => {
-      requestAnimationFrame(() => {
+      const sync = () => {
         resize();
         updateKeyPositions();
-      });
+        if (!playing) draw(pausedAt || 0);
+      };
+      requestAnimationFrame(sync);
+      setTimeout(sync, 100);
+      setTimeout(sync, 400);
     });
     window.addEventListener("staveflow:booted", () => {
       setTimeout(() => resize(), 50);
@@ -275,23 +279,6 @@ const Game = (() => {
     line.style.top = `${y - 2}px`;
   }
 
-  function collectPluckStringPositions(areaRect) {
-    const byString = new Map();
-    document.querySelectorAll(".string-touch-target").forEach((el) => {
-      const stringIdx = Number(el.dataset.string);
-      if (Number.isNaN(stringIdx)) return;
-      const line =
-        el.querySelector(".guitar-string-line, .violin-string-line") || el;
-      const r = line.getBoundingClientRect();
-      const wrap = el.getBoundingClientRect();
-      byString.set(stringIdx, {
-        x: r.left + r.width / 2 - areaRect.left,
-        w: Math.max(r.width, wrap.width),
-      });
-    });
-    return byString;
-  }
-
   function updateKeyPositions() {
     keyPositions.clear();
     if (!canvas?.parentElement) return;
@@ -305,9 +292,8 @@ const Game = (() => {
 
     if (mode === "guitar" || mode === "violin") {
       const mod = surface.activeModule?.();
-      const stringLanes = collectPluckStringPositions(areaRect);
       const midis = new Set();
-      document.querySelectorAll(".guitar-neck .guitar-cell, .violin-board .guitar-cell").forEach((key) => {
+      document.querySelectorAll(".guitar-neck .guitar-cell").forEach((key) => {
         const midi = Number(key.dataset.midi);
         if (midi >= range.startMidi && midi <= range.endMidi) midis.add(midi);
       });
@@ -315,22 +301,14 @@ const Game = (() => {
         const target = mod?.getMidiTarget?.(midi);
         const cell = target?.cell;
         if (!cell) continue;
-        const stringIdx = target.stringIdx;
-        const pluck = stringLanes.get(stringIdx);
         const r = cell.getBoundingClientRect();
-        const centerX = pluck?.x ?? r.left + r.width / 2 - areaRect.left;
+        const centerX = r.left + r.width / 2 - areaRect.left;
         const fret = target.fret;
+        const stringIdx = target.stringIdx;
         const label = `${stringLabelForMode(mode, stringIdx)}${fret}`;
         const laneColor =
           getComputedStyle(cell).getPropertyValue("--str-color")?.trim() || null;
-        keyPositions.set(midi, {
-          x: centerX,
-          w: pluck?.w ?? r.width,
-          fret,
-          label,
-          laneColor,
-          stringIdx,
-        });
+        keyPositions.set(midi, { x: centerX, w: r.width, fret, label, laneColor });
       }
       return;
     }
