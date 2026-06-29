@@ -3070,9 +3070,14 @@ function createFrettedInstrument(config) {
         wrapEl.style.height = "auto";
         wrapEl.style.maxHeight = "";
         const measured = Math.ceil(wrapEl.getBoundingClientRect().height);
-        const nextH = Math.min(Math.max(96, measured + 2), maxFooter);
+        const pad = 4;
+        const nextH = Math.min(Math.max(96, measured + pad), maxFooter);
         document.documentElement.style.setProperty("--footer-row-h", `${nextH}px`);
-        if (footerEl) footerEl.style.maxHeight = `${nextH}px`;
+        if (footerEl) {
+          footerEl.style.height = "auto";
+          footerEl.style.minHeight = "0";
+          footerEl.style.maxHeight = `${nextH}px`;
+        }
       }
 
       function applyDims(nextRow, nextStr, nextCell, nextPluck) {
@@ -6124,7 +6129,7 @@ window.mainJsOk = true;
   window.I18n?.init();
   const t = (key, vars) => window.I18n?.t(key, vars) ?? key;
   const APP_NAME = window.I18n?.APP_NAME || "StaveFlow";
-  const APP_VERSION = "v0.9.9";
+  const APP_VERSION = "v0.9.10";
   const $ = (sel) => document.querySelector(sel);
 
   function mods() {
