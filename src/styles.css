@@ -938,13 +938,12 @@ body[data-play-mode="violin"] .instrument-footer {
   min-height: 0;
   height: auto;
   max-height: var(--footer-row-h, auto);
-  justify-content: flex-start;
-  align-self: start;
+  justify-content: flex-end;
+  align-self: end;
 }
 
 body.piano-dock-middle[data-play-mode="guitar"] .instrument-footer,
 body.piano-dock-middle[data-play-mode="violin"] .instrument-footer {
-  align-self: end;
   height: auto;
   max-height: var(--footer-row-h, min(46vh, 440px));
 }
