@@ -40,6 +40,7 @@ const I18n = (() => {
     "header.score": "Score",
     "header.remaining": "Left:",
     "header.play": "▶ Play (you play)",
+    "header.pause": "⏸ Pause",
     "header.autoplay": "🎹 Auto play",
     "header.autoplayPause": "⏸ Pause auto",
     "header.stop": "■ Stop",
@@ -50,6 +51,9 @@ const I18n = (() => {
     "header.window": "⛶ Window",
     "header.instrument": "Instrument",
     "header.trackPosition": "Track position",
+    "sidebar.tab.library": "Library",
+    "sidebar.tab.songs": "Songs",
+    "sidebar.tab.settings": "Settings",
     "libs.title": "Libraries",
     "libs.new": "New library name",
     "libs.add": "Add",
@@ -61,17 +65,22 @@ const I18n = (() => {
     "libs.renameTitle": "Double-click: rename",
     "songs.title": "Songs",
     "songs.midi": "+ MIDI",
+    "songs.audio": "♫ MP3→MIDI",
     "songs.hintWeb": "Web: ~15 MB per MIDI. Desktop for MP3→MIDI (<code>npm start</code>). Select a song then <strong>▶ Play</strong>.",
+    "songs.hintAudio": "MP3→MIDI: best with a single instrument or vocal track.",
     "songs.hintSelectLib": "Select a library first.",
     "songs.hintPick": "Pick a song from the list to play.",
     "songs.hintAddMidi": "Add files with + MIDI to this library.",
     "songs.hintPlay": "▶ Play — notes fall from the top. Touch or keyboard to play.",
     "songs.empty": "No songs yet.",
     "songs.select": "Select a song",
+    "songs.delete": "Delete",
     "songs.trackOption": "{name} ({count} notes){inst}",
     "settings.title": "Settings",
     "settings.language": "Language",
     "settings.move": "↔ Move panels",
+    "settings.moveSave": "✓ Save position",
+    "settings.themeHint": "Colors are saved per instrument (piano / guitar / violin).",
     "settings.tab.song": "Track",
     "settings.tab.keys": "Keyboard",
     "settings.tab.look": "Look",
@@ -148,7 +157,8 @@ const I18n = (() => {
     "settings.kb.detected": "Detected: {name}",
     "settings.kb.selected": "Selected: {name}",
     "settings.dynamic": "Dynamic pressure",
-    "settings.sustain": "Sustain (soft release)",
+    "settings.sustain": "Sustain release",
+    "settings.sustainHint": "0 = instant cut. Higher = longer soft fade after release.",
     "settings.timing": "Timing window",
     "settings.touchHint": "Touch: multi-finger gestures disabled.",
     "inst.piano": "Piano",
@@ -210,11 +220,27 @@ const I18n = (() => {
     "toast.pianoWarn": "Piano warning: {msg}",
     "toast.demoError": "Demo song: {msg}",
     "toast.autoPlayOn": "Auto play — notes are hit automatically.",
+    "toast.kbOn": "Keyboard playing enabled.",
+    "toast.kbOff": "Keyboard playing disabled.",
+    "toast.kbLayoutAuto": "Keyboard layout will auto-detect.",
+    "toast.kbLayoutPick": "Keyboard layout: {name}",
+    "toast.labelsUpdated": "Key letters updated.",
+    "toast.flameStyle": "Note style: {name}",
+    "toast.dynamicOn": "Dynamic pressure on.",
+    "toast.dynamicOff": "Fixed volume.",
+    "toast.sustainMs": "Sustain: {ms} ms",
+    "toast.moveHintPiano": "Piano position: Settings → Keyboard → position / alignment.",
+    "toast.sound": "Sound: {name}",
+    "toast.instrumentRefreshFail": "Instrument changed; some settings could not refresh: {msg}",
+    "toast.audioNoImport": "Audio import is not available in this build.",
+    "toast.convertFail": "Could not convert audio: {msg}",
     "feedback.miss": "Miss!",
     "feedback.good": "+{points}",
     "starter.lib": "Sample tracks (royalty-free)",
     "starter.song": "Bach — Prelude BWV 846",
     "import.memberTitle": "Sign up to save MIDI (one-time $1 USD). You can still play without an account.",
+    "audioImport.title": "Converting audio to MIDI",
+    "audioImport.preparing": "Preparing…",
   };
 
   const tr = {
@@ -225,39 +251,209 @@ const I18n = (() => {
     "intro.skip": "Atla",
     "auth.connecting": "Wix hesabına bağlanılıyor… Siteye giriş yaptığınızdan emin olun.",
     "auth.member": "Giriş yapıldı{email}. Kütüphaneleriniz bulutta saklanır.",
-    "auth.guest": "Misafir modu — serbest çalın. MIDI bu tarayıcıda saklanır; buluta kayıt için üye olun (tek seferlik 1 USD).",
+    "auth.guest":
+      "Misafir modu — serbest çalın. MIDI bu tarayıcıda saklanır; buluta kayıt için üye olun (tek seferlik 1 USD).",
+    "auth.embedOnly":
+      "Oynatıcıyı Wix Piyano sayfanızdan açın. GitHub Pages misafir modunda çalışır; bulut için Wix gerekir.",
+    "auth.guestShort": "Misafir modu — MIDI kaydetmek için Wix üyeliği (tek seferlik 1 USD).",
+    "auth.bridgeFail": "Wix köprüsüne bağlanılamadı.",
+    "apiError.web":
+      "Oynatıcı yüklenemedi. Wix sitenizdeki <strong>Piyano</strong> sayfasından açın veya yapılandırmayı kontrol edin.",
     "header.score": "Puan",
     "header.remaining": "Kalan:",
     "header.play": "▶ Oynat (sen çal)",
+    "header.pause": "⏸ Duraklat",
     "header.autoplay": "🎹 Sen çal",
+    "header.autoplayPause": "⏸ Bilgisayar duraklat",
     "header.stop": "■ Durdur",
     "header.speed": "Hız",
     "header.menu": "☰ Menü",
     "header.menuOpen": "☰ Menüyü aç",
     "header.fullscreen": "⛶ Tam ekran",
     "header.window": "⛶ Pencere",
+    "header.instrument": "Enstrüman",
     "header.trackPosition": "Parça konumu",
+    "sidebar.tab.library": "Kütüphane",
+    "sidebar.tab.songs": "Şarkılar",
+    "sidebar.tab.settings": "Ayarlar",
     "libs.title": "Kütüphaneler",
     "libs.new": "Yeni kütüphane adı",
     "libs.add": "Ekle",
     "libs.hint": "Kütüphane seçin veya yukarıdan ekleyin. Dosyalar Wix hesabınıza kaydedilir.",
-    "libs.hintGuest": "Misafir modu: MIDI bu tarayıcıda saklanır. Buluta kayıt için Wix üyeliği (tek seferlik 1 USD).",
+    "libs.hintGuest":
+      "Misafir modu: MIDI bu tarayıcıda saklanır. Buluta kayıt için Wix üyeliği (tek seferlik 1 USD).",
     "libs.hintDesktop": "Kütüphane seçin veya yukarıdan ekleyin.",
+    "libs.hintSelected": "Seçili: {name} — + MIDI ile dosya ekleyin",
     "libs.empty": "Henüz kütüphane yok.",
     "libs.renameTitle": "Çift tık: yeniden adlandır",
     "songs.title": "Şarkılar",
+    "songs.midi": "+ MIDI",
+    "songs.audio": "♫ MP3→MIDI",
+    "songs.hintWeb":
+      "Web: MIDI parça başına ~15 MB. MP3→MIDI için masaüstü (<code>npm start</code>). Şarkı seçince <strong>▶ Oynat</strong>.",
+    "songs.hintAudio": "MP3→MIDI: tek enstrüman veya vokal en iyi sonucu verir.",
+    "songs.hintSelectLib": "Önce bir kütüphane seçin.",
+    "songs.hintPick": "Listeden bir şarkı seçin.",
+    "songs.hintAddMidi": "Bu kütüphaneye + MIDI ile dosya ekleyin.",
+    "songs.hintPlay": "▶ Oynat — notalar yukarıdan düşer. Dokunun veya klavye ile çalın.",
+    "songs.empty": "Henüz şarkı yok.",
+    "songs.select": "Şarkı seçin",
+    "songs.delete": "Sil",
+    "songs.trackOption": "{name} ({count} nota){inst}",
     "settings.title": "Ayarlar",
     "settings.language": "Dil",
     "settings.move": "↔ Hareket ettir",
+    "settings.moveSave": "✓ Konumu kaydet",
+    "settings.themeHint": "Renkler seçili enstrümana özel kaydedilir (piyano / gitar / keman).",
     "settings.tab.song": "Parça",
     "settings.tab.keys": "Klavye",
     "settings.tab.look": "Görünüm",
     "settings.tab.play": "Oyun",
+    "settings.track": "MIDI izi",
+    "settings.trackEmpty": "Önce şarkı seçin",
+    "settings.trimStart": "Baştan kes (sn)",
+    "settings.trimEnd": "Sondan kes (sn)",
+    "settings.trimHint": "Kırpma sonrası parça yeniden yüklenir.",
+    "settings.octaveStart": "Başlangıç oktavı",
+    "settings.octaveCount": "Oktav sayısı",
+    "settings.octaveHint": "Şarkı seçilince otomatik (tam genişlik).",
+    "settings.keyWidth.piano": "Tuş genişliği",
+    "settings.keyWidth.fretted": "Perde hücre genişliği",
+    "settings.keyHeight.piano": "Klavye yüksekliği",
+    "settings.keyHeight.fretted": "Panel yüksekliği",
+    "settings.neckHeight": "Kol tel yüksekliği",
+    "settings.stringHeight": "Sağ tel yüksekliği",
+    "settings.neckWidth": "Kol / perde genişliği",
+    "settings.pluckWidth": "Teller paneli genişliği",
+    "settings.gripGuitar": "Tüm telleri sık (gitar — bir perde → 6 tel)",
+    "settings.gripViolin": "Tüm telleri sık (keman — bir pozisyon → 4 tel)",
+    "settings.neckNearby": "Perde: yakın temasları da algıla",
+    "settings.stringsNearby": "Sağ teller: yakın temasları da algıla",
+    "settings.gripHint": "Kapalıyken her tele ayrı perde. Açıkken bir perde tüm tellere uygulanır.",
+    "settings.vibrato": "Tel titreşim hassasiyeti",
+    "settings.vibratoHint":
+      "Teller panelinde parmağınızı basılı tutup hafifçe sürükleyin — titreşim artar.",
+    "settings.dock.piano": "Klavye konumu (dikey)",
+    "settings.dock.other": "Enstrüman konumu (dikey)",
+    "settings.align.piano": "Klavye hizası (yatay)",
+    "settings.align.other": "Enstrüman hizası (yatay)",
+    "settings.dock.bottom": "Alt (varsayılan)",
+    "settings.dock.middle": "Orta (notaların altı)",
+    "settings.dock.top": "Üst",
+    "settings.align.stretch": "Tam genişlik",
+    "settings.align.left": "Sola",
+    "settings.align.center": "Ortaya",
+    "settings.align.right": "Sağa",
+    "settings.dockHintPiano": "Az oktav kullanıyorsanız ortaya/sağa hizalayın veya orta konuma alın.",
+    "settings.dockHintStrings": "Panelleri sol menüden ↔ Hareket ettir ile sürükleyebilirsiniz.",
+    "settings.instrumentSound": "Enstrüman sesi",
+    "settings.labelMode": "Etiket modu",
+    "settings.label.note": "Nota adı",
+    "settings.label.letters": "Harf düzeni",
+    "settings.label.custom": "Özel liste",
+    "settings.labelPreset": "Harf düzeni",
+    "settings.label.game": "Oyun (ZXCV…)",
+    "settings.label.piano": "Klavye (AWSE…)",
+    "settings.customLetters": "Özel harfler",
+    "settings.apply": "Uygula",
+    "settings.labelHint":
+      "Tuşa <strong>sağ tık</strong> (fare) → harf ata. Dokunmatikte Ayarlar’dan düzenleyin.",
+    "settings.effectHue": "Efekt rengi (ton)",
+    "settings.keyTop": "Basılı tuş (üst)",
+    "settings.keyMid": "Basılı tuş (orta)",
+    "settings.keyBottom": "Basılı tuş (alt)",
+    "settings.hitLine": "Vuruş çizgisi",
+    "settings.noteStyle": "Nota stili",
+    "settings.flame.aurora": "Aurora",
+    "settings.flame.fire": "Alev",
+    "settings.flame.ice": "Buz",
+    "settings.flame.neon": "Neon",
+    "settings.flame.rainbow": "Gökkuşağı",
+    "settings.flame.plasma": "Plazma",
+    "settings.flame.minimal": "Sade",
+    "settings.flameIntensity": "Efekt yoğunluğu",
+    "settings.pcKeyboard": "Bilgisayar klavyesi",
+    "settings.kbLayout": "Klavye düzeni",
+    "settings.kb.auto": "Otomatik algıla",
+    "settings.kb.qwerty": "QWERTY (ABD/İngilizce)",
+    "settings.kb.tr-f": "Türkçe F",
+    "settings.kb.tr-q": "Türkçe Q",
+    "settings.kb.qwertz": "QWERTZ (Almanca)",
+    "settings.kb.azerty": "AZERTY (Fransızca)",
+    "settings.dynamic": "Dinamik basınç",
+    "settings.sustain": "Sustain (bırakış süresi)",
+    "settings.sustainHint": "0 = anında kesilir. Yüksek değer = bırakınca daha uzun yumuşak sönüm.",
+    "settings.timing": "Zaman toleransı",
+    "settings.touchHint": "Dokunmatik: çok parmaklı jestler kapatıldı.",
+    "inst.piano": "Piyano",
+    "inst.guitar": "Gitar",
+    "inst.violin": "Keman",
+    "inst.flute": "Flüt",
+    "inst.brass": "Bakır üflemeli",
+    "inst.synth": "Synth",
+    "inst.guitarNeck": "Gitar kolu",
+    "inst.guitarNeckSub": "Perdeye basın — ses sağdan gelir",
+    "inst.strings": "Teller (titreştir)",
+    "inst.stringsSub": "Aynı renk = aynı tel",
+    "inst.violinNeck": "Keman klavyesi",
     "picker.title": "Hangi enstrümanla çalmak istersiniz?",
-    "starter.lib": "Örnek Parçalar (telifsiz)",
-    "starter.song": "Bach — Prelude BWV 846",
+    "picker.hint":
+      "Düşen notalar aynı kalır; alttaki çalma yüzeyi değişir. Üst menüden istediğiniz zaman değiştirin.",
+    "modal.newLib": "Yeni kütüphane",
+    "modal.renameLib": "Kütüphaneyi yeniden adlandır",
+    "modal.libName": "Kütüphane adı",
+    "modal.cancel": "İptal",
+    "modal.save": "Kaydet",
+    "modal.assignKey": "Tuş harfi ata",
+    "modal.assignHint": "{name} — tek harf veya boş",
+    "modal.oneLetter": "Tek harf",
+    "modal.clear": "Temizle",
+    "toast.libEmpty": "Kütüphane adı boş olamaz.",
+    "toast.libRenamed": "Kütüphane adı güncellendi.",
+    "toast.libAdded": "\"{name}\" kütüphanesi eklendi.",
+    "toast.saveError": "Kayıt hatası: {msg}",
+    "toast.instrument": "Enstrüman: {name}",
     "toast.cloudLibError":
       "Bulut kütüphanesi açılamadı: {msg}. Örnek parça yine de yüklendi.",
+    "toast.bootGuest": "Misafir modu: çalabilirsiniz. Bulut kütüphanesi için üye olun.",
+    "toast.kbOn": "Klavye ile çalma açık.",
+    "toast.kbOff": "Klavye ile çalma kapalı.",
+    "toast.kbLayoutAuto": "Klavye düzeni otomatik algılanacak.",
+    "toast.kbLayoutPick": "Klavye düzeni: {name}",
+    "toast.labelsUpdated": "Tuş harfleri güncellendi.",
+    "toast.flameStyle": "Nota stili: {name}",
+    "toast.dynamicOn": "Dinamik basınç açık.",
+    "toast.dynamicOff": "Sabit ses şiddeti.",
+    "toast.sustainMs": "Sustain: {ms} ms",
+    "toast.moveHintPiano": "Piyano konumu: Ayarlar → Klavye → konum / hiza.",
+    "toast.sound": "Ses: {name}",
+    "toast.instrumentRefreshFail": "Enstrüman değişti; bazı ayarlar yenilenemedi: {msg}",
+    "toast.audioNoImport": "Ses içe aktarma bu sürümde yok.",
+    "toast.convertFail": "Ses dönüştürülemedi: {msg}",
+    "toast.octavePianoOnly": "Oktav ayarları yalnızca piyano modunda geçerlidir.",
+    "toast.octaveSet": "Klavye: oktav {start}, {count} oktav",
+    "toast.fitSong": "Klavye şarkıya göre: {count} oktav (tam genişlik)",
+    "toast.songLoaded": "\"{name}\" yüklendi.",
+    "toast.songLoadFail": "Şarkı yüklenemedi: {msg}",
+    "toast.noNotes": "Bu MIDI dosyasında nota bulunamadı.",
+    "toast.songDeleted": "Şarkı silindi.",
+    "toast.deleteFail": "Silinemedi: {msg}",
+    "toast.trackDone": "Parça bitti! ■ ile yeniden başlayın.",
+    "toast.midiCloud": "{n} MIDI buluta kaydedildi.",
+    "toast.midiLocal": "{n} MIDI bu tarayıcıya kaydedildi (misafir).",
+    "toast.midiFail": "MIDI eklenemedi: {msg}",
+    "toast.pickLib": "Önce bir kütüphane seçin veya oluşturun.",
+    "toast.trim": "Kırpma: baş {start} sn, son {end} sn",
+    "toast.importCancel": "İşlem iptal edildi veya dosya seçilmedi.",
+    "toast.audioConverted": "{n} parça MIDI'ye çevrildi ({notes} nota). Şarkıyı seçip oynatın.",
+    "toast.autoPlayOn": "Bilgisayar çalıyor — notalar otomatik vuruluyor.",
+    "modal.assignClear": "Harf kaldırıldı",
+    "modal.assignSet": "Tuş → \"{ch}\"",
+    "starter.lib": "Örnek Parçalar (telifsiz)",
+    "starter.song": "Bach — Prelude BWV 846",
+    "import.memberTitle": "MIDI kaydetmek için üye olun (tek seferlik 1 USD). Hesapsız da çalabilirsiniz.",
+    "audioImport.title": "Ses → MIDI dönüştürülüyor",
+    "audioImport.preparing": "Hazırlanıyor…",
   };
 
   const de = {
@@ -272,15 +468,35 @@ const I18n = (() => {
     "header.autoplay": "🎹 Auto-Spiel",
     "header.stop": "■ Stopp",
     "header.speed": "Tempo",
+    "header.menu": "☰ Menü",
+    "header.fullscreen": "⛶ Vollbild",
+    "sidebar.tab.library": "Bibliothek",
+    "sidebar.tab.songs": "Stücke",
+    "sidebar.tab.settings": "Einstellungen",
     "libs.title": "Bibliotheken",
+    "libs.add": "Hinzufügen",
+    "libs.new": "Neuer Bibliotheksname",
+    "libs.hint": "Bibliothek wählen oder oben hinzufügen. Dateien werden in Ihrem Wix-Konto gespeichert.",
+    "libs.hintGuest": "Gastmodus: MIDI bleibt in diesem Browser. Wix-Mitgliedschaft für Cloud (einmalig 1 USD).",
     "songs.title": "Stücke",
+    "songs.hintSelectLib": "Zuerst eine Bibliothek wählen.",
+    "songs.hintPlay": "▶ Abspielen — Noten fallen von oben. Tippen oder Tastatur.",
     "settings.title": "Einstellungen",
     "settings.language": "Sprache",
+    "settings.move": "↔ Panels verschieben",
+    "settings.moveSave": "✓ Position speichern",
+    "settings.tab.song": "Spur",
+    "settings.tab.keys": "Tastatur",
+    "settings.tab.look": "Aussehen",
+    "settings.tab.play": "Spiel",
+    "settings.track": "MIDI-Spur",
+    "settings.trackEmpty": "Zuerst ein Stück wählen",
     "inst.piano": "Klavier",
     "inst.guitar": "Gitarre",
     "inst.violin": "Violine",
     "picker.title": "Welches Instrument möchten Sie spielen?",
     "starter.lib": "Beispielstücke (lizenzfrei)",
+    "starter.song": "Bach — Präludium BWV 846",
   };
 
   const fr = {
@@ -291,16 +507,36 @@ const I18n = (() => {
     "header.score": "Score",
     "header.remaining": "Reste :",
     "header.play": "▶ Jouer (vous jouez)",
+    "header.autoplay": "🎹 Lecture auto",
     "header.stop": "■ Stop",
+    "header.speed": "Vitesse",
+    "header.menu": "☰ Menu",
+    "sidebar.tab.library": "Bibliothèque",
+    "sidebar.tab.songs": "Morceaux",
+    "sidebar.tab.settings": "Réglages",
     "libs.title": "Bibliothèques",
+    "libs.add": "Ajouter",
+    "libs.new": "Nom de bibliothèque",
+    "libs.hint": "Choisissez ou ajoutez une bibliothèque. Fichiers enregistrés sur votre compte Wix.",
     "songs.title": "Morceaux",
+    "songs.hintSelectLib": "Choisissez d'abord une bibliothèque.",
+    "songs.hintPlay": "▶ Jouer — les notes tombent du haut. Touchez ou clavier.",
     "settings.title": "Paramètres",
     "settings.language": "Langue",
+    "settings.move": "↔ Déplacer les panneaux",
+    "settings.moveSave": "✓ Enregistrer la position",
+    "settings.tab.song": "Piste",
+    "settings.tab.keys": "Clavier",
+    "settings.tab.look": "Apparence",
+    "settings.tab.play": "Jeu",
+    "settings.track": "Piste MIDI",
+    "settings.trackEmpty": "Choisissez d'abord un morceau",
     "inst.piano": "Piano",
     "inst.guitar": "Guitare",
     "inst.violin": "Violon",
     "picker.title": "Quel instrument voulez-vous jouer ?",
     "starter.lib": "Exemples (libres de droits)",
+    "starter.song": "Bach — Prélude BWV 846",
   };
 
   const it = {
@@ -311,11 +547,23 @@ const I18n = (() => {
     "header.score": "Punteggio",
     "header.remaining": "Rimasto:",
     "header.play": "▶ Riproduci (suoni tu)",
+    "header.autoplay": "🎹 Auto play",
     "header.stop": "■ Stop",
+    "header.speed": "Velocità",
+    "sidebar.tab.library": "Libreria",
+    "sidebar.tab.songs": "Brani",
+    "sidebar.tab.settings": "Impostazioni",
     "libs.title": "Librerie",
+    "libs.add": "Aggiungi",
     "songs.title": "Brani",
+    "songs.hintSelectLib": "Seleziona prima una libreria.",
     "settings.title": "Impostazioni",
     "settings.language": "Lingua",
+    "settings.move": "↔ Sposta pannelli",
+    "settings.tab.song": "Traccia",
+    "settings.tab.keys": "Tastiera",
+    "settings.tab.look": "Aspetto",
+    "settings.tab.play": "Gioco",
     "inst.piano": "Piano",
     "inst.guitar": "Chitarra",
     "inst.violin": "Violino",
@@ -330,10 +578,22 @@ const I18n = (() => {
     "intro.skip": "Omitir",
     "header.score": "Puntuación",
     "header.remaining": "Queda:",
+    "header.play": "▶ Tocar (tú tocas)",
+    "header.autoplay": "🎹 Auto",
+    "sidebar.tab.library": "Biblioteca",
+    "sidebar.tab.songs": "Canciones",
+    "sidebar.tab.settings": "Ajustes",
     "libs.title": "Bibliotecas",
+    "libs.add": "Añadir",
     "songs.title": "Canciones",
+    "songs.hintSelectLib": "Primero elige una biblioteca.",
     "settings.title": "Ajustes",
     "settings.language": "Idioma",
+    "settings.move": "↔ Mover paneles",
+    "settings.tab.song": "Pista",
+    "settings.tab.keys": "Teclado",
+    "settings.tab.look": "Aspecto",
+    "settings.tab.play": "Juego",
     "inst.piano": "Piano",
     "inst.guitar": "Guitarra",
     "inst.violin": "Violín",
@@ -345,6 +605,9 @@ const I18n = (() => {
     ...en,
     "app.tagline": "Piano · Guitarra · Violino — toque com MIDI",
     "intro.skip": "Pular",
+    "sidebar.tab.library": "Biblioteca",
+    "sidebar.tab.songs": "Músicas",
+    "sidebar.tab.settings": "Ajustes",
     "libs.title": "Bibliotecas",
     "songs.title": "Músicas",
     "settings.language": "Idioma",
@@ -358,6 +621,9 @@ const I18n = (() => {
     ...en,
     "app.tagline": "Piano · Gitaar · Viool — speel met MIDI",
     "intro.skip": "Overslaan",
+    "sidebar.tab.library": "Bibliotheek",
+    "sidebar.tab.songs": "Nummers",
+    "sidebar.tab.settings": "Instellingen",
     "libs.title": "Bibliotheken",
     "settings.language": "Taal",
     "inst.piano": "Piano",
@@ -370,6 +636,9 @@ const I18n = (() => {
     ...en,
     "app.tagline": "Fortepian · Gitara · Skrzypce — graj z MIDI",
     "intro.skip": "Pomiń",
+    "sidebar.tab.library": "Biblioteka",
+    "sidebar.tab.songs": "Utwory",
+    "sidebar.tab.settings": "Ustawienia",
     "libs.title": "Biblioteki",
     "settings.language": "Język",
     "inst.piano": "Fortepian",
@@ -382,6 +651,9 @@ const I18n = (() => {
     ...en,
     "app.tagline": "Пианино · Гитара · Скрипка — играйте с MIDI",
     "intro.skip": "Пропустить",
+    "sidebar.tab.library": "Библиотека",
+    "sidebar.tab.songs": "Треки",
+    "sidebar.tab.settings": "Настройки",
     "libs.title": "Библиотеки",
     "settings.language": "Язык",
     "inst.piano": "Пианино",
@@ -394,6 +666,9 @@ const I18n = (() => {
     ...en,
     "app.tagline": "ピアノ · ギター · バイオリン — MIDIで演奏",
     "intro.skip": "スキップ",
+    "sidebar.tab.library": "ライブラリ",
+    "sidebar.tab.songs": "曲",
+    "sidebar.tab.settings": "設定",
     "libs.title": "ライブラリ",
     "settings.language": "言語",
     "inst.piano": "ピアノ",
@@ -406,6 +681,9 @@ const I18n = (() => {
     ...en,
     "app.tagline": "피아노 · 기타 · 바이올린 — MIDI로 연주",
     "intro.skip": "건너뛰기",
+    "sidebar.tab.library": "라이브러리",
+    "sidebar.tab.songs": "곡",
+    "sidebar.tab.settings": "설정",
     "libs.title": "라이브러리",
     "settings.language": "언어",
     "inst.piano": "피아노",
@@ -418,6 +696,9 @@ const I18n = (() => {
     ...en,
     "app.tagline": "钢琴 · 吉他 · 小提琴 — MIDI 演奏",
     "intro.skip": "跳过",
+    "sidebar.tab.library": "曲库",
+    "sidebar.tab.songs": "曲目",
+    "sidebar.tab.settings": "设置",
     "libs.title": "曲库",
     "settings.language": "语言",
     "inst.piano": "钢琴",
@@ -494,6 +775,10 @@ const I18n = (() => {
       const key = el.getAttribute("data-i18n");
       if (key) el.textContent = t(key);
     });
+    root.querySelectorAll("[data-i18n-html]").forEach((el) => {
+      const key = el.getAttribute("data-i18n-html");
+      if (key) el.innerHTML = t(key);
+    });
     document.documentElement.lang = locale;
   }
 
@@ -568,7 +853,7 @@ const AppSettings = (() => {
     keyWidth: 48,
     keyHeight: 160,
     dynamicPressure: true,
-    sustainEnabled: true,
+    sustainMs: 550,
     timingWindow: 200,
     speed: 100,
     labelMode: "note",
@@ -618,7 +903,12 @@ const AppSettings = (() => {
     try {
       const raw = localStorage.getItem(KEY);
       if (!raw) return { ...defaults };
-      return { ...defaults, ...JSON.parse(raw) };
+      const data = { ...defaults, ...JSON.parse(raw) };
+      if (data.sustainMs == null || !Number.isFinite(data.sustainMs)) {
+        data.sustainMs = data.sustainEnabled === false ? 0 : 550;
+      }
+      data.sustainMs = Math.max(0, Math.min(5000, Math.round(data.sustainMs)));
+      return data;
     } catch {
       return { ...defaults };
     }
@@ -738,10 +1028,8 @@ const AudioEngine = (() => {
   let nextVoiceId = 1;
 
   let dynamicPressure = true;
-  let sustainEnabled = true;
+  let sustainMs = 550;
   let instrumentId = "piano";
-  const RELEASE_FAST = 0.05;
-  const RELEASE_SLOW = 0.55;
 
   const INSTRUMENTS = {
     piano: { label: "Piyano", sustainScale: 1 },
@@ -766,8 +1054,12 @@ const AudioEngine = (() => {
     dynamicPressure = !!on;
   }
 
-  function setSustain(on) {
-    sustainEnabled = !!on;
+  function setSustainMs(ms) {
+    sustainMs = Math.max(0, Math.min(5000, Math.round(Number(ms) || 0)));
+  }
+
+  function getSustainMs() {
+    return sustainMs;
   }
 
   function setInstrument(id) {
@@ -981,9 +1273,9 @@ const AudioEngine = (() => {
     const ac = ensure();
     const t = ac.currentTime;
     const scale = INSTRUMENTS[instrumentId]?.sustainScale ?? 1;
-    const base = silent ? 0.001 : sustainEnabled ? RELEASE_SLOW : RELEASE_FAST;
+    const base = silent ? 0.001 : Math.max(0.001, (sustainMs / 1000) * scale);
     const release =
-      releaseOverride != null ? releaseOverride : Math.min(1.2, base * scale);
+      releaseOverride != null ? releaseOverride : Math.min(5.5, base);
 
     try {
       voice.master.gain.cancelScheduledValues(t);
@@ -1102,7 +1394,8 @@ const AudioEngine = (() => {
     setLiveVibrato,
     setLiveGain,
     setDynamicPressure,
-    setSustain,
+    setSustainMs,
+    getSustainMs,
     setInstrument,
     getInstruments,
     velocityFromPointer,
@@ -3564,14 +3857,18 @@ const InstrumentMove = (() => {
     window.AppSettings.save({ panelLayout: layout });
   }
 
+  function syncMoveBtn() {
+    const btn = document.getElementById("btnMoveInstrument");
+    if (!btn || !window.I18n) return;
+    const on = moveMode;
+    btn.classList.toggle("active", on);
+    btn.textContent = on ? window.I18n.t("settings.moveSave") : window.I18n.t("settings.move");
+  }
+
   function setMoveMode(on) {
     moveMode = !!on;
     document.body.classList.toggle("instrument-move-mode", moveMode);
-    const btn = document.getElementById("btnMoveInstrument");
-    if (btn) {
-      btn.classList.toggle("active", moveMode);
-      btn.textContent = moveMode ? "✓ Konumu kaydet" : "↔ Hareket ettir";
-    }
+    syncMoveBtn();
   }
 
   function isMoveMode() {
@@ -3638,7 +3935,9 @@ const InstrumentMove = (() => {
 
   bind();
 
-  return { setMoveMode, isMoveMode, applyLayout };
+  window.addEventListener("staveflow:locale", () => syncMoveBtn());
+
+  return { setMoveMode, isMoveMode, applyLayout, syncMoveBtn };
 })();
 
 window.InstrumentMove = InstrumentMove;
@@ -4238,6 +4537,16 @@ const Game = (() => {
       });
       for (const el of observeTargets) ro.observe(el);
     }
+    window.addEventListener("touch-piano:play-mode", () => {
+      requestAnimationFrame(() => {
+        resize();
+        updateKeyPositions();
+      });
+    });
+    window.addEventListener("staveflow:booted", () => {
+      setTimeout(() => resize(), 50);
+      setTimeout(() => resize(), 400);
+    });
   }
 
   function setFlameIntensity(level) {
@@ -4310,13 +4619,43 @@ const Game = (() => {
 
   function getHitY() {
     const area = canvas?.parentElement;
-    const playEl = getPlaySurfaceEl();
-    if (!area || !playEl || playEl.closest(".hidden")) {
-      return area?.clientHeight * HIT_LINE_FALLBACK || 400;
-    }
+    if (!area) return 400;
+    const mode = window.PlaySurface?.getMode?.() || "piano";
     const ar = area.getBoundingClientRect();
-    const pr = playEl.getBoundingClientRect();
-    const y = Math.round(pr.top - ar.top - 3);
+
+    let target = getPlaySurfaceEl();
+    if (mode === "guitar") {
+      target =
+        document.getElementById("guitarFrets") ||
+        document.getElementById("guitarWrap") ||
+        target;
+    } else if (mode === "violin") {
+      target =
+        document.getElementById("violinBoard") ||
+        document.getElementById("violinWrap") ||
+        target;
+    }
+
+    if (!target || target.closest(".hidden")) {
+      return area.clientHeight * HIT_LINE_FALLBACK;
+    }
+
+    const pr = target.getBoundingClientRect();
+    if (pr.height < 4) {
+      return area.clientHeight * HIT_LINE_FALLBACK;
+    }
+
+    let y = Math.round(pr.top - ar.top - 3);
+
+    // Alt satır dock: enstrüman oyun alanının altında — çizgiyi klavye üstüne sabitle
+    if (y > area.clientHeight - 8) {
+      const footer = document.getElementById("instrumentFooter");
+      const fr = footer?.getBoundingClientRect();
+      if (fr && fr.height > 8) {
+        y = Math.round(fr.top - ar.top - 3);
+      }
+    }
+
     return Math.max(56, Math.min(area.clientHeight - 6, y));
   }
 
@@ -5497,15 +5836,13 @@ window.mainJsOk = true;
 
   if (!window.mainJsOk || !window.LibraryStore) {
     $("#apiError")?.classList.remove("hidden");
-    $("#apiError").innerHTML =
-      "Ana program yüklenemedi. Terminalde klasöre gidip: <code>npm start</code>";
+    $("#apiError").innerHTML = t("apiError.desktop");
     return;
   }
 
   if (!window.Piano || !window.PianoRange) {
     $("#apiError")?.classList.remove("hidden");
-    $("#apiError").innerHTML =
-      "Piyano modülü yüklenemedi; kütüphane yine de kullanılabilir. <code>npm start</code> ile yeniden açın.";
+    $("#apiError").innerHTML = t("apiError.desktop");
   }
 
   if (!window.pianoApi) {
@@ -5564,7 +5901,8 @@ window.mainJsOk = true;
   const guitarPluckWidthLabel = $("#guitarPluckWidthLabel");
   const appVersion = $("#appVersion");
   const dynamicPressure = $("#dynamicPressure");
-  const sustainEnabled = $("#sustainEnabled");
+  const sustainRange = $("#sustainRange");
+  const sustainLabel = $("#sustainLabel");
   const speedRange = $("#speedRange");
   const speedLabel = $("#speedLabel");
   const timingWindow = $("#timingWindow");
@@ -5635,6 +5973,59 @@ window.mainJsOk = true;
     });
   }
 
+  function setupSidebarTabs() {
+    const tabs = document.querySelectorAll(".sidebar-tab");
+    const panels = document.querySelectorAll(".sidebar-panel");
+    if (!tabs.length) return;
+    tabs.forEach((tab) => {
+      tab.setAttribute("role", "tab");
+      tab.addEventListener("click", () => {
+        const id = tab.dataset.sidebarTab;
+        tabs.forEach((t) => {
+          const on = t === tab;
+          t.classList.toggle("active", on);
+          t.setAttribute("aria-selected", on ? "true" : "false");
+        });
+        panels.forEach((p) => p.classList.toggle("active", p.dataset.sidebarPanel === id));
+        try {
+          localStorage.setItem("staveflow-sidebar-tab", id);
+        } catch {
+          /* */
+        }
+      });
+    });
+    try {
+      const saved = localStorage.getItem("staveflow-sidebar-tab");
+      if (saved) {
+        const tab = document.querySelector(`.sidebar-tab[data-sidebar-tab="${saved}"]`);
+        tab?.click();
+      }
+    } catch {
+      /* */
+    }
+  }
+
+  function syncMoveInstrumentBtn() {
+    window.InstrumentMove?.syncMoveBtn?.();
+  }
+
+  function syncTransportButtons({ playing = false, autoPlaying = false } = {}) {
+    if (btnPlay) btnPlay.textContent = playing ? t("header.pause") : t("header.play");
+    if (btnAutoPlay) {
+      btnAutoPlay.textContent = autoPlaying ? t("header.autoplayPause") : t("header.autoplay");
+    }
+    if (btnStop) btnStop.textContent = t("header.stop");
+  }
+
+  function resetTrackSelectEmpty() {
+    if (!trackSelect) return;
+    trackSelect.innerHTML = "";
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.textContent = t("settings.trackEmpty");
+    trackSelect.appendChild(opt);
+  }
+
   const themeInputs = () => ({
     effectHue: effectHueInput,
     keyColorTop: keyColorTopInput,
@@ -5665,8 +6056,9 @@ window.mainJsOk = true;
   function openLabelAssignModal(midi) {
     labelEditMidi = midi;
     const name = KeyLabels?.noteNameForMidi?.(midi) || `MIDI ${midi}`;
-    labelAssignTitle.textContent = "Tuş harfi ata";
-    labelAssignHint.textContent = `${name} — tek harf veya boş`;
+    labelAssignTitle.textContent = t("modal.assignKey");
+    labelAssignHint.textContent = t("modal.assignHint", { name });
+    labelAssignInput.placeholder = t("modal.oneLetter");
     labelAssignInput.value = KeyLabels?.getMidiLabel?.(midi) || "";
     labelAssignModal.classList.remove("hidden");
     labelAssignModal.setAttribute("aria-hidden", "false");
@@ -5689,7 +6081,7 @@ window.mainJsOk = true;
     });
     applyLabelSettings(AppSettings.load());
     window.KeyboardInput?.rebuild?.();
-    toast(ch ? `Tuş → "${ch}"` : "Harf kaldırıldı");
+    toast(ch ? t("modal.assignSet", { ch }) : t("modal.assignClear"));
     closeLabelAssignModal();
   }
 
@@ -5760,20 +6152,44 @@ window.mainJsOk = true;
     }
     if (btnAutoPlay) btnAutoPlay.textContent = t("header.autoplay");
     if (btnStop) btnStop.textContent = t("header.stop");
-    const speedLbl = $(".speed-label");
-    if (speedLbl?.firstChild) speedLbl.firstChild.textContent = `${t("header.speed")} `;
     document.title = `${APP_NAME} — ${t("app.tagline")}`;
     const brandEl = document.querySelector(".top-bar h1");
     if (brandEl) brandEl.textContent = APP_NAME;
     const introLogo = document.querySelector(".intro-splash-logo");
     if (introLogo) introLogo.textContent = APP_NAME;
     updateSettingsForPlayMode(window.PlaySurface?.getMode?.() || "piano");
+    syncMoveInstrumentBtn();
     updateHints();
     updateKeyboardLayoutHint();
     if (flameLabel) flameLabel.textContent = flameLabelText(Number(flameRange?.value || 100));
     if (vibratoSensLabel) {
       vibratoSensLabel.textContent = vibratoSensLabelText(Number(stringVibratoSens?.value || 100));
     }
+    if (btnToggleSidebar) {
+      const visible = !document.body.classList.contains("sidebar-hidden");
+      btnToggleSidebar.textContent = visible ? t("header.menu") : t("header.menuOpen");
+    }
+    if (btnFullscreen) {
+      btnFullscreen.textContent = document.fullscreenElement
+        ? t("header.window")
+        : t("header.fullscreen");
+    }
+    if (playModeSelect) playModeSelect.title = t("header.instrument");
+    if (labelAssignClear) labelAssignClear.textContent = t("modal.clear");
+    if (labelAssignCancel) labelAssignCancel.textContent = t("modal.cancel");
+    if (labelAssignSave) labelAssignSave.textContent = t("modal.save");
+    if (trackSelect?.disabled && trackSelect.options[0]?.value === "") {
+      trackSelect.options[0].textContent = t("settings.trackEmpty");
+    }
+    syncPlatformUI();
+  }
+
+  function syncPlatformUI() {
+    const desktop = !!window.pianoApi?.isDesktop;
+    document.body.classList.toggle("is-desktop", desktop);
+    btnImportAudio?.classList.toggle("hidden", !desktop);
+    document.querySelector(".songs-hint-audio")?.classList.toggle("hidden", !desktop);
+    document.querySelector(".songs-hint-web")?.classList.toggle("hidden", desktop);
   }
 
   function openModal(editId = null) {
@@ -5795,7 +6211,7 @@ window.mainJsOk = true;
     const LibraryStore = requireStore();
     const trimmed = name.trim();
     if (!trimmed) {
-      toast("Kütüphane adı boş olamaz.", true);
+      toast(t("toast.libEmpty"), true);
       return false;
     }
     try {
@@ -5803,12 +6219,12 @@ window.mainJsOk = true;
         const lib = LibraryStore.getLibrary(editingLibraryId);
         if (lib) {
           lib.name = trimmed;
-          toast(`Kütüphane adı güncellendi.`);
+          toast(t("toast.libRenamed"));
         }
       } else {
         const lib = LibraryStore.createLibrary(trimmed);
         LibraryStore.setActiveLibrary(lib.id);
-        toast(`"${trimmed}" kütüphanesi eklendi.`);
+        toast(t("toast.libAdded", { name: trimmed }));
       }
       await LibraryStore.save();
       if (window.pianoApi?.isMember?.()) {
@@ -5820,7 +6236,7 @@ window.mainJsOk = true;
       updateHints();
       return true;
     } catch (err) {
-      toast(`Kayıt hatası: ${err.message}`, true);
+      toast(t("toast.saveError", { msg: err.message }), true);
       return false;
     }
   }
@@ -5895,6 +6311,8 @@ window.mainJsOk = true;
     requestAnimationFrame(() => requestAnimationFrame(run));
     setTimeout(run, 100);
     setTimeout(run, 350);
+    setTimeout(run, 700);
+    setTimeout(run, 1200);
   }
 
   function syncFrettedSizeSliders(s) {
@@ -5992,10 +6410,12 @@ window.mainJsOk = true;
       syncFrettedSizeSliders(s);
       window.PlaySurface?.activeModule?.()?.applyLayout?.();
     }
+    scheduleInstrumentLayoutSync();
     setTimeout(() => {
       requireMods().Game.resize();
       reloadTrackNotes();
     }, 100);
+    setTimeout(() => requireMods().Game.resize(), 500);
     return m;
   }
 
@@ -6014,13 +6434,23 @@ window.mainJsOk = true;
         applyPlayMode(btn.dataset.mode, { force: true, markPrompt: true });
         instrumentPickerModal.classList.add("hidden");
         instrumentPickerModal.setAttribute("aria-hidden", "true");
-        toast(`Enstrüman: ${window.PlaySurface.getModes()[btn.dataset.mode]?.label || btn.dataset.mode}`);
+        toast(
+          t("toast.instrument", {
+            name: window.PlaySurface.getModes()[btn.dataset.mode]?.label || btn.dataset.mode,
+          })
+        );
       };
     });
   }
 
+  function effectivePianoDock(s) {
+    const mode = window.PlaySurface?.getMode?.() || s?.playMode || "piano";
+    if (mode === "guitar" || mode === "violin") return "middle";
+    return s?.pianoDock || "bottom";
+  }
+
   function applyPianoLayout(s) {
-    const dock = s.pianoDock || "bottom";
+    const dock = effectivePianoDock(s);
     const align = s.pianoAlign || "stretch";
     document.body.classList.remove("piano-dock-bottom", "piano-dock-top", "piano-dock-middle");
     document.body.classList.add(`piano-dock-${dock}`);
@@ -6051,7 +6481,9 @@ window.mainJsOk = true;
     keyWidthLabel.textContent = `${s.keyWidth} px`;
     keyHeightLabel.textContent = `${s.keyHeight} px`;
     dynamicPressure.checked = s.dynamicPressure;
-    sustainEnabled.checked = s.sustainEnabled;
+    const sustainMs = Math.max(0, Math.min(5000, Math.round(s.sustainMs ?? 550)));
+    if (sustainRange) sustainRange.value = String(sustainMs);
+    if (sustainLabel) sustainLabel.textContent = `${sustainMs} ms`;
     timingWindow.value = String(s.timingWindow);
     timingLabel.textContent = `${s.timingWindow} ms`;
     speedRange.value = String(s.speed);
@@ -6064,7 +6496,7 @@ window.mainJsOk = true;
     keyboardEnabled.checked = s.keyboardEnabled !== false;
 
     AudioEngine.setDynamicPressure(s.dynamicPressure);
-    AudioEngine.setSustain(s.sustainEnabled);
+    AudioEngine.setSustainMs(sustainMs);
     const playMode = s.playMode || "piano";
     const modeSound = window.PlaySurface?.getModes?.()?.[playMode]?.sound || s.instrumentId || "piano";
     AudioEngine.setInstrument(modeSound);
@@ -6190,7 +6622,7 @@ window.mainJsOk = true;
 
   function rebuildPiano() {
     if (window.PlaySurface?.getMode?.() !== "piano") {
-      toast("Oktav ayarları yalnızca piyano modunda geçerlidir.");
+      toast(t("toast.octavePianoOnly"));
       return;
     }
     const { Piano, Game } = requireMods();
@@ -6218,7 +6650,7 @@ window.mainJsOk = true;
       reloadTrackNotes();
     }, 80);
 
-    toast(`Klavye: oktav ${clamped.startOctave}, ${clamped.octaveCount} oktav`);
+    toast(t("toast.octaveSet", { start: clamped.startOctave, count: clamped.octaveCount }));
   }
 
   function fitKeyboardToSong(notes) {
@@ -6248,10 +6680,7 @@ window.mainJsOk = true;
     Game.setTrim(s.trimStart ?? 0, s.trimEnd ?? 0);
     const fit = fitKeyboardToSong(notes);
     if (fit) {
-      toast(
-        `Klavye şarkıya göre: ${fit.octaveCount} oktav (tam genişlik)`,
-        false
-      );
+      toast(t("toast.fitSong", { count: fit.octaveCount }), false);
     } else if ((window.PlaySurface?.getMode?.() || "piano") === "piano") {
       Piano.setAutoFit((s.pianoAlign || "stretch") === "stretch");
       window.KeyboardInput?.rebuild?.();
@@ -6333,6 +6762,7 @@ window.mainJsOk = true;
   }
 
   function showAudioImportProgress(show) {
+    if (!audioImportOverlay) return;
     audioImportOverlay.classList.toggle("hidden", !show);
     if (!show) {
       audioImportBarFill.style.width = "0%";
@@ -6371,7 +6801,7 @@ window.mainJsOk = true;
       del.type = "button";
       del.className = "btn small";
       del.textContent = "×";
-      del.title = "Sil";
+      del.title = t("songs.delete");
       del.addEventListener("click", (e) => {
         e.stopPropagation();
         deleteSong(song.id);
@@ -6390,7 +6820,7 @@ window.mainJsOk = true;
     LibraryStore.setActiveLibrary(id);
     renderLibraries();
     renderSongs();
-    trackSelect.innerHTML = '<option value="">Şarkı seçin</option>';
+    resetTrackSelectEmpty();
     trackSelect.disabled = true;
     btnPlay.disabled = true;
     try {
@@ -6414,16 +6844,20 @@ window.mainJsOk = true;
         return;
       }
       if (!parsed.tracks.length) {
-        toast("Bu MIDI dosyasında nota bulunamadı.", true);
+        toast(t("toast.noNotes"), true);
         return;
       }
 
       trackSelect.innerHTML = "";
-      parsed.tracks.forEach((t, i) => {
+      parsed.tracks.forEach((track, i) => {
         const opt = document.createElement("option");
         opt.value = String(i);
-        const inst = t.instrument ? ` — ${t.instrument}` : "";
-        opt.textContent = `${t.name} (${t.noteCount} nota)${inst}`;
+        const inst = track.instrument ? ` — ${track.instrument}` : "";
+        opt.textContent = t("songs.trackOption", {
+          name: track.name,
+          count: track.noteCount,
+          inst,
+        });
         trackSelect.appendChild(opt);
       });
       trackSelect.disabled = false;
@@ -6435,9 +6869,9 @@ window.mainJsOk = true;
       } catch {
         btnPlay.disabled = false;
       }
-      toast(`"${song.name}" yüklendi.`);
+      toast(t("toast.songLoaded", { name: song.name }));
     } catch (err) {
-      toast(`Şarkı yüklenemedi: ${err.message}`, true);
+      toast(t("toast.songLoadFail", { msg: err.message }), true);
     }
   }
 
@@ -6446,7 +6880,7 @@ window.mainJsOk = true;
     try {
       await LibraryStore.deleteSong(LibraryStore.getActiveLibraryId(), songId);
       renderSongs();
-      trackSelect.innerHTML = '<option value="">Şarkı seçin</option>';
+      resetTrackSelectEmpty();
       trackSelect.disabled = true;
       try {
         requireMods().Game.stop();
@@ -6454,22 +6888,21 @@ window.mainJsOk = true;
         /* */
       }
       btnPlay.disabled = true;
-      toast("Şarkı silindi.");
+      toast(t("toast.songDeleted"));
     } catch (err) {
-      toast(`Silinemedi: ${err.message}`, true);
+      toast(t("toast.deleteFail", { msg: err.message }), true);
     }
   }
 
   function showFeedback(type, points) {
     if (type === "complete") {
-      toast("Parça bitti! ■ ile yeniden başlayın.");
+      toast(t("toast.trackDone"));
       try {
         requireMods().Game.setAutoPlayMode(false);
       } catch {
         /* */
       }
-      btnPlay.textContent = "▶ Oynat (sen çal)";
-      if (btnAutoPlay) btnAutoPlay.textContent = "🎹 Sen çal";
+      syncTransportButtons();
       return;
     }
     const el = document.createElement("div");
@@ -6553,7 +6986,7 @@ window.mainJsOk = true;
     const LibraryStore = requireStore();
     const libId = LibraryStore.getActiveLibraryId();
     if (!libId) {
-      toast("Önce bir kütüphane seçin veya oluşturun.", true);
+      toast(t("toast.pickLib"), true);
       return;
     }
     try {
@@ -6571,11 +7004,11 @@ window.mainJsOk = true;
       const cloud = window.pianoApi.isMember?.();
       toast(
         cloud
-          ? `${imported.length} MIDI buluta kaydedildi.`
-          : `${imported.length} MIDI bu tarayıcıya kaydedildi (misafir).`
+          ? t("toast.midiCloud", { n: imported.length })
+          : t("toast.midiLocal", { n: imported.length })
       );
     } catch (err) {
-      toast(`MIDI eklenemedi: ${err.message}`, true);
+      toast(t("toast.midiFail", { msg: err.message }), true);
     }
   });
 
@@ -6584,11 +7017,11 @@ window.mainJsOk = true;
     const LibraryStore = requireStore();
     const libId = LibraryStore.getActiveLibraryId();
     if (!libId) {
-      toast("Önce bir kütüphane seçin veya oluşturun.", true);
+      toast(t("toast.pickLib"), true);
       return;
     }
     if (!window.pianoApi?.importAudio) {
-      toast("Ses içe aktarma bu sürümde yok.", true);
+      toast(t("toast.audioNoImport"), true);
       return;
     }
     if (btnImportAudio) btnImportAudio.disabled = true;
@@ -6600,21 +7033,19 @@ window.mainJsOk = true;
     try {
       const imported = await window.pianoApi.importAudio(libId);
       if (!imported.length) {
-        toast("İşlem iptal edildi veya dosya seçilmedi.");
+        toast(t("toast.importCancel"));
         return;
       }
       await LibraryStore.importSongs(libId, imported);
       renderSongs();
       const totalNotes = imported.reduce((s, x) => s + (x.noteCount || 0), 0);
-      toast(
-        `${imported.length} parça MIDI'ye çevrildi (${totalNotes} nota). Şarkıyı seçip oynatın.`
-      );
+      toast(t("toast.audioConverted", { n: imported.length, notes: totalNotes }));
       if (imported.length === 1) {
         LibraryStore.setActiveSong(imported[0].id);
         await selectSong(imported[0].id);
       }
     } catch (err) {
-      toast(`Ses dönüştürülemedi: ${err.message}`, true);
+      toast(t("toast.convertFail", { msg: err.message }), true);
     } finally {
       unbindAudioProgress?.();
       unbindAudioProgress = null;
@@ -6712,7 +7143,7 @@ window.mainJsOk = true;
     const id = instrumentSelect.value;
     requireMods().AudioEngine.setInstrument(id);
     persistSettings({ instrumentId: id });
-    toast(`Ses: ${instrumentSelect.selectedOptions[0]?.textContent || id}`);
+    toast(t("toast.sound", { name: instrumentSelect.selectedOptions[0]?.textContent || id }));
   });
 
   playModeSelect?.addEventListener("change", () => {
@@ -6720,37 +7151,39 @@ window.mainJsOk = true;
       const m = applyPlayMode(playModeSelect.value, { force: true });
       reloadTrackNotes();
       updateSettingsForPlayMode(m);
-      toast(`Enstrüman: ${window.PlaySurface.getModes()[m]?.label || m}`);
+      toast(t("toast.instrument", { name: window.PlaySurface.getModes()[m]?.label || m }));
     } catch (err) {
       console.error(err);
       updateSettingsForPlayMode(playModeSelect.value);
-      toast(`Enstrüman değişti; bazı ayarlar yenilenemedi: ${err.message}`, true);
+      toast(t("toast.instrumentRefreshFail", { msg: err.message }), true);
     }
   });
 
   btnMoveInstrument?.addEventListener("click", () => {
     const mode = window.PlaySurface?.getMode?.() || "piano";
     if (mode === "piano") {
-      toast("Piyano konumu: Ayarlar → Klavye → konum / hiza.");
+      toast(t("toast.moveHintPiano"));
       return;
     }
-    toast("Gitar/keman panelleri sabit düzende. Boyut için Ayarlar → Klavye kaydırıcılarını kullanın.");
+    const IM = window.InstrumentMove;
+    if (IM) IM.setMoveMode(!IM.isMoveMode());
   });
 
   dynamicPressure.addEventListener("change", () => {
     requireMods().AudioEngine.setDynamicPressure(dynamicPressure.checked);
     persistSettings({ dynamicPressure: dynamicPressure.checked });
-    toast(dynamicPressure.checked ? "Dinamik basınç açık." : "Sabit ses şiddeti.");
+    toast(dynamicPressure.checked ? t("toast.dynamicOn") : t("toast.dynamicOff"));
   });
 
-  sustainEnabled.addEventListener("change", () => {
-    requireMods().AudioEngine.setSustain(sustainEnabled.checked);
-    persistSettings({ sustainEnabled: sustainEnabled.checked });
-    toast(
-      sustainEnabled.checked
-        ? "Sustain açık — bırakınca ses yumuşak söner."
-        : "Sustain kapalı — bırakınca ses hemen kesilir."
-    );
+  sustainRange?.addEventListener("input", () => {
+    const ms = Number(sustainRange.value);
+    if (sustainLabel) sustainLabel.textContent = `${ms} ms`;
+    requireMods().AudioEngine.setSustainMs(ms);
+    persistSettings({ sustainMs: ms });
+  });
+
+  sustainRange?.addEventListener("change", () => {
+    toast(t("toast.sustainMs", { ms: Number(sustainRange.value) }));
   });
 
   speedRange.addEventListener("input", () => {
@@ -6781,7 +7214,7 @@ window.mainJsOk = true;
   btnApplyLabels.addEventListener("click", () => {
     persistSettings({ customLabels: customLabels.value });
     applyLabelSettings(AppSettings.load());
-    toast("Tuş harfleri güncellendi.");
+    toast(t("toast.labelsUpdated"));
   });
 
   customLabels.addEventListener("keydown", (e) => {
@@ -6800,7 +7233,7 @@ window.mainJsOk = true;
     const id = flameStyle.value;
     requireMods().Game.setFlameStyle(id);
     persistSettings({ flameStyle: id });
-    toast(`Alev stili: ${window.FlameStyles?.getStyleName(id) || id}`);
+    toast(t("toast.flameStyle", { name: window.FlameStyles?.getStyleName(id) || id }));
   });
 
   function applyTrim() {
@@ -6810,7 +7243,7 @@ window.mainJsOk = true;
     try {
       requireMods().Game.setTrim(start, end);
       reloadTrackNotes();
-      toast(`Kırpma: baş ${start} sn, son ${end} sn`);
+      toast(t("toast.trim", { start, end }));
     } catch {
       /* */
     }
@@ -6820,6 +7253,7 @@ window.mainJsOk = true;
   trimEndInput?.addEventListener("change", applyTrim);
 
   setupSettingsTabs();
+  setupSidebarTabs();
   effectHueInput?.addEventListener("input", persistThemeFromInputs);
   keyColorTopInput?.addEventListener("input", persistThemeFromInputs);
   keyColorMidInput?.addEventListener("input", persistThemeFromInputs);
@@ -6847,7 +7281,7 @@ window.mainJsOk = true;
     window.KeyboardInput?.setEnabled(on);
     if (on) window.KeyboardInput?.rebuild?.();
     persistSettings({ keyboardEnabled: on });
-    toast(on ? "Klavye ile çalma açık." : "Klavye ile çalma kapalı.");
+    toast(on ? t("toast.kbOn") : t("toast.kbOff"));
   });
 
   keyboardLayout?.addEventListener("change", () => {
@@ -6856,7 +7290,13 @@ window.mainJsOk = true;
     persistSettings({ keyboardLayout: id });
     updateKeyboardLayoutHint();
     window.KeyboardInput?.rebuild?.();
-    toast(id === "auto" ? "Klavye düzeni otomatik algılanacak." : `Klavye düzeni: ${keyboardLayout.options[keyboardLayout.selectedIndex].text}`);
+    toast(
+      id === "auto"
+        ? t("toast.kbLayoutAuto")
+        : t("toast.kbLayoutPick", {
+            name: keyboardLayout.options[keyboardLayout.selectedIndex].text,
+          })
+    );
   });
 
   let keyboardLayoutSaveTimer = null;
@@ -6894,10 +7334,10 @@ window.mainJsOk = true;
     AudioEngine.ensure();
     if (Game.isPlaying()) {
       Game.pause();
-      btnPlay.textContent = "▶ Oynat (sen çal)";
+      syncTransportButtons();
     } else {
       Game.play();
-      btnPlay.textContent = "⏸ Duraklat";
+      syncTransportButtons({ playing: true });
       btnStop.disabled = false;
     }
   });
@@ -6908,14 +7348,12 @@ window.mainJsOk = true;
     Game.setAutoPlayMode(true);
     if (Game.isPlaying()) {
       Game.pause();
-      btnAutoPlay.textContent = "🎹 Sen çal";
-      btnPlay.textContent = "▶ Oynat (sen çal)";
+      syncTransportButtons();
     } else {
       Game.play();
-      btnAutoPlay.textContent = "⏸ Bilgisayar duraklat";
-      btnPlay.textContent = "▶ Oynat (sen çal)";
+      syncTransportButtons({ playing: true, autoPlaying: true });
       btnStop.disabled = false;
-      toast("Bilgisayar çalıyor — notalar otomatik vuruluyor.");
+      toast(t("toast.autoPlayOn"));
     }
   });
 
@@ -6925,8 +7363,7 @@ window.mainJsOk = true;
     PlaySurface.releaseAll?.();
     window.KeyboardInput?.releaseAll?.();
     Game.resetRound();
-    btnPlay.textContent = "▶ Oynat (sen çal)";
-    btnAutoPlay.textContent = "🎹 Sen çal";
+    syncTransportButtons();
     btnPlay.disabled = !Game.hasNotes();
     btnAutoPlay.disabled = !Game.hasNotes();
     btnStop.disabled = true;
@@ -6946,6 +7383,7 @@ window.mainJsOk = true;
   window.addEventListener("staveflow:locale", () => applyAppTranslations());
 
   (async function boot() {
+    const smokeBoot = new URLSearchParams(window.location.search).has("smoke");
     const savedLoc = AppSettings.load().locale;
     if (savedLoc) window.I18n.setPreference(savedLoc);
     else window.I18n.init();
@@ -6953,15 +7391,56 @@ window.mainJsOk = true;
     window.__appName = APP_NAME;
     if (appVersion) appVersion.textContent = `${APP_NAME} ${APP_VERSION}`;
     applyAppTranslations();
+    syncPlatformUI();
     bindProgressSeek();
     window.__bootStatus = "başlıyor";
-    try {
-      if (window.IntroSplash?.play) {
-        await window.IntroSplash.play();
-      }
-    } catch (err) {
-      console.warn("Intro:", err);
+
+    if (smokeBoot) {
+      AppSettings.save({ instrumentPromptDone: true });
     }
+
+    let cloudLibError = null;
+    const libraryBootPromise = (async () => {
+      try {
+        if (window.pianoApi?.isWeb && window.pianoApi.waitForSession) {
+          await window.pianoApi.waitForSession(4500);
+        }
+        try {
+          await requireStore().load();
+        } catch (loadErr) {
+          cloudLibError = loadErr.message;
+          if (!window.pianoApi?.isWeb) throw loadErr;
+        }
+        if (window.StarterLibrary?.ensure) {
+          try {
+            await window.StarterLibrary.ensure(requireStore());
+          } catch (err) {
+            console.warn("Örnek kütüphane:", err);
+          }
+        }
+        return true;
+      } catch (err) {
+        window.__bootStatus = "hata: " + err.message;
+        if (window.pianoApi?.isWeb) {
+          cloudLibError = cloudLibError || err.message;
+          return false;
+        }
+        toast(t("toast.bootLibError", { msg: err.message }), true);
+        console.error(err);
+        return false;
+      }
+    })();
+
+    if (!smokeBoot) {
+      try {
+        if (window.IntroSplash?.play) {
+          await window.IntroSplash.play();
+        }
+      } catch (err) {
+        console.warn("Intro:", err);
+      }
+    }
+
     try {
       const { PlaySurface, Game, AppSettings } = requireMods();
       Game.init($("#notesCanvas"), {
@@ -6978,7 +7457,7 @@ window.mainJsOk = true;
       scheduleInstrumentLayoutSync();
       window.KeyboardInput?.bind?.();
       window.KeyboardInput?.rebuild?.();
-      showInstrumentPickerIfNeeded();
+      if (!smokeBoot) showInstrumentPickerIfNeeded();
       updateSettingsForPlayMode(PlaySurface.getMode());
       applyAppTranslations();
       window.__bootStatus = "piyano hazır";
@@ -6988,39 +7467,17 @@ window.mainJsOk = true;
       console.error(err);
     }
 
-    let cloudLibError = null;
-    try {
-      if (window.pianoApi?.isWeb && window.pianoApi.waitForSession) {
-        await window.pianoApi.waitForSession(4500);
-      }
-      try {
-        await requireStore().load();
-      } catch (loadErr) {
-        cloudLibError = loadErr.message;
-        if (!window.pianoApi?.isWeb) throw loadErr;
-      }
-      if (window.StarterLibrary?.ensure) {
-        try {
-          await window.StarterLibrary.ensure(requireStore());
-        } catch (err) {
-          console.warn("Örnek kütüphane:", err);
-        }
-      }
+    const libOk = await libraryBootPromise;
+    if (libOk) {
       window.__bootStatus = "kütüphane yüklendi";
       renderLibraries();
       renderSongs();
       updateImportButtons();
-    } catch (err) {
-      window.__bootStatus = "hata: " + err.message;
-      if (window.pianoApi?.isWeb) {
-        cloudLibError = cloudLibError || err.message;
-        renderLibraries();
-        updateImportButtons();
-      } else {
-        toast(t("toast.bootLibError", { msg: err.message }), true);
-        console.error(err);
-        return;
-      }
+    } else if (window.pianoApi?.isWeb) {
+      renderLibraries();
+      updateImportButtons();
+    } else if (!libOk) {
+      return;
     }
 
     if (cloudLibError) {

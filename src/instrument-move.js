@@ -59,14 +59,18 @@ const InstrumentMove = (() => {
     window.AppSettings.save({ panelLayout: layout });
   }
 
+  function syncMoveBtn() {
+    const btn = document.getElementById("btnMoveInstrument");
+    if (!btn || !window.I18n) return;
+    const on = moveMode;
+    btn.classList.toggle("active", on);
+    btn.textContent = on ? window.I18n.t("settings.moveSave") : window.I18n.t("settings.move");
+  }
+
   function setMoveMode(on) {
     moveMode = !!on;
     document.body.classList.toggle("instrument-move-mode", moveMode);
-    const btn = document.getElementById("btnMoveInstrument");
-    if (btn) {
-      btn.classList.toggle("active", moveMode);
-      btn.textContent = moveMode ? "✓ Konumu kaydet" : "↔ Hareket ettir";
-    }
+    syncMoveBtn();
   }
 
   function isMoveMode() {
@@ -133,7 +137,9 @@ const InstrumentMove = (() => {
 
   bind();
 
-  return { setMoveMode, isMoveMode, applyLayout };
+  window.addEventListener("staveflow:locale", () => syncMoveBtn());
+
+  return { setMoveMode, isMoveMode, applyLayout, syncMoveBtn };
 })();
 
 window.InstrumentMove = InstrumentMove;

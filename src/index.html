@@ -18,7 +18,7 @@
     #authBanner.ok { background: #1a3d2e; color: #bbf7d0; }
     #authBanner.warn { background: #4a3520; color: #fde68a; }
     body.has-auth-banner {
-      grid-template-rows: auto auto minmax(0, 1fr) minmax(0, var(--footer-row-h, min(42vh, 420px)));
+      grid-template-rows: auto auto minmax(0, 1fr) minmax(0, var(--footer-row-h, auto));
       grid-template-areas:
         "banner banner"
         "header header"
@@ -31,6 +31,9 @@
         "header header"
         "sidebar piano"
         "sidebar main";
+    }
+    body.has-auth-banner.piano-dock-middle {
+      grid-template-rows: auto auto minmax(0, 1fr) 0;
     }
     body.has-auth-banner.piano-dock-middle .game-area,
     body.has-auth-banner.piano-dock-middle .instrument-footer,
@@ -70,10 +73,10 @@
     <button type="button" id="introSplashSkip" class="btn" data-i18n="intro.skip">Skip</button>
   </div>
 
-  <div id="authBanner" class="warn">Wix hesabına bağlanılıyor… Siteye giriş yaptığınızdan emin olun.</div>
+  <div id="authBanner" class="warn" data-i18n="auth.connecting">Connecting to Wix account… Please sign in on the site.</div>
 
-  <div id="apiError" class="api-error hidden">
-    Oynatıcı yüklenemedi. Wix sitenizdeki <strong>Piyano</strong> sayfasından açın veya yapılandırmayı kontrol edin.
+  <div id="apiError" class="api-error hidden" data-i18n-html="apiError.web">
+    Player failed to load. Open from your Wix <strong>Piano</strong> page or check configuration.
   </div>
 
   <header class="top-bar">
@@ -90,29 +93,29 @@
         <span id="timeTotal">0:00</span>
       </div>
       <div class="time-remaining"><span id="timeRemainingLabel" data-i18n="header.remaining">Left:</span> <strong id="timeRemaining">0:00</strong></div>
-      <div id="progressTrack" class="progress-track" role="slider" aria-label="Parça konumu" aria-valuemin="0" aria-valuemax="100">
+      <div id="progressTrack" class="progress-track" role="slider" data-i18n-aria="header.trackPosition" aria-valuemin="0" aria-valuemax="100">
         <div id="progressFill" class="progress-fill"></div>
         <div id="progressThumb" class="progress-thumb"></div>
       </div>
     </div>
     <div class="view-controls">
       <label class="play-mode-bar">
-        <span class="sr-only">Enstrüman</span>
-        <select id="playModeSelect" title="Çalma enstrümanı">
+        <span class="sr-only" data-i18n="header.instrument">Instrument</span>
+        <select id="playModeSelect" data-i18n-title="header.instrument" title="Instrument">
           <option value="piano">🎹 Piyano</option>
           <option value="guitar">🎸 Gitar</option>
           <option value="violin">🎻 Keman</option>
         </select>
       </label>
-      <button type="button" id="btnToggleSidebar" class="btn small" title="Sol menü">☰ Menü</button>
-      <button type="button" id="btnFullscreen" class="btn small" title="Tam ekran">⛶ Tam ekran</button>
+      <button type="button" id="btnToggleSidebar" class="btn small" data-i18n="header.menu" data-i18n-title="header.menu" title="Menu">☰ Menu</button>
+      <button type="button" id="btnFullscreen" class="btn small" data-i18n="header.fullscreen" data-i18n-title="header.fullscreen" title="Full screen">⛶ Full screen</button>
     </div>
     <div class="transport">
-      <button id="btnPlay" class="btn primary" disabled>▶ Oynat (sen çal)</button>
-      <button id="btnAutoPlay" class="btn" disabled title="Bilgisayar doğru notaları çalar">🎹 Sen çal</button>
-      <button id="btnStop" class="btn" disabled>■ Durdur</button>
+      <button id="btnPlay" class="btn primary" disabled data-i18n="header.play">▶ Play (you play)</button>
+      <button id="btnAutoPlay" class="btn" disabled data-i18n="header.autoplay" data-i18n-title="header.autoplay" title="Auto play">🎹 Auto play</button>
+      <button id="btnStop" class="btn" disabled data-i18n="header.stop">■ Stop</button>
       <label class="speed-label">
-        Hız
+        <span data-i18n="header.speed">Speed</span>
         <input type="range" id="speedRange" min="50" max="150" value="100" />
         <span id="speedLabel">100%</span>
       </label>
@@ -120,74 +123,99 @@
   </header>
 
   <aside class="sidebar">
-    <section class="panel">
-      <div class="panel-head">
-        <h2>Kütüphaneler</h2>
-        <button type="button" id="btnNewLibrary" class="btn small" title="Yeni kütüphane">+</button>
+    <nav class="sidebar-tabs" role="tablist" aria-label="Sidebar">
+      <button type="button" class="sidebar-tab active" role="tab" aria-selected="true" data-sidebar-tab="library" data-i18n="sidebar.tab.library">Library</button>
+      <button type="button" class="sidebar-tab" role="tab" aria-selected="false" data-sidebar-tab="songs" data-i18n="sidebar.tab.songs">Songs</button>
+      <button type="button" class="sidebar-tab" role="tab" aria-selected="false" data-sidebar-tab="settings" data-i18n="sidebar.tab.settings">Settings</button>
+    </nav>
+
+    <div class="sidebar-panel active" data-sidebar-panel="library">
+    <section class="panel panel-inset">
+      <div class="panel-head panel-head-end">
+        <button type="button" id="btnNewLibrary" class="btn small" data-i18n-title="libs.new" title="New library">+</button>
       </div>
       <form id="inlineLibraryForm" class="inline-form">
-        <input type="text" id="inlineLibraryName" placeholder="Yeni kütüphane adı" maxlength="64" />
-        <button type="submit" class="btn small primary">Ekle</button>
+        <input type="text" id="inlineLibraryName" data-i18n-placeholder="libs.new" placeholder="New library name" maxlength="64" />
+        <button type="submit" class="btn small primary" data-i18n="libs.add">Add</button>
       </form>
       <ul id="libraryList" class="list"></ul>
-      <p id="libraryHint" class="hint">Kütüphane seçin veya yukarıdan ekleyin. Dosyalar Wix hesabınıza kaydedilir.</p>
+      <p id="libraryHint" class="hint"></p>
     </section>
+    </div>
 
-    <section class="panel" id="songsPanel">
-      <div class="panel-head">
-        <h2>Şarkılar</h2>
-        <button type="button" id="btnImportMidi" class="btn small" disabled title="MIDI ekle">+ MIDI</button>
+    <div class="sidebar-panel" data-sidebar-panel="songs">
+    <section class="panel panel-inset" id="songsPanel">
+      <div class="panel-head panel-head-end">
+        <button type="button" id="btnImportMidi" class="btn small" disabled data-i18n="songs.midi">+ MIDI</button>
+        <button type="button" id="btnImportAudio" class="btn small hidden" disabled data-i18n="songs.audio">♫ MP3→MIDI</button>
       </div>
-      <p class="hint small-hint">Web: MIDI parça başına ~15 MB. MP3→MIDI için masaüstü (<code>npm start</code>). Şarkı seçince <strong>▶ Oynat</strong>.</p>
+      <p class="hint small-hint songs-hint-web" data-i18n-html="songs.hintWeb">Web: ~15 MB per MIDI…</p>
+      <p class="hint small-hint songs-hint-audio hidden" data-i18n="songs.hintAudio">MP3→MIDI: best with single instrument or vocal.</p>
       <ul id="songList" class="list"></ul>
-      <p id="songHint" class="hint">Önce bir kütüphane seçin.</p>
+      <p id="songHint" class="hint"></p>
     </section>
+    </div>
 
-    <section class="panel settings-panel">
-      <h2 data-i18n="settings.title">Settings</h2>
+    <div class="sidebar-panel" data-sidebar-panel="settings">
+    <section class="panel settings-panel panel-inset">
       <label class="field">
         <span data-i18n="settings.language">Language</span>
-        <select id="localeSelect" aria-label="Language"></select>
+        <select id="localeSelect" aria-label="Language">
+          <option value="auto">🌐 Auto / Otomatik</option>
+          <option value="en">English</option>
+          <option value="tr">Türkçe</option>
+          <option value="de">Deutsch</option>
+          <option value="fr">Français</option>
+          <option value="it">Italiano</option>
+          <option value="es">Español</option>
+          <option value="pt">Português</option>
+          <option value="nl">Nederlands</option>
+          <option value="pl">Polski</option>
+          <option value="ru">Русский</option>
+          <option value="ja">日本語</option>
+          <option value="ko">한국어</option>
+          <option value="zh">中文</option>
+        </select>
       </label>
       <div class="panel-actions">
-        <button type="button" id="btnMoveInstrument" class="btn small" title="Gitar/keman panellerini sürükleyin">↔ Hareket ettir</button>
+        <button type="button" id="btnMoveInstrument" class="btn small" data-i18n="settings.move">↔ Move panels</button>
       </div>
       <nav class="settings-tabs" role="tablist">
-        <button type="button" class="stab active" data-tab="song">Parça</button>
-        <button type="button" class="stab" data-tab="keys" id="stabKeys">Klavye</button>
-        <button type="button" class="stab" data-tab="look">Görünüm</button>
-        <button type="button" class="stab" data-tab="play">Oyun</button>
+        <button type="button" class="stab active" data-tab="song" data-i18n="settings.tab.song">Track</button>
+        <button type="button" class="stab" data-tab="keys" id="stabKeys" data-i18n="settings.tab.keys">Keyboard</button>
+        <button type="button" class="stab" data-tab="look" data-i18n="settings.tab.look">Look</button>
+        <button type="button" class="stab" data-tab="play" data-i18n="settings.tab.play">Play</button>
       </nav>
 
       <div class="stab-panel active" data-panel="song">
         <label class="field">
-          MIDI izi
+          <span data-i18n="settings.track">MIDI track</span>
           <select id="trackSelect" disabled>
-            <option value="">Önce şarkı seçin</option>
+            <option value="" data-i18n="settings.trackEmpty">Select a song first</option>
           </select>
         </label>
         <label class="field">
-          Baştan kes (sn)
+          <span data-i18n="settings.trimStart">Trim start (sec)</span>
           <input type="number" id="trimStart" min="0" max="600" step="0.5" value="0" />
         </label>
         <label class="field">
-          Sondan kes (sn)
+          <span data-i18n="settings.trimEnd">Trim end (sec)</span>
           <input type="number" id="trimEnd" min="0" max="600" step="0.5" value="0" />
         </label>
-        <p class="hint small-hint">Kırpma sonrası parça yeniden yüklenir.</p>
+        <p class="hint small-hint" data-i18n="settings.trimHint">Track reloads after trimming.</p>
       </div>
 
       <div class="stab-panel" data-panel="keys">
         <div class="settings-scope settings-scope-piano">
         <label class="field">
-          Başlangıç oktavı
+          <span data-i18n="settings.octaveStart">Start octave</span>
           <select id="octaveStart"></select>
         </label>
         <label class="field">
-          Oktav sayısı
+          <span data-i18n="settings.octaveCount">Octave count</span>
           <select id="octaveCount"></select>
         </label>
-        <p class="hint small-hint">Şarkı seçilince otomatik (tam genişlik).</p>
+        <p class="hint small-hint" data-i18n="settings.octaveHint">Auto-fits full width when a song is selected.</p>
         </div>
         <div class="settings-scope settings-scope-piano-only">
         <label class="field">
@@ -201,180 +229,184 @@
         </div>
         <div class="settings-scope settings-scope-fretted">
         <label class="field">
-          Kol tel yüksekliği: <span id="guitarNeckHeightLabel">30 px</span>
+          <span data-i18n="settings.neckHeight">Neck row height</span>: <span id="guitarNeckHeightLabel">30 px</span>
           <input type="range" id="guitarNeckHeight" min="10" max="220" value="30" />
         </label>
         <label class="field">
-          Sağ tel yüksekliği: <span id="guitarStringHeightLabel">30 px</span>
+          <span data-i18n="settings.stringHeight">String row height</span>: <span id="guitarStringHeightLabel">30 px</span>
           <input type="range" id="guitarStringHeight" min="10" max="220" value="30" />
         </label>
         <label class="field">
-          Kol / perde genişliği: <span id="guitarNeckWidthLabel">42 px</span>
+          <span data-i18n="settings.neckWidth">Neck / fret width</span>: <span id="guitarNeckWidthLabel">42 px</span>
           <input type="range" id="guitarNeckWidth" min="10" max="240" value="42" />
         </label>
         <label class="field">
-          Teller paneli genişliği: <span id="guitarPluckWidthLabel">220 px</span>
+          <span data-i18n="settings.pluckWidth">Strings panel width</span>: <span id="guitarPluckWidthLabel">220 px</span>
           <input type="range" id="guitarPluckWidth" min="80" max="900" value="220" />
         </label>
-        <label class="field settings-scope-guitar-only">
+        <label class="field settings-scope-guitar-only toggle-row">
+          <span data-i18n="settings.gripGuitar">Grip all strings (guitar)</span>
           <input type="checkbox" id="guitarGripAllStrings" />
-          Tüm telleri sık (gitar — bir perde → 6 tel)
         </label>
-        <label class="field settings-scope-guitar-only">
+        <label class="field settings-scope-guitar-only toggle-row">
+          <span data-i18n="settings.neckNearby">Frets: detect nearby touch</span>
           <input type="checkbox" id="guitarNeckNearbyTouch" checked />
-          Perde: yakın temasları da algıla
         </label>
-        <label class="field settings-scope-guitar-only">
+        <label class="field settings-scope-guitar-only toggle-row">
+          <span data-i18n="settings.stringsNearby">Strings: detect nearby touch</span>
           <input type="checkbox" id="guitarStringsNearbyTouch" />
-          Sağ teller: yakın temasları da algıla
         </label>
-        <label class="field settings-scope-violin-only">
+        <label class="field settings-scope-violin-only toggle-row">
+          <span data-i18n="settings.gripViolin">Grip all strings (violin)</span>
           <input type="checkbox" id="violinGripAllStrings" />
-          Tüm telleri sık (keman — bir pozisyon → 4 tel)
         </label>
-        <label class="field settings-scope-violin-only">
+        <label class="field settings-scope-violin-only toggle-row">
+          <span data-i18n="settings.neckNearby">Frets: detect nearby touch</span>
           <input type="checkbox" id="violinNeckNearbyTouch" checked />
-          Perde: yakın temasları da algıla
         </label>
-        <label class="field settings-scope-violin-only">
+        <label class="field settings-scope-violin-only toggle-row">
+          <span data-i18n="settings.stringsNearby">Strings: detect nearby touch</span>
           <input type="checkbox" id="violinStringsNearbyTouch" />
-          Sağ teller: yakın temasları da algıla
         </label>
-        <p class="hint small-hint">Kapalıyken her tele ayrı perde. Açıkken bir perde tüm tellere uygulanır.</p>
+        <p class="hint small-hint" data-i18n="settings.gripHint">Off = separate fret per string.</p>
         </div>
         <div class="settings-scope settings-scope-strings">
         <label class="field">
-          Tel titreşim hassasiyeti: <span id="vibratoSensLabel">Normal</span>
+          <span data-i18n="settings.vibrato">String vibrato sensitivity</span>: <span id="vibratoSensLabel">Normal</span>
           <input type="range" id="stringVibratoSens" min="50" max="200" value="100" />
         </label>
-        <p class="hint small-hint">Teller panelinde parmağınızı basılı tutup hafifçe sürükleyin — titreşim artar.</p>
+        <p class="hint small-hint" data-i18n="settings.vibratoHint">Hold and slide slightly on strings panel for vibrato.</p>
         </div>
         <label class="field">
           <span id="dockDesc">Enstrüman konumu (dikey)</span>
           <select id="pianoDock">
-            <option value="bottom" selected>Alt (varsayılan)</option>
-            <option value="middle">Orta (notaların altı)</option>
-            <option value="top">Üst</option>
+            <option value="bottom" selected data-i18n="settings.dock.bottom">Bottom (default)</option>
+            <option value="middle" data-i18n="settings.dock.middle">Middle (below notes)</option>
+            <option value="top" data-i18n="settings.dock.top">Top</option>
           </select>
         </label>
         <label class="field">
-          <span id="alignDesc">Enstrüman hizası (yatay)</span>
+          <span id="alignDesc">Instrument alignment (horizontal)</span>
           <select id="pianoAlign">
-            <option value="stretch" selected>Tam genişlik</option>
-            <option value="left">Sola</option>
-            <option value="center">Ortaya</option>
-            <option value="right">Sağa</option>
+            <option value="stretch" selected data-i18n="settings.align.stretch">Full width</option>
+            <option value="left" data-i18n="settings.align.left">Left</option>
+            <option value="center" data-i18n="settings.align.center">Center</option>
+            <option value="right" data-i18n="settings.align.right">Right</option>
           </select>
         </label>
-        <p class="hint small-hint settings-scope settings-scope-piano">Az oktav kullanıyorsanız ortaya/sağa hizalayın veya orta konuma alın.</p>
-        <p class="hint small-hint settings-scope settings-scope-strings">Panelleri sol menüden ↔ Hareket ettir ile sürükleyebilirsiniz.</p>
+        <p class="hint small-hint settings-scope settings-scope-piano" data-i18n="settings.dockHintPiano">With few octaves, try center/right align or middle position.</p>
+        <p class="hint small-hint settings-scope settings-scope-strings" data-i18n="settings.dockHintStrings">Drag panels with ↔ Move in the sidebar.</p>
         <label class="field settings-scope settings-scope-piano">
-          Enstrüman sesi
+          <span data-i18n="settings.instrumentSound">Instrument sound</span>
           <select id="instrumentSelect">
-            <option value="piano">Piyano</option>
-            <option value="violin">Keman</option>
-            <option value="guitar">Gitar</option>
-            <option value="flute">Flüt</option>
-            <option value="brass">Bakır üflemeli</option>
-            <option value="synth">Synth</option>
+            <option value="piano" data-i18n="inst.piano">Piano</option>
+            <option value="violin" data-i18n="inst.violin">Violin</option>
+            <option value="guitar" data-i18n="inst.guitar">Guitar</option>
+            <option value="flute" data-i18n="inst.flute">Flute</option>
+            <option value="brass" data-i18n="inst.brass">Brass</option>
+            <option value="synth" data-i18n="inst.synth">Synth</option>
           </select>
         </label>
         <div class="settings-scope settings-scope-piano">
         <label class="field">
-          Etiket modu
+          <span data-i18n="settings.labelMode">Label mode</span>
           <select id="labelMode">
-            <option value="note">Nota adı</option>
-            <option value="letters">Harf düzeni</option>
-            <option value="custom">Özel liste</option>
+            <option value="note" data-i18n="settings.label.note">Note name</option>
+            <option value="letters" data-i18n="settings.label.letters">Letter layout</option>
+            <option value="custom" data-i18n="settings.label.custom">Custom list</option>
           </select>
         </label>
         <label class="field" id="labelPresetWrap">
-          Harf düzeni
+          <span data-i18n="settings.labelPreset">Letter preset</span>
           <select id="labelPreset">
-            <option value="game">Oyun (ZXCV…)</option>
-            <option value="piano">Klavye (AWSE…)</option>
+            <option value="game" data-i18n="settings.label.game">Game (ZXCV…)</option>
+            <option value="piano" data-i18n="settings.label.piano">Keyboard (AWSE…)</option>
           </select>
         </label>
         <label class="field" id="customLabelsWrap">
-          Özel harfler
+          <span data-i18n="settings.customLetters">Custom letters</span>
           <input type="text" id="customLabels" placeholder="Z,X,C,V,…" />
-          <button type="button" id="btnApplyLabels" class="btn small primary">Uygula</button>
+          <button type="button" id="btnApplyLabels" class="btn small primary" data-i18n="settings.apply">Apply</button>
         </label>
-        <p class="hint small-hint">Tuşa <strong>sağ tık</strong> (fare) → harf ata. Dokunmatikte Ayarlar’dan düzenleyin.</p>
+        <p class="hint small-hint" data-i18n-html="settings.labelHint">Right-click a key to assign a letter.</p>
         </div>
       </div>
 
       <div class="stab-panel" data-panel="look">
+        <p class="hint small-hint settings-theme-hint" data-i18n="settings.themeHint">Colors are saved per instrument.</p>
         <label class="field">
-          Efekt rengi (ton)
+          <span data-i18n="settings.effectHue">Effect hue</span>
           <input type="range" id="effectHue" min="0" max="360" value="275" />
         </label>
         <label class="field color-row">
-          Basılı tuş (üst)
+          <span data-i18n="settings.keyTop">Pressed key (top)</span>
           <input type="color" id="keyColorTop" value="#e8d4ff" />
         </label>
         <label class="field color-row">
-          Basılı tuş (orta)
+          <span data-i18n="settings.keyMid">Pressed key (mid)</span>
           <input type="color" id="keyColorMid" value="#a855f7" />
         </label>
         <label class="field color-row">
-          Basılı tuş (alt)
+          <span data-i18n="settings.keyBottom">Pressed key (bottom)</span>
           <input type="color" id="keyColorBottom" value="#6b21a8" />
         </label>
         <label class="field color-row">
-          Vuruş çizgisi
+          <span data-i18n="settings.hitLine">Hit line</span>
           <input type="color" id="hitLineColor" value="#d8b4fe" />
         </label>
         <label class="field">
-          Nota stili
+          <span data-i18n="settings.noteStyle">Note style</span>
           <select id="flameStyle">
-            <option value="aurora" selected>Aurora</option>
-            <option value="fire">Alev</option>
-            <option value="ice">Buz</option>
-            <option value="neon">Neon</option>
-            <option value="rainbow">Gökkuşağı</option>
-            <option value="plasma">Plazma</option>
-            <option value="minimal">Sade</option>
+            <option value="aurora" selected data-i18n="settings.flame.aurora">Aurora</option>
+            <option value="fire" data-i18n="settings.flame.fire">Fire</option>
+            <option value="ice" data-i18n="settings.flame.ice">Ice</option>
+            <option value="neon" data-i18n="settings.flame.neon">Neon</option>
+            <option value="rainbow" data-i18n="settings.flame.rainbow">Rainbow</option>
+            <option value="plasma" data-i18n="settings.flame.plasma">Plasma</option>
+            <option value="minimal" data-i18n="settings.flame.minimal">Minimal</option>
           </select>
         </label>
         <label class="field">
-          Efekt yoğunluğu: <span id="flameLabel">Normal</span>
+          <span data-i18n="settings.flameIntensity">Effect intensity</span>: <span id="flameLabel">Normal</span>
           <input type="range" id="flameRange" min="30" max="200" value="100" />
         </label>
       </div>
 
       <div class="stab-panel" data-panel="play">
         <label class="field toggle-row">
-          <span>Bilgisayar klavyesi</span>
+          <span data-i18n="settings.pcKeyboard">Computer keyboard</span>
           <input type="checkbox" id="keyboardEnabled" checked />
         </label>
         <label class="field">
-          Klavye düzeni
+          <span data-i18n="settings.kbLayout">Keyboard layout</span>
           <select id="keyboardLayout">
-            <option value="auto">Otomatik algıla</option>
-            <option value="qwerty">QWERTY (ABD/İngilizce)</option>
-            <option value="tr-f">Türkçe F</option>
-            <option value="tr-q">Türkçe Q</option>
-            <option value="qwertz">QWERTZ (Almanca)</option>
-            <option value="azerty">AZERTY (Fransızca)</option>
+            <option value="auto" data-i18n="settings.kb.auto">Auto-detect</option>
+            <option value="qwerty" data-i18n="settings.kb.qwerty">QWERTY (US/English)</option>
+            <option value="tr-f" data-i18n="settings.kb.tr-f">Turkish F</option>
+            <option value="tr-q" data-i18n="settings.kb.tr-q">Turkish Q</option>
+            <option value="qwertz" data-i18n="settings.kb.qwertz">QWERTZ (German)</option>
+            <option value="azerty" data-i18n="settings.kb.azerty">AZERTY (French)</option>
           </select>
         </label>
-        <p class="hint small-hint" id="keyboardLayoutHint">Algılanan: —</p>
+        <p class="hint small-hint" id="keyboardLayoutHint">Detected: —</p>
         <label class="field toggle-row">
-          <span>Dinamik basınç</span>
+          <span data-i18n="settings.dynamic">Dynamic pressure</span>
           <input type="checkbox" id="dynamicPressure" checked />
         </label>
-        <label class="field toggle-row">
-          <span>Sustain (yumuşak bırakış)</span>
-          <input type="checkbox" id="sustainEnabled" checked />
-        </label>
         <label class="field">
-          Zaman toleransı: <span id="timingLabel">200 ms</span>
+          <span data-i18n="settings.sustain">Sustain release</span>: <span id="sustainLabel">550 ms</span>
+          <input type="range" id="sustainRange" min="0" max="5000" step="10" value="550" />
+        </label>
+        <p class="hint small-hint" data-i18n="settings.sustainHint">0 = instant cut. Higher = longer soft fade after release.</p>
+        <label class="field">
+          <span data-i18n="settings.timing">Timing window</span>: <span id="timingLabel">200 ms</span>
           <input type="range" id="timingWindow" min="80" max="400" value="200" />
         </label>
-        <p class="hint small-hint">Dokunmatik: çok parmaklı jestler kapatıldı.</p>
+        <p class="hint small-hint" data-i18n="settings.touchHint">Touch: multi-finger gestures disabled.</p>
       </div>
     </section>
+    </div>
+    <div id="appVersion" class="sidebar-version"></div>
   </aside>
 
   <main class="game-area">
@@ -390,33 +422,33 @@
     <div id="guitarWrap" class="guitar-wrap instrument-panel hidden">
       <div class="inst-card guitar-chord-card">
         <div class="inst-card-head">
-          <div class="inst-card-title">Gitar kolu</div>
-          <p class="inst-card-sub">Perdeye basılı tutun — ses sağdan</p>
+          <div class="inst-card-title" data-i18n="inst.guitarNeck">Guitar neck</div>
+          <p class="inst-card-sub" data-i18n="inst.guitarNeckSub">Hold a fret — sound from the right</p>
         </div>
-        <div id="guitarFrets" class="guitar-neck"></div>
+        <div id="guitarFrets"></div>
       </div>
       <div class="inst-card guitar-strings-card">
         <div class="inst-card-head">
-          <div class="inst-card-title">Teller (titreştir)</div>
-          <p class="inst-card-sub">Aynı renk = aynı tel</p>
+          <div class="inst-card-title" data-i18n="inst.strings">Strings (pluck)</div>
+          <p class="inst-card-sub" data-i18n="inst.stringsSub">Same color = same string</p>
         </div>
-        <div id="guitarStrings" class="guitar-strings"></div>
+        <div id="guitarStrings"></div>
       </div>
     </div>
     <div id="violinWrap" class="violin-wrap instrument-panel hidden">
       <div class="inst-card violin-chord-card">
         <div class="inst-card-head">
-          <div class="inst-card-title">Keman kolu</div>
-          <p class="inst-card-sub">Perdeye basılı tutun — ses sağdan</p>
+          <div class="inst-card-title" data-i18n="inst.violinNeck">Violin fingerboard</div>
+          <p class="inst-card-sub" data-i18n="inst.guitarNeckSub">Hold a fret — sound from the right</p>
         </div>
-        <div id="violinBoard" class="guitar-neck"></div>
+        <div id="violinBoard"></div>
       </div>
       <div class="inst-card violin-strings-card">
         <div class="inst-card-head">
-          <div class="inst-card-title">Teller (titreştir)</div>
-          <p class="inst-card-sub">Aynı renk = aynı tel</p>
+          <div class="inst-card-title" data-i18n="inst.strings">Strings (pluck)</div>
+          <p class="inst-card-sub" data-i18n="inst.stringsSub">Same color = same string</p>
         </div>
-        <div id="violinStrings" class="guitar-strings"></div>
+        <div id="violinStrings"></div>
       </div>
     </div>
   </footer>
@@ -424,8 +456,8 @@
   <div id="instrumentPickerModal" class="modal hidden" aria-hidden="true">
     <div class="modal-backdrop"></div>
     <div class="modal-box instrument-picker-box" role="dialog" aria-labelledby="instrumentPickerTitle">
-      <h3 id="instrumentPickerTitle">Hangi enstrümanla çalmak istersiniz?</h3>
-      <p class="hint">Düşen notalar aynı kalır; alt kısımdaki çalma yüzeyi değişir. Sonra üst menüden değiştirebilirsiniz.</p>
+      <h3 id="instrumentPickerTitle" data-i18n="picker.title">Which instrument do you want to play?</h3>
+      <p class="hint" data-i18n="picker.hint">Falling notes stay the same; the play surface below changes.</p>
       <div class="instrument-picker-grid">
         <button type="button" class="instrument-pick btn" data-mode="piano">
           <span class="instrument-pick-icon">🎹</span>
@@ -446,12 +478,12 @@
   <div id="libraryModal" class="modal hidden" aria-hidden="true">
     <div class="modal-backdrop" id="libraryBackdrop"></div>
     <div class="modal-box" role="dialog" aria-labelledby="libraryDialogTitle">
-      <h3 id="libraryDialogTitle">Yeni kütüphane</h3>
+      <h3 id="libraryDialogTitle" data-i18n="modal.newLib">New library</h3>
       <form id="libraryForm">
-        <input type="text" id="libraryNameInput" placeholder="Kütüphane adı" maxlength="64" autocomplete="off" />
+        <input type="text" id="libraryNameInput" data-i18n-placeholder="modal.libName" placeholder="Library name" maxlength="64" autocomplete="off" />
         <div class="dialog-actions">
-          <button type="button" class="btn" id="libraryCancel">İptal</button>
-          <button type="submit" class="btn primary" id="librarySave">Kaydet</button>
+          <button type="button" class="btn" id="libraryCancel" data-i18n="modal.cancel">Cancel</button>
+          <button type="submit" class="btn primary" id="librarySave" data-i18n="modal.save">Save</button>
         </div>
       </form>
     </div>
@@ -462,18 +494,27 @@
   <div id="labelAssignModal" class="modal hidden" aria-hidden="true">
     <div class="modal-backdrop" id="labelAssignBackdrop"></div>
     <div class="modal-box" role="dialog">
-      <h3 id="labelAssignTitle">Tuş harfi ata</h3>
+      <h3 id="labelAssignTitle" data-i18n="modal.assignKey">Assign key letter</h3>
       <p id="labelAssignHint" class="hint"></p>
-      <input type="text" id="labelAssignInput" maxlength="2" placeholder="Tek harf" autocomplete="off" />
+      <input type="text" id="labelAssignInput" maxlength="2" data-i18n-placeholder="modal.oneLetter" placeholder="One letter" autocomplete="off" />
       <div class="dialog-actions">
-        <button type="button" class="btn" id="labelAssignClear">Temizle</button>
-        <button type="button" class="btn" id="labelAssignCancel">İptal</button>
-        <button type="button" class="btn primary" id="labelAssignSave">Kaydet</button>
+        <button type="button" class="btn" id="labelAssignClear" data-i18n="modal.clear">Clear</button>
+        <button type="button" class="btn" id="labelAssignCancel" data-i18n="modal.cancel">Cancel</button>
+        <button type="button" class="btn primary" id="labelAssignSave" data-i18n="modal.save">Save</button>
       </div>
     </div>
   </div>
 
-    <script src="touch-guard.js"></script>
+  <div id="audioImportOverlay" class="audio-import-overlay hidden" aria-live="polite">
+    <div class="audio-import-card">
+      <h3 data-i18n="audioImport.title">Converting audio to MIDI</h3>
+      <p id="audioImportFile" class="audio-import-file"></p>
+      <div class="audio-import-bar"><div id="audioImportBarFill"></div></div>
+      <p id="audioImportStatus" class="audio-import-status" data-i18n="audioImport.preparing">Preparing…</p>
+    </div>
+  </div>
+
+  <script src="touch-guard.js"></script>
   <script src="main.js"></script>
 </body>
 </html>

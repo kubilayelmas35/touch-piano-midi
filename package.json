@@ -1,7 +1,7 @@
 {
-  "name": "touch-piano-midi",
+  "name": "staveflow",
   "version": "1.1.0",
-  "description": "Dokunmatik piyano, gitar, keman — MIDI düşen notalar",
+  "description": "StaveFlow — Piano, guitar & violin with falling MIDI notes",
   "main": "electron/main.js",
   "scripts": {
     "bundle": "node scripts/bundle-renderer.js",
@@ -20,8 +20,8 @@
     "@tonejs/midi": "^2.0.28"
   },
   "build": {
-    "appId": "com.touchpiano.midi",
-    "productName": "Touch Piano MIDI",
+    "appId": "com.staveflow.app",
+    "productName": "StaveFlow",
     "directories": {
       "output": "dist"
     },

@@ -6,10 +6,8 @@ const AudioEngine = (() => {
   let nextVoiceId = 1;
 
   let dynamicPressure = true;
-  let sustainEnabled = true;
+  let sustainMs = 550;
   let instrumentId = "piano";
-  const RELEASE_FAST = 0.05;
-  const RELEASE_SLOW = 0.55;
 
   const INSTRUMENTS = {
     piano: { label: "Piyano", sustainScale: 1 },
@@ -34,8 +32,12 @@ const AudioEngine = (() => {
     dynamicPressure = !!on;
   }
 
-  function setSustain(on) {
-    sustainEnabled = !!on;
+  function setSustainMs(ms) {
+    sustainMs = Math.max(0, Math.min(5000, Math.round(Number(ms) || 0)));
+  }
+
+  function getSustainMs() {
+    return sustainMs;
   }
 
   function setInstrument(id) {
@@ -249,9 +251,9 @@ const AudioEngine = (() => {
     const ac = ensure();
     const t = ac.currentTime;
     const scale = INSTRUMENTS[instrumentId]?.sustainScale ?? 1;
-    const base = silent ? 0.001 : sustainEnabled ? RELEASE_SLOW : RELEASE_FAST;
+    const base = silent ? 0.001 : Math.max(0.001, (sustainMs / 1000) * scale);
     const release =
-      releaseOverride != null ? releaseOverride : Math.min(1.2, base * scale);
+      releaseOverride != null ? releaseOverride : Math.min(5.5, base);
 
     try {
       voice.master.gain.cancelScheduledValues(t);
@@ -370,7 +372,8 @@ const AudioEngine = (() => {
     setLiveVibrato,
     setLiveGain,
     setDynamicPressure,
-    setSustain,
+    setSustainMs,
+    getSustainMs,
     setInstrument,
     getInstruments,
     velocityFromPointer,
