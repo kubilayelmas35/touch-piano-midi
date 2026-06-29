@@ -2995,15 +2995,25 @@ function createFrettedInstrument(config) {
 
       const footerEl = document.getElementById("instrumentFooter");
       if (footerEl) {
-        footerEl.style.height = `${footerH}px`;
-        footerEl.style.minHeight = `${footerH}px`;
+        footerEl.style.height = "";
+        footerEl.style.minHeight = "";
         footerEl.style.maxHeight = `${footerH}px`;
       }
 
       if (wrapEl) {
-        wrapEl.style.height = `${footerH}px`;
+        wrapEl.style.height = "auto";
         wrapEl.style.minHeight = "0";
-        wrapEl.style.maxHeight = `${footerH}px`;
+        wrapEl.style.maxHeight = "";
+      }
+
+      function finalizeFooterHeight() {
+        if (!wrapEl) return;
+        wrapEl.style.height = "auto";
+        wrapEl.style.maxHeight = "";
+        const measured = Math.ceil(wrapEl.getBoundingClientRect().height);
+        const nextH = Math.min(Math.max(96, measured + 2), maxFooter);
+        document.documentElement.style.setProperty("--footer-row-h", `${nextH}px`);
+        if (footerEl) footerEl.style.maxHeight = `${nextH}px`;
       }
 
       function applyDims(nextRow, nextStr, nextCell, nextPluck) {
@@ -3021,9 +3031,9 @@ function createFrettedInstrument(config) {
           el.style.setProperty(pluckMinVar, pluck);
         }
         if (wrapEl) {
-          wrapEl.style.height = `${footerH}px`;
+          wrapEl.style.height = "auto";
           wrapEl.style.minHeight = "0";
-          wrapEl.style.maxHeight = `${footerH}px`;
+          wrapEl.style.maxHeight = "";
           DISPLAY_STRINGS.forEach((s, i) => {
             wrapEl.style.setProperty(`--str-thick-${i}`, `${STRING_THICK[i]}px`);
           });
@@ -3070,6 +3080,7 @@ function createFrettedInstrument(config) {
       }
 
       applyDims(rowPx, strPx, cellPx, pluckPx);
+      requestAnimationFrame(finalizeFooterHeight);
     }
 
     function applySize() {
@@ -6038,7 +6049,7 @@ window.mainJsOk = true;
   window.I18n?.init();
   const t = (key, vars) => window.I18n?.t(key, vars) ?? key;
   const APP_NAME = window.I18n?.APP_NAME || "StaveFlow";
-  const APP_VERSION = "v0.9.7";
+  const APP_VERSION = "v0.9.8";
   const $ = (sel) => document.querySelector(sel);
 
   function mods() {

@@ -3,7 +3,7 @@
   window.I18n?.init();
   const t = (key, vars) => window.I18n?.t(key, vars) ?? key;
   const APP_NAME = window.I18n?.APP_NAME || "StaveFlow";
-  const APP_VERSION = "v0.9.7";
+  const APP_VERSION = "v0.9.8";
   const $ = (sel) => document.querySelector(sel);
 
   function mods() {

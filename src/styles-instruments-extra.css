@@ -122,7 +122,7 @@ body[data-play-mode="violin"] .violin-chord-card .guitar-neck {
   margin-bottom: 0.35rem;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 
 .inst-card-title {
