@@ -620,7 +620,7 @@
     }
     scheduleInstrumentLayoutSync();
     setTimeout(() => {
-      requireMods().Game.resize();
+      requireMods().Game.refreshView?.();
       reloadTrackNotes();
     }, 100);
     setTimeout(() => requireMods().Game.resize(), 500);
@@ -689,7 +689,7 @@
     keyWidthLabel.textContent = `${s.keyWidth} px`;
     keyHeightLabel.textContent = `${s.keyHeight} px`;
     dynamicPressure.checked = s.dynamicPressure;
-    const sustainMs = Math.max(0, Math.min(5000, Math.round(s.sustainMs ?? 550)));
+    const sustainMs = Math.max(0, Math.min(10000, Math.round(s.sustainMs ?? 550)));
     if (sustainRange) sustainRange.value = String(sustainMs);
     if (sustainLabel) sustainLabel.textContent = `${sustainMs} ms`;
     timingWindow.value = String(s.timingWindow);

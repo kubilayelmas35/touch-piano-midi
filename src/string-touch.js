@@ -1,6 +1,7 @@
-/** Tel vuruşu — dokunma alanındaki tüm teller çalar, ayrılınca susar */
+/** Tel vuruşu — dokunma alanındaki tüm teller çalar, ayrılınca sustain süresince söner */
 const StringTouch = (() => {
   const bundles = new Map();
+  const decaying = new Map();
 
   function resolveMidi(getMidi) {
     return typeof getMidi === "function" ? getMidi() : getMidi;
@@ -8,6 +9,10 @@ const StringTouch = (() => {
 
   function vibratoSens() {
     return window.AppSettings?.load?.()?.stringVibratoSens ?? 1;
+  }
+
+  function sustainMs() {
+    return window.AudioEngine?.getSustainMs?.() ?? 550;
   }
 
   function releaseVoice(voiceId) {
@@ -36,15 +41,6 @@ const StringTouch = (() => {
     return found ? [found] : [];
   }
 
-  function clearRowVisual(rowState) {
-    if (!rowState?.el) return;
-    rowState.el.classList.remove("active", "string-held", "string-vibrating");
-    rowState.el.style.removeProperty("--vib-intensity");
-    rowState.lineEl?.classList.remove("string-line-active");
-    rowState.lineEl?.style.removeProperty("--vib-intensity");
-    rowState.row?.onVibrateEnd?.();
-  }
-
   function rowLineEl(row) {
     return (
       row.el.querySelector(".string-line") ||
@@ -54,7 +50,67 @@ const StringTouch = (() => {
     );
   }
 
+  function rowVisualState(row) {
+    return {
+      row,
+      el: row.el,
+      lineEl: rowLineEl(row),
+    };
+  }
+
+  function cancelDecay(el) {
+    const id = decaying.get(el);
+    if (id != null) cancelAnimationFrame(id);
+    decaying.delete(el);
+  }
+
+  function applyVisualIntensity(rowState, intensity) {
+    const light = Math.max(0, intensity);
+    rowState.el.style.setProperty("--vib-intensity", String(light));
+    rowState.el.classList.toggle("string-vibrating", light > 0.03);
+    rowState.el.classList.toggle("active", light > 0.03);
+    rowState.lineEl?.style.setProperty("--vib-intensity", String(light));
+    rowState.lineEl?.classList.toggle("string-line-active", light > 0.03);
+    rowState.row?.onVibrate?.(light);
+  }
+
+  function clearRowVisual(rowState) {
+    if (!rowState?.el) return;
+    cancelDecay(rowState.el);
+    rowState.el.classList.remove("active", "string-held", "string-vibrating");
+    rowState.el.style.removeProperty("--vib-intensity");
+    rowState.lineEl?.classList.remove("string-line-active");
+    rowState.lineEl?.style.removeProperty("--vib-intensity");
+    rowState.row?.onVibrateEnd?.();
+  }
+
+  function decayPluckVisual(rowEntry, durationMs) {
+    if (!rowEntry?.el) return;
+    const rowState = rowVisualState(rowEntry);
+    const ms = Math.max(0, Number(durationMs) || 0);
+    if (ms <= 0) {
+      clearRowVisual(rowState);
+      return;
+    }
+    cancelDecay(rowEntry.el);
+    const startIntensity =
+      parseFloat(rowState.el.style.getPropertyValue("--vib-intensity")) || 0.35;
+    const start = performance.now();
+    const tick = (now) => {
+      const t = Math.min(1, (now - start) / ms);
+      const intensity = startIntensity * (1 - t);
+      if (t >= 1) {
+        clearRowVisual(rowState);
+        return;
+      }
+      applyVisualIntensity(rowState, intensity);
+      decaying.set(rowEntry.el, requestAnimationFrame(tick));
+    };
+    decaying.set(rowEntry.el, requestAnimationFrame(tick));
+  }
+
   function startRowVoice(st, row, e) {
+    cancelDecay(row.el);
     const midi = resolveMidi(row.getMidi);
     if (!midi) return null;
 
@@ -118,10 +174,7 @@ const StringTouch = (() => {
     window.AudioEngine.setLiveGain?.(rowState.voiceId, rowState.pluck);
 
     const intensity = Math.min(1, rowState.pluck / 1.2);
-    rowState.el.style.setProperty("--vib-intensity", String(intensity));
-    rowState.el.classList.toggle("string-vibrating", intensity > 0.05);
-    rowState.lineEl?.style.setProperty("--vib-intensity", String(intensity));
-    rowState.row?.onVibrate?.(intensity);
+    applyVisualIntensity(rowState, intensity);
   }
 
   function releaseRowVoice(rowState, e) {
@@ -130,7 +183,8 @@ const StringTouch = (() => {
       releaseVoice(rowState.voiceId);
       rowState.row?.onUp?.(rowState.midi, e);
     }
-    clearRowVisual(rowState);
+    rowState.el.classList.remove("string-held");
+    decayPluckVisual(rowState.row, sustainMs());
   }
 
   function syncRows(st, rows, e) {
@@ -191,7 +245,7 @@ const StringTouch = (() => {
     ]);
   }
 
-  return { bind, bindPluckBundle };
+  return { bind, bindPluckBundle, decayPluckVisual };
 })();
 
 window.StringTouch = StringTouch;

@@ -280,6 +280,10 @@ function createFrettedInstrument(config) {
       return map;
     }
 
+    function openStringWord() {
+      return window.I18n?.t?.("inst.openString") || "open";
+    }
+
     function formatActiveString(fret, midi, touchedFrets) {
       const note = noteLabel(midi);
       if (touchedFrets.length > 1) {
@@ -287,7 +291,7 @@ function createFrettedInstrument(config) {
         return `P${fret} · ${note} (${uniq.join("+")}→${fret})`;
       }
       if (fret > 0) return `P${fret} · ${note}`;
-      return `açık · ${note}`;
+      return `${openStringWord()} · ${note}`;
     }
 
     function updateStringHighlights() {
@@ -551,7 +555,7 @@ function createFrettedInstrument(config) {
         row.dataset.midi = String(STRING_OPEN[s]);
         row.style.setProperty("--str-color", STRING_COLORS[colorIdx]);
         row.style.setProperty("--str-thick", `${STRING_THICK[colorIdx]}px`);
-        row.innerHTML = `<span class="guitar-string-name">${STRING_NAMES[colorIdx]}</span><span class="guitar-string-fret">açık</span><span class="guitar-string-line string-line"></span>`;
+        row.innerHTML = `<span class="guitar-string-name">${STRING_NAMES[colorIdx]}</span><span class="guitar-string-fret">${openStringWord()}</span><span class="guitar-string-line string-line"></span>`;
 
         const entry = {
           el: row,
@@ -634,11 +638,12 @@ function createFrettedInstrument(config) {
           delete autoFrets[target.stringIdx];
           mergeFrettedDisplay();
         }
-        clearNeckVibrato(target.stringIdx);
-        const row = pluckRows.find((r) => r.stringIdx === target.stringIdx)?.el;
-        if (row) {
-          row.classList.remove("active", "string-held", "string-vibrating");
-          row.style.removeProperty("--vib-intensity");
+        const rowEntry = pluckRows.find((r) => r.stringIdx === target.stringIdx);
+        const ms = window.AudioEngine?.getSustainMs?.() ?? 550;
+        if (rowEntry) {
+          window.StringTouch?.decayPluckVisual?.(rowEntry, ms);
+        } else {
+          clearNeckVibrato(target.stringIdx);
         }
       }
       highlightMidi(midi, false);

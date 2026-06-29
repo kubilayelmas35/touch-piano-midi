@@ -60,7 +60,7 @@ const AppSettings = (() => {
       if (data.sustainMs == null || !Number.isFinite(data.sustainMs)) {
         data.sustainMs = data.sustainEnabled === false ? 0 : 550;
       }
-      data.sustainMs = Math.max(0, Math.min(5000, Math.round(data.sustainMs)));
+      data.sustainMs = Math.max(0, Math.min(10000, Math.round(data.sustainMs)));
       return data;
     } catch {
       return { ...defaults };
