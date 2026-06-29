@@ -158,7 +158,7 @@ const I18n = (() => {
     "settings.kb.selected": "Selected: {name}",
     "settings.dynamic": "Dynamic pressure",
     "settings.sustain": "Sustain release",
-    "settings.sustainHint": "0 = instant cut. Higher = longer soft fade after release.",
+    "settings.sustainHint": "0–10,000 ms. 0 = instant cut. Affects sound and string vibration fade on guitar/violin.",
     "settings.timing": "Timing window",
     "settings.touchHint": "Touch: multi-finger gestures disabled.",
     "inst.piano": "Piano",
@@ -168,9 +168,10 @@ const I18n = (() => {
     "inst.brass": "Brass",
     "inst.synth": "Synth",
     "inst.guitarNeck": "Guitar neck",
-    "inst.guitarNeckSub": "Hold a fret — sound from the right",
+    "inst.guitarNeckSub": "Press a fret — pluck the string on the right",
     "inst.strings": "Strings (pluck)",
     "inst.stringsSub": "Same color = same string",
+    "inst.openString": "open",
     "inst.violinNeck": "Violin fingerboard",
     "picker.title": "Which instrument do you want to play?",
     "picker.hint": "Falling notes stay the same; the play surface below changes. Switch anytime from the top menu.",
@@ -382,7 +383,7 @@ const I18n = (() => {
     "settings.kb.azerty": "AZERTY (Fransızca)",
     "settings.dynamic": "Dinamik basınç",
     "settings.sustain": "Sustain (bırakış süresi)",
-    "settings.sustainHint": "0 = anında kesilir. Yüksek değer = bırakınca daha uzun yumuşak sönüm.",
+    "settings.sustainHint": "0–10.000 ms. 0 = anında kesilir. Ses ve sağ tellerdeki titreşimin yavaşlamasını ayarlar.",
     "settings.timing": "Zaman toleransı",
     "settings.touchHint": "Dokunmatik: çok parmaklı jestler kapatıldı.",
     "inst.piano": "Piyano",
@@ -392,9 +393,10 @@ const I18n = (() => {
     "inst.brass": "Bakır üflemeli",
     "inst.synth": "Synth",
     "inst.guitarNeck": "Gitar kolu",
-    "inst.guitarNeckSub": "Perdeye basın — ses sağdan gelir",
+    "inst.guitarNeckSub": "Perdeye basın — teli sağdan çekin",
     "inst.strings": "Teller (titreştir)",
     "inst.stringsSub": "Aynı renk = aynı tel",
+    "inst.openString": "açık",
     "inst.violinNeck": "Keman klavyesi",
     "picker.title": "Hangi enstrümanla çalmak istersiniz?",
     "picker.hint":
@@ -494,6 +496,14 @@ const I18n = (() => {
     "inst.piano": "Klavier",
     "inst.guitar": "Gitarre",
     "inst.violin": "Violine",
+    "settings.sustain": "Sustain (Ausklingen)",
+    "settings.sustainHint": "0–10.000 ms. 0 = sofortiger Stopp. Steuert Klang und Saiten-Tremolo bei Gitarre/Geige.",
+    "inst.guitarNeck": "Gitarrenhals",
+    "inst.guitarNeckSub": "Bund drücken — Saite rechts zupfen",
+    "inst.strings": "Saiten (zupfen)",
+    "inst.stringsSub": "Gleiche Farbe = gleiche Saite",
+    "inst.violinNeck": "Geigengriffbrett",
+    "inst.openString": "leer",
     "picker.title": "Welches Instrument möchten Sie spielen?",
     "starter.lib": "Beispielstücke (lizenzfrei)",
     "starter.song": "Bach — Präludium BWV 846",
@@ -534,6 +544,14 @@ const I18n = (() => {
     "inst.piano": "Piano",
     "inst.guitar": "Guitare",
     "inst.violin": "Violon",
+    "settings.sustain": "Sustain (relâchement)",
+    "settings.sustainHint": "0–10 000 ms. 0 = coupure instantanée. Contrôle le son et la vibration des cordes (guitare/violon).",
+    "inst.guitarNeck": "Manche de guitare",
+    "inst.guitarNeckSub": "Appuyez sur une case — pincez la corde à droite",
+    "inst.strings": "Cordes (pincer)",
+    "inst.stringsSub": "Même couleur = même corde",
+    "inst.violinNeck": "Touche de violon",
+    "inst.openString": "à vide",
     "picker.title": "Quel instrument voulez-vous jouer ?",
     "starter.lib": "Exemples (libres de droits)",
     "starter.song": "Bach — Prélude BWV 846",
@@ -567,6 +585,14 @@ const I18n = (() => {
     "inst.piano": "Piano",
     "inst.guitar": "Chitarra",
     "inst.violin": "Violino",
+    "settings.sustain": "Sustain (rilascio)",
+    "settings.sustainHint": "0–10.000 ms. 0 = taglio immediato. Controlla suono e vibrazione corde (chitarra/violino).",
+    "inst.guitarNeck": "Manico chitarra",
+    "inst.guitarNeckSub": "Premi un tasto — pizzica la corda a destra",
+    "inst.strings": "Corde (pizzica)",
+    "inst.stringsSub": "Stesso colore = stessa corda",
+    "inst.violinNeck": "Tastiera violino",
+    "inst.openString": "aperto",
     "picker.title": "Quale strumento vuoi suonare?",
     "starter.lib": "Brani di esempio (royalty-free)",
   };
@@ -597,6 +623,14 @@ const I18n = (() => {
     "inst.piano": "Piano",
     "inst.guitar": "Guitarra",
     "inst.violin": "Violín",
+    "settings.sustain": "Sustain (soltar)",
+    "settings.sustainHint": "0–10.000 ms. 0 = corte instantáneo. Controla el sonido y la vibración de cuerdas (guitarra/violín).",
+    "inst.guitarNeck": "Mástil de guitarra",
+    "inst.guitarNeckSub": "Pulsa un traste — pellizca la cuerda a la derecha",
+    "inst.strings": "Cuerdas (pellizcar)",
+    "inst.stringsSub": "Mismo color = misma cuerda",
+    "inst.violinNeck": "Diapasón de violín",
+    "inst.openString": "al aire",
     "picker.title": "¿Qué instrumento quieres tocar?",
     "starter.lib": "Ejemplos (libres de derechos)",
   };
@@ -614,6 +648,14 @@ const I18n = (() => {
     "inst.piano": "Piano",
     "inst.guitar": "Guitarra",
     "inst.violin": "Violino",
+    "settings.sustain": "Sustain (soltura)",
+    "settings.sustainHint": "0–10.000 ms. 0 = corte imediato. Controla som e vibração das cordas (guitarra/violino).",
+    "inst.guitarNeck": "Braço da guitarra",
+    "inst.guitarNeckSub": "Pressione uma casa — dedilhe a corda à direita",
+    "inst.strings": "Cordas (dedilhar)",
+    "inst.stringsSub": "Mesma cor = mesma corda",
+    "inst.violinNeck": "Escala do violino",
+    "inst.openString": "solta",
     "starter.lib": "Exemplos (livres de royalties)",
   };
 
@@ -629,6 +671,14 @@ const I18n = (() => {
     "inst.piano": "Piano",
     "inst.guitar": "Gitaar",
     "inst.violin": "Viool",
+    "settings.sustain": "Sustain (loslaten)",
+    "settings.sustainHint": "0–10.000 ms. 0 = direct stop. Regelt geluid en snaartrilling (gitaar/viool).",
+    "inst.guitarNeck": "Gitaarhals",
+    "inst.guitarNeckSub": "Druk een fret — tokkel de snaar rechts",
+    "inst.strings": "Snaren (tokkelen)",
+    "inst.stringsSub": "Zelfde kleur = zelfde snaar",
+    "inst.violinNeck": "Vioolvingerboard",
+    "inst.openString": "open",
     "starter.lib": "Voorbeelden (royalty-vrij)",
   };
 
@@ -644,6 +694,14 @@ const I18n = (() => {
     "inst.piano": "Fortepian",
     "inst.guitar": "Gitara",
     "inst.violin": "Skrzypce",
+    "settings.sustain": "Sustain (wybrzmienie)",
+    "settings.sustainHint": "0–10 000 ms. 0 = natychmiastowe wyciszenie. Steruje dźwiękiem i wibracją strun (gitara/skrzypce).",
+    "inst.guitarNeck": "Gryf gitary",
+    "inst.guitarNeckSub": "Naciśnij próg — szarpnij strunę po prawej",
+    "inst.strings": "Struny (szarpnięcie)",
+    "inst.stringsSub": "Ten sam kolor = ta sama struna",
+    "inst.violinNeck": "Podstrunnica skrzypiec",
+    "inst.openString": "pusta",
     "starter.lib": "Przykłady (bez tantiem)",
   };
 
@@ -659,6 +717,14 @@ const I18n = (() => {
     "inst.piano": "Пианино",
     "inst.guitar": "Гитара",
     "inst.violin": "Скрипка",
+    "settings.sustain": "Сустейн (затухание)",
+    "settings.sustainHint": "0–10 000 мс. 0 = мгновенная остановка. Управляет звуком и вибрацией струн (гитара/скрипка).",
+    "inst.guitarNeck": "Гриф гитары",
+    "inst.guitarNeckSub": "Нажмите лад — щипните струну справа",
+    "inst.strings": "Струны (щипок)",
+    "inst.stringsSub": "Один цвет = одна струна",
+    "inst.violinNeck": "Гриф скрипки",
+    "inst.openString": "открытая",
     "starter.lib": "Примеры (без лицензии)",
   };
 
@@ -674,6 +740,14 @@ const I18n = (() => {
     "inst.piano": "ピアノ",
     "inst.guitar": "ギター",
     "inst.violin": "バイオリン",
+    "settings.sustain": "サステイン（余韻）",
+    "settings.sustainHint": "0〜10,000 ms。0で即停止。ギター/バイオリンの音と弦の振動の減衰を調整。",
+    "inst.guitarNeck": "ギターネック",
+    "inst.guitarNeckSub": "フレットを押す — 右の弦を弾く",
+    "inst.strings": "弦（弾く）",
+    "inst.stringsSub": "同じ色 = 同じ弦",
+    "inst.violinNeck": "バイオリン指板",
+    "inst.openString": "開放",
     "starter.lib": "サンプル（ロイヤリティフリー）",
   };
 
@@ -689,6 +763,14 @@ const I18n = (() => {
     "inst.piano": "피아노",
     "inst.guitar": "기타",
     "inst.violin": "바이올린",
+    "settings.sustain": "서스테인 (잔향)",
+    "settings.sustainHint": "0–10,000 ms. 0 = 즉시 정지. 기타/바이올린 소리와 줄 진동 감쇠를 조절합니다.",
+    "inst.guitarNeck": "기타 넥",
+    "inst.guitarNeckSub": "프렛을 누르고 — 오른쪽 줄을 뜯으세요",
+    "inst.strings": "줄 (뜯기)",
+    "inst.stringsSub": "같은 색 = 같은 줄",
+    "inst.violinNeck": "바이올린 지판",
+    "inst.openString": "개방",
     "starter.lib": "샘플 (로열티 프리)",
   };
 
@@ -704,6 +786,14 @@ const I18n = (() => {
     "inst.piano": "钢琴",
     "inst.guitar": "吉他",
     "inst.violin": "小提琴",
+    "settings.sustain": "延音（释放）",
+    "settings.sustainHint": "0–10,000 毫秒。0 = 立即停止。控制吉他/小提琴的声音与弦振动衰减。",
+    "inst.guitarNeck": "吉他琴颈",
+    "inst.guitarNeckSub": "按品位 — 在右侧拨弦",
+    "inst.strings": "弦（拨弦）",
+    "inst.stringsSub": "同色 = 同弦",
+    "inst.violinNeck": "小提琴指板",
+    "inst.openString": "空弦",
     "starter.lib": "示例曲目（免版税）",
   };
 
@@ -907,7 +997,7 @@ const AppSettings = (() => {
       if (data.sustainMs == null || !Number.isFinite(data.sustainMs)) {
         data.sustainMs = data.sustainEnabled === false ? 0 : 550;
       }
-      data.sustainMs = Math.max(0, Math.min(5000, Math.round(data.sustainMs)));
+      data.sustainMs = Math.max(0, Math.min(10000, Math.round(data.sustainMs)));
       return data;
     } catch {
       return { ...defaults };
@@ -1028,13 +1118,14 @@ const AudioEngine = (() => {
   let nextVoiceId = 1;
 
   let dynamicPressure = true;
+  const SUSTAIN_MS_MAX = 10000;
   let sustainMs = 550;
   let instrumentId = "piano";
 
   const INSTRUMENTS = {
     piano: { label: "Piyano", sustainScale: 1 },
     violin: { label: "Keman", sustainScale: 1.15 },
-    guitar: { label: "Gitar", sustainScale: 0.35 },
+    guitar: { label: "Gitar", sustainScale: 1 },
     flute: { label: "Flüt", sustainScale: 0.85 },
     brass: { label: "Bakır üflemeli", sustainScale: 0.9 },
     synth: { label: "Synth", sustainScale: 0.75 },
@@ -1055,7 +1146,7 @@ const AudioEngine = (() => {
   }
 
   function setSustainMs(ms) {
-    sustainMs = Math.max(0, Math.min(5000, Math.round(Number(ms) || 0)));
+    sustainMs = Math.max(0, Math.min(SUSTAIN_MS_MAX, Math.round(Number(ms) || 0)));
   }
 
   function getSustainMs() {
@@ -1275,7 +1366,7 @@ const AudioEngine = (() => {
     const scale = INSTRUMENTS[instrumentId]?.sustainScale ?? 1;
     const base = silent ? 0.001 : Math.max(0.001, (sustainMs / 1000) * scale);
     const release =
-      releaseOverride != null ? releaseOverride : Math.min(5.5, base);
+      releaseOverride != null ? releaseOverride : Math.min(SUSTAIN_MS_MAX / 1000 + 0.5, base);
 
     try {
       voice.master.gain.cancelScheduledValues(t);
@@ -1333,8 +1424,11 @@ const AudioEngine = (() => {
   }
 
   function noteOffPluck(voiceId) {
+    const scale = INSTRUMENTS[instrumentId]?.sustainScale ?? 1;
     const rel =
-      instrumentId === "guitar" ? 2.35 : instrumentId === "violin" ? 2.05 : 1.2;
+      sustainMs <= 0
+        ? 0.001
+        : Math.min(SUSTAIN_MS_MAX / 1000 + 0.5, Math.max(0.001, (sustainMs / 1000) * scale));
     noteOffVoice(voiceId, false, rel);
   }
 
@@ -2989,6 +3083,10 @@ function createFrettedInstrument(config) {
       return map;
     }
 
+    function openStringWord() {
+      return window.I18n?.t?.("inst.openString") || "open";
+    }
+
     function formatActiveString(fret, midi, touchedFrets) {
       const note = noteLabel(midi);
       if (touchedFrets.length > 1) {
@@ -2996,7 +3094,7 @@ function createFrettedInstrument(config) {
         return `P${fret} · ${note} (${uniq.join("+")}→${fret})`;
       }
       if (fret > 0) return `P${fret} · ${note}`;
-      return `açık · ${note}`;
+      return `${openStringWord()} · ${note}`;
     }
 
     function updateStringHighlights() {
@@ -3260,7 +3358,7 @@ function createFrettedInstrument(config) {
         row.dataset.midi = String(STRING_OPEN[s]);
         row.style.setProperty("--str-color", STRING_COLORS[colorIdx]);
         row.style.setProperty("--str-thick", `${STRING_THICK[colorIdx]}px`);
-        row.innerHTML = `<span class="guitar-string-name">${STRING_NAMES[colorIdx]}</span><span class="guitar-string-fret">açık</span><span class="guitar-string-line string-line"></span>`;
+        row.innerHTML = `<span class="guitar-string-name">${STRING_NAMES[colorIdx]}</span><span class="guitar-string-fret">${openStringWord()}</span><span class="guitar-string-line string-line"></span>`;
 
         const entry = {
           el: row,
@@ -3343,11 +3441,12 @@ function createFrettedInstrument(config) {
           delete autoFrets[target.stringIdx];
           mergeFrettedDisplay();
         }
-        clearNeckVibrato(target.stringIdx);
-        const row = pluckRows.find((r) => r.stringIdx === target.stringIdx)?.el;
-        if (row) {
-          row.classList.remove("active", "string-held", "string-vibrating");
-          row.style.removeProperty("--vib-intensity");
+        const rowEntry = pluckRows.find((r) => r.stringIdx === target.stringIdx);
+        const ms = window.AudioEngine?.getSustainMs?.() ?? 550;
+        if (rowEntry) {
+          window.StringTouch?.decayPluckVisual?.(rowEntry, ms);
+        } else {
+          clearNeckVibrato(target.stringIdx);
         }
       }
       highlightMidi(midi, false);
@@ -3430,9 +3529,10 @@ window.Violin = Violin;
 
 
 /* === string-touch.js === */
-/** Tel vuruşu — dokunma alanındaki tüm teller çalar, ayrılınca susar */
+/** Tel vuruşu — dokunma alanındaki tüm teller çalar, ayrılınca sustain süresince söner */
 const StringTouch = (() => {
   const bundles = new Map();
+  const decaying = new Map();
 
   function resolveMidi(getMidi) {
     return typeof getMidi === "function" ? getMidi() : getMidi;
@@ -3440,6 +3540,10 @@ const StringTouch = (() => {
 
   function vibratoSens() {
     return window.AppSettings?.load?.()?.stringVibratoSens ?? 1;
+  }
+
+  function sustainMs() {
+    return window.AudioEngine?.getSustainMs?.() ?? 550;
   }
 
   function releaseVoice(voiceId) {
@@ -3468,15 +3572,6 @@ const StringTouch = (() => {
     return found ? [found] : [];
   }
 
-  function clearRowVisual(rowState) {
-    if (!rowState?.el) return;
-    rowState.el.classList.remove("active", "string-held", "string-vibrating");
-    rowState.el.style.removeProperty("--vib-intensity");
-    rowState.lineEl?.classList.remove("string-line-active");
-    rowState.lineEl?.style.removeProperty("--vib-intensity");
-    rowState.row?.onVibrateEnd?.();
-  }
-
   function rowLineEl(row) {
     return (
       row.el.querySelector(".string-line") ||
@@ -3486,7 +3581,67 @@ const StringTouch = (() => {
     );
   }
 
+  function rowVisualState(row) {
+    return {
+      row,
+      el: row.el,
+      lineEl: rowLineEl(row),
+    };
+  }
+
+  function cancelDecay(el) {
+    const id = decaying.get(el);
+    if (id != null) cancelAnimationFrame(id);
+    decaying.delete(el);
+  }
+
+  function applyVisualIntensity(rowState, intensity) {
+    const light = Math.max(0, intensity);
+    rowState.el.style.setProperty("--vib-intensity", String(light));
+    rowState.el.classList.toggle("string-vibrating", light > 0.03);
+    rowState.el.classList.toggle("active", light > 0.03);
+    rowState.lineEl?.style.setProperty("--vib-intensity", String(light));
+    rowState.lineEl?.classList.toggle("string-line-active", light > 0.03);
+    rowState.row?.onVibrate?.(light);
+  }
+
+  function clearRowVisual(rowState) {
+    if (!rowState?.el) return;
+    cancelDecay(rowState.el);
+    rowState.el.classList.remove("active", "string-held", "string-vibrating");
+    rowState.el.style.removeProperty("--vib-intensity");
+    rowState.lineEl?.classList.remove("string-line-active");
+    rowState.lineEl?.style.removeProperty("--vib-intensity");
+    rowState.row?.onVibrateEnd?.();
+  }
+
+  function decayPluckVisual(rowEntry, durationMs) {
+    if (!rowEntry?.el) return;
+    const rowState = rowVisualState(rowEntry);
+    const ms = Math.max(0, Number(durationMs) || 0);
+    if (ms <= 0) {
+      clearRowVisual(rowState);
+      return;
+    }
+    cancelDecay(rowEntry.el);
+    const startIntensity =
+      parseFloat(rowState.el.style.getPropertyValue("--vib-intensity")) || 0.35;
+    const start = performance.now();
+    const tick = (now) => {
+      const t = Math.min(1, (now - start) / ms);
+      const intensity = startIntensity * (1 - t);
+      if (t >= 1) {
+        clearRowVisual(rowState);
+        return;
+      }
+      applyVisualIntensity(rowState, intensity);
+      decaying.set(rowEntry.el, requestAnimationFrame(tick));
+    };
+    decaying.set(rowEntry.el, requestAnimationFrame(tick));
+  }
+
   function startRowVoice(st, row, e) {
+    cancelDecay(row.el);
     const midi = resolveMidi(row.getMidi);
     if (!midi) return null;
 
@@ -3550,10 +3705,7 @@ const StringTouch = (() => {
     window.AudioEngine.setLiveGain?.(rowState.voiceId, rowState.pluck);
 
     const intensity = Math.min(1, rowState.pluck / 1.2);
-    rowState.el.style.setProperty("--vib-intensity", String(intensity));
-    rowState.el.classList.toggle("string-vibrating", intensity > 0.05);
-    rowState.lineEl?.style.setProperty("--vib-intensity", String(intensity));
-    rowState.row?.onVibrate?.(intensity);
+    applyVisualIntensity(rowState, intensity);
   }
 
   function releaseRowVoice(rowState, e) {
@@ -3562,7 +3714,8 @@ const StringTouch = (() => {
       releaseVoice(rowState.voiceId);
       rowState.row?.onUp?.(rowState.midi, e);
     }
-    clearRowVisual(rowState);
+    rowState.el.classList.remove("string-held");
+    decayPluckVisual(rowState.row, sustainMs());
   }
 
   function syncRows(st, rows, e) {
@@ -3623,7 +3776,7 @@ const StringTouch = (() => {
     ]);
   }
 
-  return { bind, bindPluckBundle };
+  return { bind, bindPluckBundle, decayPluckVisual };
 })();
 
 window.StringTouch = StringTouch;
@@ -4666,6 +4819,23 @@ const Game = (() => {
     line.style.top = `${y - 2}px`;
   }
 
+  function collectPluckStringPositions(areaRect) {
+    const byString = new Map();
+    document.querySelectorAll(".string-touch-target").forEach((el) => {
+      const stringIdx = Number(el.dataset.string);
+      if (Number.isNaN(stringIdx)) return;
+      const line =
+        el.querySelector(".guitar-string-line, .violin-string-line") || el;
+      const r = line.getBoundingClientRect();
+      const wrap = el.getBoundingClientRect();
+      byString.set(stringIdx, {
+        x: r.left + r.width / 2 - areaRect.left,
+        w: Math.max(r.width, wrap.width),
+      });
+    });
+    return byString;
+  }
+
   function updateKeyPositions() {
     keyPositions.clear();
     if (!canvas?.parentElement) return;
@@ -4679,8 +4849,9 @@ const Game = (() => {
 
     if (mode === "guitar" || mode === "violin") {
       const mod = surface.activeModule?.();
+      const stringLanes = collectPluckStringPositions(areaRect);
       const midis = new Set();
-      document.querySelectorAll(".guitar-neck .guitar-cell").forEach((key) => {
+      document.querySelectorAll(".guitar-neck .guitar-cell, .violin-board .guitar-cell").forEach((key) => {
         const midi = Number(key.dataset.midi);
         if (midi >= range.startMidi && midi <= range.endMidi) midis.add(midi);
       });
@@ -4688,14 +4859,22 @@ const Game = (() => {
         const target = mod?.getMidiTarget?.(midi);
         const cell = target?.cell;
         if (!cell) continue;
-        const r = cell.getBoundingClientRect();
-        const centerX = r.left + r.width / 2 - areaRect.left;
-        const fret = target.fret;
         const stringIdx = target.stringIdx;
+        const pluck = stringLanes.get(stringIdx);
+        const r = cell.getBoundingClientRect();
+        const centerX = pluck?.x ?? r.left + r.width / 2 - areaRect.left;
+        const fret = target.fret;
         const label = `${stringLabelForMode(mode, stringIdx)}${fret}`;
         const laneColor =
           getComputedStyle(cell).getPropertyValue("--str-color")?.trim() || null;
-        keyPositions.set(midi, { x: centerX, w: r.width, fret, label, laneColor });
+        keyPositions.set(midi, {
+          x: centerX,
+          w: pluck?.w ?? r.width,
+          fret,
+          label,
+          laneColor,
+          stringIdx,
+        });
       }
       return;
     }
@@ -4774,6 +4953,8 @@ const Game = (() => {
     combo = 0;
     emitScore();
     emitTime(0);
+    updateKeyPositions();
+    draw(0);
   }
 
   function spawnFlame(x, y, w, count, hot, midi) {
@@ -5269,7 +5450,8 @@ const Game = (() => {
     refreshView: () => {
       resize();
       updateKeyPositions();
-      draw(performance.now() / 1000, 0);
+      const t = playing ? currentTime() : pausedAt || 0;
+      draw(t, 0);
     },
   };
 })();
@@ -6412,7 +6594,7 @@ window.mainJsOk = true;
     }
     scheduleInstrumentLayoutSync();
     setTimeout(() => {
-      requireMods().Game.resize();
+      requireMods().Game.refreshView?.();
       reloadTrackNotes();
     }, 100);
     setTimeout(() => requireMods().Game.resize(), 500);
@@ -6481,7 +6663,7 @@ window.mainJsOk = true;
     keyWidthLabel.textContent = `${s.keyWidth} px`;
     keyHeightLabel.textContent = `${s.keyHeight} px`;
     dynamicPressure.checked = s.dynamicPressure;
-    const sustainMs = Math.max(0, Math.min(5000, Math.round(s.sustainMs ?? 550)));
+    const sustainMs = Math.max(0, Math.min(10000, Math.round(s.sustainMs ?? 550)));
     if (sustainRange) sustainRange.value = String(sustainMs);
     if (sustainLabel) sustainLabel.textContent = `${sustainMs} ms`;
     timingWindow.value = String(s.timingWindow);

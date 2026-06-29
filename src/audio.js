@@ -6,13 +6,14 @@ const AudioEngine = (() => {
   let nextVoiceId = 1;
 
   let dynamicPressure = true;
+  const SUSTAIN_MS_MAX = 10000;
   let sustainMs = 550;
   let instrumentId = "piano";
 
   const INSTRUMENTS = {
     piano: { label: "Piyano", sustainScale: 1 },
     violin: { label: "Keman", sustainScale: 1.15 },
-    guitar: { label: "Gitar", sustainScale: 0.35 },
+    guitar: { label: "Gitar", sustainScale: 1 },
     flute: { label: "Flüt", sustainScale: 0.85 },
     brass: { label: "Bakır üflemeli", sustainScale: 0.9 },
     synth: { label: "Synth", sustainScale: 0.75 },
@@ -33,7 +34,7 @@ const AudioEngine = (() => {
   }
 
   function setSustainMs(ms) {
-    sustainMs = Math.max(0, Math.min(5000, Math.round(Number(ms) || 0)));
+    sustainMs = Math.max(0, Math.min(SUSTAIN_MS_MAX, Math.round(Number(ms) || 0)));
   }
 
   function getSustainMs() {
@@ -253,7 +254,7 @@ const AudioEngine = (() => {
     const scale = INSTRUMENTS[instrumentId]?.sustainScale ?? 1;
     const base = silent ? 0.001 : Math.max(0.001, (sustainMs / 1000) * scale);
     const release =
-      releaseOverride != null ? releaseOverride : Math.min(5.5, base);
+      releaseOverride != null ? releaseOverride : Math.min(SUSTAIN_MS_MAX / 1000 + 0.5, base);
 
     try {
       voice.master.gain.cancelScheduledValues(t);
@@ -311,8 +312,11 @@ const AudioEngine = (() => {
   }
 
   function noteOffPluck(voiceId) {
+    const scale = INSTRUMENTS[instrumentId]?.sustainScale ?? 1;
     const rel =
-      instrumentId === "guitar" ? 2.35 : instrumentId === "violin" ? 2.05 : 1.2;
+      sustainMs <= 0
+        ? 0.001
+        : Math.min(SUSTAIN_MS_MAX / 1000 + 0.5, Math.max(0.001, (sustainMs / 1000) * scale));
     noteOffVoice(voiceId, false, rel);
   }
 
