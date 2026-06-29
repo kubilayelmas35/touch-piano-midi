@@ -4,6 +4,11 @@ const fs = require("fs");
 const fsp = require("fs").promises;
 const { transcribeAudioFile } = require("./audio-to-midi");
 
+if (process.platform === "win32") {
+  app.commandLine.appendSwitch("disable-pinch");
+  app.commandLine.appendSwitch("high-dpi-support", "1");
+}
+
 const MAX_AUDIO_SEC = 360;
 const AUDIO_EXT = ["mp3", "wav", "ogg", "flac", "m4a", "aac", "webm", "wma", "opus"];
 

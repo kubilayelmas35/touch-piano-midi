@@ -227,7 +227,6 @@ const StringTouch = (() => {
       document.addEventListener("visibilitychange", () => {
         if (document.hidden) ctl.releaseAll?.();
       });
-      bundleEl.addEventListener("pointerleave", () => ctl.releaseAll?.(), { passive: true });
     }
     bundles.set(bundleEl, ctl);
   }

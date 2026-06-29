@@ -160,7 +160,7 @@ const I18n = (() => {
     "settings.sustain": "Sustain release",
     "settings.sustainHint": "0–10,000 ms. 0 = instant cut. Affects sound and string vibration fade on guitar/violin.",
     "settings.timing": "Timing window",
-    "settings.touchHint": "Touch: multi-finger gestures disabled.",
+    "settings.touchHint": "Touch: multi-finger gestures disabled. Long-press and double-tap on keys are ignored.",
     "inst.piano": "Piano",
     "inst.guitar": "Guitar",
     "inst.violin": "Violin",
@@ -385,7 +385,7 @@ const I18n = (() => {
     "settings.sustain": "Sustain (bırakış süresi)",
     "settings.sustainHint": "0–10.000 ms. 0 = anında kesilir. Ses ve sağ tellerdeki titreşimin yavaşlamasını ayarlar.",
     "settings.timing": "Zaman toleransı",
-    "settings.touchHint": "Dokunmatik: çok parmaklı jestler kapatıldı.",
+    "settings.touchHint": "Dokunmatik: çok parmaklı jestler kapalı. Tuşlarda uzun basış ve çift dokunuş yok sayılır.",
     "inst.piano": "Piyano",
     "inst.guitar": "Gitar",
     "inst.violin": "Keman",
@@ -2404,7 +2404,7 @@ const Piano = (() => {
       e.preventDefault();
       e.stopPropagation();
       if (window.__touchPianoTouchInput) return;
-      if (e.pointerType === "touch") return;
+      if (e.pointerType === "touch" || e.pointerType === "pen") return;
       openLabelEditor(midi);
     });
 
@@ -2412,7 +2412,8 @@ const Piano = (() => {
       if (e.button !== 2) return;
       e.preventDefault();
       e.stopPropagation();
-      if (window.__touchPianoTouchInput || e.pointerType === "touch") return;
+      if (window.__touchPianoTouchInput || e.pointerType === "touch" || e.pointerType === "pen")
+        return;
       openMouse(e);
     });
   }
@@ -2550,254 +2551,282 @@ window.Piano = Piano;
 
 
 /* === pointer-slide.js === */
-/** Parmak kaydırma — tek hedef veya dokunma alanındaki tüm hedefler */
-const PointerSlide = (() => {
-  function touchRect(e, pad = 14) {
-    let w = e.width > 0 ? e.width : 28;
-    let h = e.height > 0 ? e.height : 28;
-    if (e.radiusX > 0) w = Math.max(w, e.radiusX * 2);
-    if (e.radiusY > 0) h = Math.max(h, e.radiusY * 2);
-    w += pad * 2;
-    h += pad * 2;
-    return {
-      left: e.clientX - w / 2,
-      right: e.clientX + w / 2,
-      top: e.clientY - h / 2,
-      bottom: e.clientY + h / 2,
-    };
-  }
-
-  function rectsIntersect(a, b) {
-    return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
-  }
-
-  function samplePath(x0, y0, x1, y1, stepPx = 8) {
-    const dist = Math.hypot(x1 - x0, y1 - y0);
-    const steps = Math.max(1, Math.ceil(dist / stepPx));
-    const pts = [];
-    for (let i = 0; i <= steps; i++) {
-      const t = i / steps;
-      pts.push({ x: x0 + (x1 - x0) * t, y: y0 + (y1 - y0) * t });
-    }
-    return pts;
-  }
-
-  function targetKey(target) {
-    if (!target) return null;
-    if (target.midi != null) return `m${target.midi}`;
-    if (target.stringIdx != null && target.fret != null) {
-      return `s${target.stringIdx}f${target.fret}`;
-    }
-    if (target.row) return target.row;
-    if (target.el) return target.el;
-    return target;
-  }
-
-  function bindMultiArea(rootEl, opts) {
-    const {
-      collectTargets,
-      onSync,
-      onEnd,
-      shouldHandle = () => true,
-      keyOf = targetKey,
-      sampleOnMove = true,
-    } = opts;
-    const pointers = new Map();
-
-    function mergeTargets(st, e) {
-      const merged = [];
-      const seen = new Set();
-      const add = (list) => {
-        for (const t of list || []) {
-          const k = keyOf(t);
-          if (k == null || seen.has(k)) continue;
-          seen.add(k);
-          merged.push(t);
-        }
-      };
-      add(collectTargets(e, rootEl));
-      if (sampleOnMove && st.lastX != null && st.lastY != null) {
-        const pts = samplePath(st.lastX, st.lastY, e.clientX, e.clientY, 6);
-        for (const p of pts) {
-          add(
-            collectTargets(
-              {
-                ...e,
-                clientX: p.x,
-                clientY: p.y,
-                width: 0,
-                height: 0,
-                radiusX: 0,
-                radiusY: 0,
-              },
-              rootEl
-            )
-          );
-        }
-      }
-      return merged;
-    }
-
-    const sync = (st, e) => {
-      onSync(st, mergeTargets(st, e), e);
-    };
-
-    const down = (e) => {
-      if (!shouldHandle(e)) return;
-      if (e.pointerType === "mouse" && e.button !== 0) return;
-      const targets = collectTargets(e, rootEl) || [];
-      if (!targets.length) return;
-      e.preventDefault();
-      e.stopPropagation();
-      try {
-        rootEl.setPointerCapture(e.pointerId);
-      } catch {
-        /* */
-      }
-      const st = { pointerId: e.pointerId, lastX: e.clientX, lastY: e.clientY };
-      pointers.set(e.pointerId, st);
-      onSync(st, targets, e);
-    };
-
-    const move = (e) => {
-      const st = pointers.get(e.pointerId);
-      if (!st) return;
-      e.preventDefault();
-      sync(st, e);
-      st.lastX = e.clientX;
-      st.lastY = e.clientY;
-    };
-
-    const end = (e) => {
-      const st = pointers.get(e.pointerId);
-      if (!st) return;
-      e.preventDefault();
-      onEnd?.(st, e);
-      pointers.delete(e.pointerId);
-      try {
-        rootEl.releasePointerCapture(e.pointerId);
-      } catch {
-        /* */
-      }
-    };
-
-    rootEl.addEventListener("pointerdown", down, { passive: false });
-    rootEl.addEventListener("pointermove", move, { passive: false });
-    rootEl.addEventListener("pointerup", end, { passive: false });
-    rootEl.addEventListener("pointercancel", end, { passive: false });
-
-    return {
-      releaseAll() {
-        for (const [, st] of pointers) onEnd?.(st, {});
-        pointers.clear();
-      },
-    };
-  }
-
-  function bind(rootEl, opts) {
-    const {
-      hitTest,
-      onEnter,
-      onLeave,
-      onMove,
-      shouldHandle = () => true,
-    } = opts;
-    const pointers = new Map();
-
-    function leave(st, e) {
-      if (st.target == null) return;
-      onLeave?.(st, e);
-      st.target = null;
-      st.targetId = null;
-    }
-
-    function enter(st, target, e) {
-      const id = targetKey(target);
-      if (st.targetId === id) return;
-      leave(st, e);
-      st.targetId = id;
-      st.target = target;
-      if (target != null) onEnter?.(st, target, e);
-    }
-
-    function processMove(st, e) {
-      const x0 = st.lastX ?? e.clientX;
-      const y0 = st.lastY ?? e.clientY;
-      const pts = samplePath(x0, y0, e.clientX, e.clientY);
-      let lastHit = null;
-      for (const p of pts) {
-        const hit = hitTest(p.x, p.y);
-        if (hit) {
-          enter(st, hit, e);
-          lastHit = hit;
-          onMove?.(st, hit, e);
-        }
-      }
-      const at = hitTest(e.clientX, e.clientY);
-      if (at) {
-        enter(st, at, e);
-        onMove?.(st, at, e);
-      } else if (!lastHit) {
-        leave(st, e);
-      }
-      st.lastX = e.clientX;
-      st.lastY = e.clientY;
-    }
-
-    const down = (e) => {
-      if (!shouldHandle(e)) return;
-      if (e.pointerType === "mouse" && e.button !== 0) return;
-      const hit = hitTest(e.clientX, e.clientY);
-      if (!hit) return;
-      e.preventDefault();
-      e.stopPropagation();
-      try {
-        rootEl.setPointerCapture(e.pointerId);
-      } catch {
-        /* */
-      }
-      const st = { lastX: e.clientX, lastY: e.clientY, target: null };
-      pointers.set(e.pointerId, st);
-      enter(st, hit, e);
-    };
-
-    const move = (e) => {
-      const st = pointers.get(e.pointerId);
-      if (!st) return;
-      e.preventDefault();
-      processMove(st, e);
-    };
-
-    const end = (e) => {
-      const st = pointers.get(e.pointerId);
-      if (!st) return;
-      e.preventDefault();
-      leave(st, e);
-      pointers.delete(e.pointerId);
-      try {
-        rootEl.releasePointerCapture(e.pointerId);
-      } catch {
-        /* */
-      }
-    };
-
-    rootEl.addEventListener("pointerdown", down, { passive: false });
-    rootEl.addEventListener("pointermove", move, { passive: false });
-    rootEl.addEventListener("pointerup", end, { passive: false });
-    rootEl.addEventListener("pointercancel", end, { passive: false });
-
-    return {
-      releaseAll() {
-        for (const [, st] of pointers) leave(st, {});
-        pointers.clear();
-      },
-    };
-  }
-
-  return { bind, bindMultiArea, touchRect, rectsIntersect, samplePath };
-})();
-
-window.PointerSlide = PointerSlide;
+/** Parmak kaydırma — tek hedef veya dokunma alanındaki tüm hedefler */
+const PointerSlide = (() => {
+  function touchRect(e, pad = 14) {
+    let w = e.width > 0 ? e.width : 28;
+    let h = e.height > 0 ? e.height : 28;
+    if (e.radiusX > 0) w = Math.max(w, e.radiusX * 2);
+    if (e.radiusY > 0) h = Math.max(h, e.radiusY * 2);
+    w += pad * 2;
+    h += pad * 2;
+    return {
+      left: e.clientX - w / 2,
+      right: e.clientX + w / 2,
+      top: e.clientY - h / 2,
+      bottom: e.clientY + h / 2,
+    };
+  }
+
+  function rectsIntersect(a, b) {
+    return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+  }
+
+  function samplePath(x0, y0, x1, y1, stepPx = 8) {
+    const dist = Math.hypot(x1 - x0, y1 - y0);
+    const steps = Math.max(1, Math.ceil(dist / stepPx));
+    const pts = [];
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      pts.push({ x: x0 + (x1 - x0) * t, y: y0 + (y1 - y0) * t });
+    }
+    return pts;
+  }
+
+  function targetKey(target) {
+    if (!target) return null;
+    if (target.midi != null) return `m${target.midi}`;
+    if (target.stringIdx != null && target.fret != null) {
+      return `s${target.stringIdx}f${target.fret}`;
+    }
+    if (target.row) return target.row;
+    if (target.el) return target.el;
+    return target;
+  }
+
+  function isPlayPointer(e) {
+    if (e.pointerType === "mouse") return e.button === 0;
+    return e.pointerType === "touch" || e.pointerType === "pen";
+  }
+
+  function bindPointerHandlers(rootEl, handlers) {
+    const { down, move, end } = handlers;
+    rootEl.addEventListener("pointerdown", down, { passive: false });
+    rootEl.addEventListener("pointermove", move, { passive: false });
+    rootEl.addEventListener("pointerup", end, { passive: false });
+    rootEl.addEventListener("pointercancel", end, { passive: false });
+    rootEl.addEventListener("lostpointercapture", end, { passive: false });
+
+    const globalEnd = (e) => {
+      if (!handlers.hasPointer(e.pointerId)) return;
+      end(e);
+    };
+    window.addEventListener("pointerup", globalEnd, true);
+    window.addEventListener("pointercancel", globalEnd, true);
+
+    return () => {
+      window.removeEventListener("pointerup", globalEnd, true);
+      window.removeEventListener("pointercancel", globalEnd, true);
+    };
+  }
+
+  function bindMultiArea(rootEl, opts) {
+    const {
+      collectTargets,
+      onSync,
+      onEnd,
+      shouldHandle = () => true,
+      keyOf = targetKey,
+      sampleOnMove = true,
+    } = opts;
+    const pointers = new Map();
+
+    function mergeTargets(st, e) {
+      const merged = [];
+      const seen = new Set();
+      const add = (list) => {
+        for (const t of list || []) {
+          const k = keyOf(t);
+          if (k == null || seen.has(k)) continue;
+          seen.add(k);
+          merged.push(t);
+        }
+      };
+      add(collectTargets(e, rootEl));
+      if (sampleOnMove && st.lastX != null && st.lastY != null) {
+        const pts = samplePath(st.lastX, st.lastY, e.clientX, e.clientY, 6);
+        for (const p of pts) {
+          add(
+            collectTargets(
+              {
+                ...e,
+                clientX: p.x,
+                clientY: p.y,
+                width: 0,
+                height: 0,
+                radiusX: 0,
+                radiusY: 0,
+              },
+              rootEl
+            )
+          );
+        }
+      }
+      return merged;
+    }
+
+    const sync = (st, e) => {
+      onSync(st, mergeTargets(st, e), e);
+    };
+
+    const down = (e) => {
+      if (!shouldHandle(e)) return;
+      if (!isPlayPointer(e)) return;
+      if (pointers.has(e.pointerId)) return;
+      const targets = collectTargets(e, rootEl) || [];
+      if (!targets.length) return;
+      e.preventDefault();
+      e.stopPropagation();
+      try {
+        rootEl.setPointerCapture(e.pointerId);
+      } catch {
+        /* */
+      }
+      const st = { pointerId: e.pointerId, lastX: e.clientX, lastY: e.clientY };
+      pointers.set(e.pointerId, st);
+      onSync(st, targets, e);
+    };
+
+    const move = (e) => {
+      const st = pointers.get(e.pointerId);
+      if (!st) return;
+      e.preventDefault();
+      sync(st, e);
+      st.lastX = e.clientX;
+      st.lastY = e.clientY;
+    };
+
+    const end = (e) => {
+      const st = pointers.get(e.pointerId);
+      if (!st) return;
+      e.preventDefault();
+      onEnd?.(st, e);
+      pointers.delete(e.pointerId);
+      try {
+        rootEl.releasePointerCapture(e.pointerId);
+      } catch {
+        /* */
+      }
+    };
+
+    bindPointerHandlers(rootEl, {
+      down,
+      move,
+      end,
+      hasPointer: (id) => pointers.has(id),
+    });
+
+    return {
+      releaseAll() {
+        for (const [, st] of pointers) onEnd?.(st, {});
+        pointers.clear();
+      },
+    };
+  }
+
+  function bind(rootEl, opts) {
+    const {
+      hitTest,
+      onEnter,
+      onLeave,
+      onMove,
+      shouldHandle = () => true,
+    } = opts;
+    const pointers = new Map();
+
+    function leave(st, e) {
+      if (st.target == null) return;
+      onLeave?.(st, e);
+      st.target = null;
+      st.targetId = null;
+    }
+
+    function enter(st, target, e) {
+      const id = targetKey(target);
+      if (st.targetId === id) return;
+      leave(st, e);
+      st.targetId = id;
+      st.target = target;
+      if (target != null) onEnter?.(st, target, e);
+    }
+
+    function processMove(st, e) {
+      const x0 = st.lastX ?? e.clientX;
+      const y0 = st.lastY ?? e.clientY;
+      const pts = samplePath(x0, y0, e.clientX, e.clientY);
+      for (const p of pts) {
+        const hit = hitTest(p.x, p.y);
+        if (hit) {
+          enter(st, hit, e);
+          onMove?.(st, hit, e);
+        }
+      }
+      const at = hitTest(e.clientX, e.clientY);
+      if (at) {
+        enter(st, at, e);
+        onMove?.(st, at, e);
+      }
+      st.lastX = e.clientX;
+      st.lastY = e.clientY;
+    }
+
+    const down = (e) => {
+      if (!shouldHandle(e)) return;
+      if (!isPlayPointer(e)) return;
+      if (pointers.has(e.pointerId)) return;
+      const hit = hitTest(e.clientX, e.clientY);
+      if (!hit) return;
+      e.preventDefault();
+      e.stopPropagation();
+      try {
+        rootEl.setPointerCapture(e.pointerId);
+      } catch {
+        /* */
+      }
+      const st = { lastX: e.clientX, lastY: e.clientY, target: null };
+      pointers.set(e.pointerId, st);
+      enter(st, hit, e);
+    };
+
+    const move = (e) => {
+      const st = pointers.get(e.pointerId);
+      if (!st) return;
+      e.preventDefault();
+      processMove(st, e);
+    };
+
+    const end = (e) => {
+      const st = pointers.get(e.pointerId);
+      if (!st) return;
+      e.preventDefault();
+      leave(st, e);
+      pointers.delete(e.pointerId);
+      try {
+        rootEl.releasePointerCapture(e.pointerId);
+      } catch {
+        /* */
+      }
+    };
+
+    bindPointerHandlers(rootEl, {
+      down,
+      move,
+      end,
+      hasPointer: (id) => pointers.has(id),
+    });
+
+    return {
+      releaseAll() {
+        for (const [, st] of pointers) leave(st, {});
+        pointers.clear();
+      },
+    };
+  }
+
+  return { bind, bindMultiArea, touchRect, rectsIntersect, samplePath };
+})();
+
+window.PointerSlide = PointerSlide;
 
 
 /* === fretted-instrument.js === */
@@ -3758,7 +3787,6 @@ const StringTouch = (() => {
       document.addEventListener("visibilitychange", () => {
         if (document.hidden) ctl.releaseAll?.();
       });
-      bundleEl.addEventListener("pointerleave", () => ctl.releaseAll?.(), { passive: true });
     }
     bundles.set(bundleEl, ctl);
   }

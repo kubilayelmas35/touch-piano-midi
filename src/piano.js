@@ -158,7 +158,7 @@ const Piano = (() => {
       e.preventDefault();
       e.stopPropagation();
       if (window.__touchPianoTouchInput) return;
-      if (e.pointerType === "touch") return;
+      if (e.pointerType === "touch" || e.pointerType === "pen") return;
       openLabelEditor(midi);
     });
 
@@ -166,7 +166,8 @@ const Piano = (() => {
       if (e.button !== 2) return;
       e.preventDefault();
       e.stopPropagation();
-      if (window.__touchPianoTouchInput || e.pointerType === "touch") return;
+      if (window.__touchPianoTouchInput || e.pointerType === "touch" || e.pointerType === "pen")
+        return;
       openMouse(e);
     });
   }
