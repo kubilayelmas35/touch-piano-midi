@@ -588,6 +588,7 @@ function createFrettedInstrument(config) {
       stringsRoot.appendChild(pluckBundle);
       window.StringTouch?.bindPluckBundle(pluckBundle, () => pluckRows, {
         useNearbyTouch: () => stringsNearbyEnabled(),
+        instrument: id,
       });
       updateStringHighlights();
     }
@@ -629,7 +630,7 @@ function createFrettedInstrument(config) {
       }
       const el = target?.cell || cellMap.get(midi);
       if (el) el.classList.add("active");
-      window.AudioEngine.noteOn(midi, velocity, { poly: true });
+      window.AudioEngine.noteOn(midi, velocity, { poly: true, instrument: id });
       onNoteDown?.(midi, velocity);
       if (target?.stringIdx != null) {
         setNeckVibrato(target.stringIdx, 0.35);

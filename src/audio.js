@@ -46,10 +46,28 @@ const AudioEngine = (() => {
   }
 
   /** Gitar/kemanda çalma modu sesi; piyanoda ayarlardaki enstrüman seçimi */
-  function effectiveInstrument() {
+  function effectiveInstrument(opts = {}) {
+    if (opts.instrument && INSTRUMENTS[opts.instrument]) return opts.instrument;
     const mode = window.PlaySurface?.getMode?.() || "piano";
     if (mode === "guitar" || mode === "violin") return mode;
     return instrumentId;
+  }
+
+  function instrumentGain(id) {
+    switch (id) {
+      case "guitar":
+        return 1.62;
+      case "violin":
+        return 1.48;
+      case "flute":
+        return 1.12;
+      case "brass":
+        return 1.18;
+      case "synth":
+        return 1.08;
+      default:
+        return 1;
+    }
   }
 
   function getInstruments() {
@@ -90,44 +108,47 @@ const AudioEngine = (() => {
       case "violin":
         return {
           oscs: [
-            { type: "sawtooth", gain: 0.5 },
-            { type: "sine", ratio: 2, gain: 0.16 },
-            { type: "triangle", ratio: 3, gain: 0.06 },
+            { type: "sawtooth", gain: 0.68 },
+            { type: "sawtooth", ratio: 1.003, gain: 0.14 },
+            { type: "sine", ratio: 2, gain: 0.1 },
+            { type: "triangle", ratio: 3, gain: 0.05 },
           ],
-          peak: 0.46,
-          attack: 0.045,
-          sustain: 0.26,
-          decay1: 0.38,
-          decay2: 2.4,
-          tail: 0.05,
+          peak: 0.68,
+          attack: 0.055,
+          sustain: 0.36,
+          decay1: 0.42,
+          decay2: 2.8,
+          tail: 0.07,
           filterType: "lowpass",
-          filterStart: 3000,
-          filterEnd: 1100,
-          filterVel: 1600,
-          filterQ: 2.1,
-          vibratoHz: 5.8,
-          vibratoDepth: 0.009,
+          filterStart: 5200,
+          filterEnd: 1500,
+          filterVel: 2200,
+          filterQ: 2.4,
+          vibratoHz: 5.6,
+          vibratoDepth: 0.014,
         };
       case "guitar":
         return {
           oscs: [
-            { type: "triangle", gain: 0.58 },
-            { type: "sawtooth", gain: 0.14 },
-            { type: "sine", ratio: 2, gain: 0.05 },
+            { type: "sawtooth", gain: 0.42 },
+            { type: "triangle", gain: 0.24 },
+            { type: "square", ratio: 2, gain: 0.1 },
+            { type: "sine", ratio: 0.5, gain: 0.08 },
           ],
-          peak: 0.54,
-          attack: 0.0015,
-          sustain: 0.1,
-          decay1: 0.06,
-          decay2: 0.72,
-          tail: 0.02,
-          filterType: "bandpass",
-          filterStart: 2400,
-          filterEnd: 420,
-          filterVel: 520,
-          filterQ: 2.8,
-          vibratoHz: 5.5,
-          vibratoDepth: 0.005,
+          peak: 0.78,
+          attack: 0.001,
+          sustain: 0.22,
+          decay1: 0.09,
+          decay2: 0.95,
+          tail: 0.03,
+          filterType: "lowpass",
+          filterStart: 4200,
+          filterEnd: 680,
+          filterVel: 900,
+          filterQ: 1.35,
+          vibratoHz: 5.2,
+          vibratoDepth: 0.004,
+          noiseAttack: 0.22,
         };
       case "flute":
         return {
@@ -248,8 +269,36 @@ const AudioEngine = (() => {
       oscNodes.push(lfo);
     }
 
+    const extraStops = [];
+    if (cfg.noiseAttack > 0) {
+      const noiseDur = 0.045;
+      const bufferSize = Math.max(1, Math.floor(ac.sampleRate * noiseDur));
+      const buffer = ac.createBuffer(1, bufferSize, ac.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        const fade = 1 - i / bufferSize;
+        data[i] = (Math.random() * 2 - 1) * fade * fade;
+      }
+      const noise = ac.createBufferSource();
+      noise.buffer = buffer;
+      const ng = ac.createGain();
+      ng.gain.setValueAtTime(Math.max(0.0002, vol * cfg.noiseAttack), t);
+      ng.gain.exponentialRampToValueAtTime(0.0001, t + noiseDur);
+      const nf = ac.createBiquadFilter();
+      nf.type = "bandpass";
+      nf.frequency.value = Math.min(5200, Math.max(320, freq * 3.2));
+      nf.Q.value = 1.1;
+      noise.connect(ng);
+      ng.connect(nf);
+      nf.connect(filter);
+      noise.start(t);
+      noise.stop(t + noiseDur + 0.01);
+      extraStops.push(noise);
+    }
+
     return {
       oscs: oscNodes,
+      extraStops,
       master,
       filter,
       lfo,
@@ -285,6 +334,13 @@ const AudioEngine = (() => {
           /* */
         }
       }
+      for (const node of voice.extraStops || []) {
+        try {
+          node.stop(stopAt);
+        } catch {
+          /* */
+        }
+      }
     } catch {
       for (const osc of voice.oscs) {
         try {
@@ -314,9 +370,12 @@ const AudioEngine = (() => {
     const ac = ensure();
     if (!opts.poly) noteOffMidi(midi, true);
 
-    const inst = effectiveInstrument();
+    const inst = effectiveInstrument(opts);
     const freq = midiToFreq(midi);
-    const vol = Math.min(0.92, velocity * 0.38 * loudnessCompensation(freq));
+    const vol = Math.min(
+      0.98,
+      velocity * 0.42 * loudnessCompensation(freq) * instrumentGain(inst)
+    );
     const cfg = voiceConfig(inst);
     const voice = buildVoice(ac, freq, vol, velocity, cfg);
     const id = nextVoiceId++;
