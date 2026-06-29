@@ -114,12 +114,16 @@ const StringTouch = (() => {
     const midi = resolveMidi(row.getMidi);
     if (!midi) return null;
 
-    const vel = window.AudioEngine.velocityFromPointer(e, 0.55);
+    const vel = window.AudioEngine.velocityFromPointer(e, 0.72);
     const lineEl = rowLineEl(row);
     row.el.classList.add("active", "string-held");
     lineEl?.classList.add("string-line-active");
 
-    const voiceId = window.AudioEngine.noteOn(midi, vel, { poly: true });
+    const instrument = st.instrument || window.PlaySurface?.getMode?.() || null;
+    const voiceId = window.AudioEngine.noteOn(midi, vel, {
+      poly: true,
+      instrument: instrument === "piano" ? undefined : instrument,
+    });
     window.AudioEngine.setLiveGain?.(voiceId, vel);
     row.onDown?.(midi, vel, e);
 
@@ -130,6 +134,7 @@ const StringTouch = (() => {
       getMidi: row.getMidi,
       midi,
       voiceId,
+      instrument,
       baseVel: vel,
       pluck: vel,
       lastX: e.clientX,
@@ -150,7 +155,13 @@ const StringTouch = (() => {
       releaseVoice(rowState.voiceId);
       rowState.midi = midi;
       const v = window.AudioEngine.velocityFromPointer(e, rowState.baseVel);
-      rowState.voiceId = window.AudioEngine.noteOn(midi, v, { poly: true });
+      rowState.voiceId = window.AudioEngine.noteOn(midi, v, {
+        poly: true,
+        instrument:
+          rowState.instrument && rowState.instrument !== "piano"
+            ? rowState.instrument
+            : undefined,
+      });
       rowState.baseVel = v;
       rowState.pluck = v;
     }
@@ -216,9 +227,13 @@ const StringTouch = (() => {
 
   function bindPluckBundle(bundleEl, getRows, options = {}) {
     if (!window.PointerSlide?.bindMultiArea) return;
+    const instrument = options.instrument || null;
     const ctl = window.PointerSlide.bindMultiArea(bundleEl, {
       collectTargets: (e) => rowsInTouch(getRows(), e, options.useNearbyTouch),
-      onSync: (st, rows, e) => syncRows(st, rows, e),
+      onSync: (st, rows, e) => {
+        if (instrument) st.instrument = instrument;
+        syncRows(st, rows, e);
+      },
       onEnd: (st, e) => releaseAllRows(st, e),
     });
     if (!bundleEl.__stringTouchGuardBound) {
