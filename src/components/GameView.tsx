@@ -1,0 +1,288 @@
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { engine } from "../engine/engine";
+import { FretLayout, PianoLayout, visibleFrets } from "../engine/layout";
+import { midiAt } from "../engine/fretting";
+import { keyLabelMap } from "../input/keyboard";
+import { niceKeyboardRange } from "../lib/notes";
+import { Highway } from "../render/highway";
+import { BLACK_KEY_RATIO, FretboardRenderer, KeyboardRenderer } from "../render/instrument";
+import { useApp } from "../state/store";
+import { updateSettings } from "../state/actions";
+import { useT } from "../i18n";
+import { Hud } from "./Hud";
+import { EmptyState } from "./EmptyState";
+
+const MIN_WHITE = 15;
+const MAX_WHITE = 46;
+
+function pianoRange(width: number): [number, number] {
+  let low = 127;
+  let high = 0;
+  for (const n of engine.notes) {
+    if (n.midi < low) low = n.midi;
+    if (n.midi > high) high = n.midi;
+  }
+  if (low > high) {
+    low = 48;
+    high = 83;
+  }
+  const minKeys = width < 520 ? 18 : width < 900 ? 25 : 37;
+  let [lo, hi] = niceKeyboardRange(low, high, minKeys);
+  const whites = (a: number, b: number) => new PianoLayout(a, b, width).whiteCount;
+  // Widen while keys are very wide, so the keyboard doesn't look like a toy.
+  let guard = 0;
+  while (width / whites(lo, hi) > MAX_WHITE && guard++ < 8) {
+    if (lo > 21) lo = Math.max(21, lo - 12);
+    if (width / whites(lo, hi) > MAX_WHITE && hi < 108) hi = Math.min(108, hi + 12);
+    if (lo === 21 && hi === 108) break;
+  }
+  [lo, hi] = niceKeyboardRange(lo, hi, 0);
+  // Too narrow: keep the song's range only (touch targets stay usable via zoom-free layout).
+  if (width / whites(lo, hi) < MIN_WHITE) [lo, hi] = niceKeyboardRange(low, high, 0);
+  return [lo, hi];
+}
+
+export function GameView() {
+  const t = useT();
+  const instrument = useApp((s) => s.settings.instrument);
+  const instrumentHeight = useApp((s) => s.settings.instrumentHeight);
+  const hasSong = useApp((s) => !!s.song);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const hwRef = useRef<HTMLCanvasElement>(null);
+  const instRef = useRef<HTMLCanvasElement>(null);
+  const [size, setSize] = useState({ w: 0, h: 0 });
+  const [notesRev, setNotesRev] = useState(0);
+
+  // Re-layout when the player's notes change (song, tracks, hand, instrument).
+  useEffect(() => {
+    let last = engine.notes;
+    return engine.subscribe(() => {
+      if (engine.notes !== last) {
+        last = engine.notes;
+        setNotesRev((r) => r + 1);
+      }
+    });
+  }, []);
+
+  useLayoutEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      const r = el.getBoundingClientRect();
+      setSize({ w: Math.floor(r.width), h: Math.floor(r.height) });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const fretSpec = instrument === "piano" ? null : engine.fretSpec;
+  const layout = useMemo(() => {
+    if (!size.w) return null;
+    if (instrument === "piano") {
+      const [lo, hi] = pianoRange(size.w);
+      return { piano: new PianoLayout(lo, hi, size.w), fret: null };
+    }
+    const spec = engine.fretSpec!;
+    let highest = 0;
+    for (const n of engine.notes) if (n.fret > highest) highest = n.fret;
+    return { piano: null, fret: new FretLayout(spec, size.w, visibleFrets(spec, size.w, highest)) };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [size.w, instrument, notesRev, fretSpec]);
+
+  const instH = useMemo(() => {
+    if (!size.h) return 0;
+    const want = size.h * instrumentHeight;
+    if (instrument === "piano") {
+      const ww = layout?.piano?.whiteW ?? 30;
+      return Math.round(Math.max(96, Math.min(want, ww * 5, 230, size.h * 0.5)));
+    }
+    const strings = instrument === "guitar" ? 6 : 4;
+    return Math.round(Math.max(strings * 22, Math.min(want, strings * 52, size.h * 0.45)));
+  }, [size.h, instrumentHeight, instrument, layout]);
+  const hwH = Math.max(0, size.h - instH);
+
+  // Renderers live for the component lifetime; the frame loop reads the latest view through a ref.
+  const renderers = useRef<{ hw: Highway; kb: KeyboardRenderer; fb: FretboardRenderer } | null>(null);
+  const viewRef = useRef({ layout, instH, hwH, w: size.w });
+  viewRef.current = { layout, instH, hwH, w: size.w };
+
+  useEffect(() => {
+    if (!hwRef.current || !instRef.current) return;
+    renderers.current = {
+      hw: new Highway(hwRef.current, engine),
+      kb: new KeyboardRenderer(instRef.current, engine),
+      fb: new FretboardRenderer(instRef.current, engine),
+    };
+    let raf = 0;
+    let lastStore = 0;
+    const labels: Record<string, string> = {};
+    const frame = (now: number) => {
+      raf = requestAnimationFrame(frame);
+      const r = renderers.current;
+      const v = viewRef.current;
+      if (!r || !v.layout || !v.w) return;
+      const st = useApp.getState();
+      const s = st.settings;
+      const time = engine.frame();
+      labels.perfect = t("perfect");
+      labels.great = t("great");
+      labels.good = t("good");
+      labels.miss = t("miss");
+      r.hw.resize(v.w, v.hwH);
+      r.hw.draw({
+        t: time,
+        fallSeconds: s.fallSeconds,
+        piano: v.layout.piano,
+        fret: v.layout.fret,
+        naming: s.noteNaming,
+        showNames: s.showNoteNames,
+        effects: s.effects,
+        labels,
+      });
+      if (v.layout.piano) {
+        r.kb.resize(v.w, v.instH);
+        r.kb.draw({
+          layout: v.layout.piano,
+          t: time,
+          naming: s.noteNaming,
+          showAllNames: false,
+          keyLabels: s.showKeyLabels ? keyLabelMap((s.keyboardOctave + 1) * 12) : null,
+        });
+      } else if (v.layout.fret) {
+        r.fb.resize(v.w, v.instH);
+        r.fb.draw({ layout: v.layout.fret, t: time, naming: s.noteNaming, violin: s.instrument === "violin" });
+      }
+      if (engine.status === "playing" && now - lastStore > 90) {
+        lastStore = now;
+        useApp.setState({ time });
+      }
+    };
+    raf = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(raf);
+  }, [t]);
+
+  // ----------------------------------------------------------- touch input
+  const pointers = useRef(new Map<number, { key: string; midi: number; x0: number; y0: number; string: number; fret: number }>());
+
+  const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const v = viewRef.current;
+    if (!v.layout) return;
+    e.preventDefault();
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const key = `ptr:${e.pointerId}`;
+    if (v.layout.piano) {
+      const midi = v.layout.piano.hit(x, y, v.instH * BLACK_KEY_RATIO);
+      if (midi == null) return;
+      const vel = e.pressure && e.pressure !== 0.5 ? e.pressure : 0.55 + 0.4 * Math.min(1, y / v.instH);
+      engine.press(key, midi, vel);
+      pointers.current.set(e.pointerId, { key, midi, x0: x, y0: y, string: -1, fret: -1 });
+    } else if (v.layout.fret && renderers.current) {
+      const spec = v.layout.fret.spec;
+      const string = renderers.current.fb.stringAt(y, spec.tuning.length);
+      const fret = v.layout.fret.fretAt(x);
+      const midi = midiAt(spec, string, fret);
+      engine.press(key, midi, 0.85, { string, fret });
+      pointers.current.set(e.pointerId, { key, midi, x0: x, y0: y, string, fret });
+    }
+  };
+
+  const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const p = pointers.current.get(e.pointerId);
+    const v = viewRef.current;
+    if (!p || !v.layout) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    if (v.layout.piano) {
+      const midi = v.layout.piano.hit(x, y, v.instH * BLACK_KEY_RATIO);
+      if (midi != null && midi !== p.midi) {
+        engine.release(p.key);
+        engine.press(p.key, midi, 0.7);
+        p.midi = midi;
+      }
+    } else if (v.layout.fret) {
+      const fret = v.layout.fret.fretAt(x);
+      const spec = v.layout.fret.spec;
+      if (fret !== p.fret) {
+        // Slide to another fret on the same string.
+        const midi = midiAt(spec, p.string, fret);
+        engine.release(p.key);
+        engine.press(p.key, midi, 0.7, { string: p.string, fret });
+        p.fret = fret;
+        p.midi = midi;
+        p.y0 = y;
+      } else {
+        const rowH = v.instH / spec.tuning.length;
+        const dy = Math.abs(y - p.y0);
+        const cents = instrument === "violin" ? Math.max(-45, Math.min(45, (p.y0 - y) * 2.2)) : Math.min(200, (dy / rowH) * 200);
+        engine.bend(p.key, cents);
+      }
+    }
+  };
+
+  const onPointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const p = pointers.current.get(e.pointerId);
+    if (!p) return;
+    pointers.current.delete(e.pointerId);
+    engine.release(p.key);
+  };
+
+  // Resize handle between the highway and the instrument.
+  const dragRef = useRef<{ y0: number; h0: number } | null>(null);
+  const onHandleDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    dragRef.current = { y0: e.clientY, h0: instH };
+  };
+  const onHandleMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const d = dragRef.current;
+    if (!d || !size.h) return;
+    const next = (d.h0 + (d.y0 - e.clientY)) / size.h;
+    useApp.setState((s) => ({ settings: { ...s.settings, instrumentHeight: Math.max(0.16, Math.min(0.5, next)) } }));
+  };
+  const onHandleUp = () => {
+    if (!dragRef.current) return;
+    dragRef.current = null;
+    updateSettings({ instrumentHeight: useApp.getState().settings.instrumentHeight });
+  };
+
+  const instLabel = instrument === "piano" ? t("piano") : instrument === "guitar" ? t("guitar") : t("violin");
+
+  return (
+    <div ref={wrapRef} className="relative min-h-0 flex-1 overflow-hidden">
+      <div className="absolute inset-x-0 top-0" style={{ height: hwH }}>
+        <canvas ref={hwRef} className="block h-full w-full" aria-hidden="true" />
+        {hasSong ? <Hud /> : <EmptyState />}
+      </div>
+      <div
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label={t("instrumentHeight")}
+        className="group absolute inset-x-0 z-10 flex h-3 -translate-y-1/2 cursor-row-resize items-center justify-center touch-none"
+        style={{ top: hwH }}
+        onPointerDown={onHandleDown}
+        onPointerMove={onHandleMove}
+        onPointerUp={onHandleUp}
+        onPointerCancel={onHandleUp}
+      >
+        <div className="h-1 w-12 rounded-full bg-white/15 transition-colors group-hover:bg-brand-400/70" />
+      </div>
+      <div className="absolute inset-x-0 bottom-0" style={{ height: instH }}>
+        <canvas
+          ref={instRef}
+          role="application"
+          aria-label={instLabel}
+          className="surface-touch block h-full w-full"
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+          onLostPointerCapture={onPointerUp}
+          onContextMenu={(e) => e.preventDefault()}
+        />
+      </div>
+    </div>
+  );
+}

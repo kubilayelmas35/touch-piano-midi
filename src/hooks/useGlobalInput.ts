@@ -1,0 +1,171 @@
+import { useEffect } from "react";
+import { unlockAudio } from "../audio/context";
+import { engine } from "../engine/engine";
+import { tNow } from "../i18n";
+import { NOTE_KEYS, isEditableTarget } from "../input/keyboard";
+import { cycleLoop, importFiles, updateSession, updateSettings } from "../state/actions";
+import { setPanel, toast, useApp } from "../state/store";
+
+/** Keyboard shortcuts, computer-keyboard notes, drag & drop import and background auto-pause. */
+export function useGlobalInput(): void {
+  useEffect(() => {
+    const down = new Set<string>();
+
+    const anyDialogOpen = () => {
+      const s = useApp.getState();
+      return !!(s.panel || s.results || s.welcomeOpen);
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (isEditableTarget(e.target)) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const st = useApp.getState();
+
+      if (anyDialogOpen()) return;
+
+      const offset = NOTE_KEYS[e.code];
+      if (offset !== undefined) {
+        e.preventDefault();
+        if (e.repeat || down.has(e.code)) return;
+        down.add(e.code);
+        void unlockAudio();
+        const base = (st.settings.keyboardOctave + 1) * 12;
+        engine.press(`key:${e.code}`, base + offset, 0.8);
+        return;
+      }
+      if (e.repeat && e.code !== "ArrowLeft" && e.code !== "ArrowRight") return;
+
+      switch (e.code) {
+        case "Space":
+          e.preventDefault();
+          (document.activeElement as HTMLElement | null)?.blur?.();
+          engine.toggle();
+          break;
+        case "ArrowLeft":
+          e.preventDefault();
+          engine.seek(engine.time - (e.shiftKey ? 10 : 5));
+          useApp.setState({ time: engine.time });
+          break;
+        case "ArrowRight":
+          e.preventDefault();
+          engine.seek(engine.time + (e.shiftKey ? 10 : 5));
+          useApp.setState({ time: engine.time });
+          break;
+        case "ArrowUp":
+          e.preventDefault();
+          updateSession({ speed: Math.min(1.5, Math.round((st.session.speed + 0.05) * 100) / 100) });
+          break;
+        case "ArrowDown":
+          e.preventDefault();
+          updateSession({ speed: Math.max(0.25, Math.round((st.session.speed - 0.05) * 100) / 100) });
+          break;
+        case "Home":
+        case "Backspace":
+          e.preventDefault();
+          engine.stop();
+          break;
+        case "KeyB":
+          cycleLoop();
+          break;
+        case "KeyN":
+          updateSession({ waitMode: !st.session.waitMode });
+          toast(`${tNow("waitMode")}: ${tNow(!st.session.waitMode ? "on" : "off")}`, "info", 1400);
+          break;
+        case "KeyM":
+          updateSettings({ metronome: !st.settings.metronome });
+          toast(`${tNow("metronome")}: ${tNow(!st.settings.metronome ? "on" : "off")}`, "info", 1400);
+          break;
+        case "KeyZ":
+          updateSettings({ keyboardOctave: Math.max(1, st.settings.keyboardOctave - 1) });
+          break;
+        case "KeyX":
+          updateSettings({ keyboardOctave: Math.min(7, st.settings.keyboardOctave + 1) });
+          break;
+        case "Slash":
+          e.preventDefault();
+          setPanel("library");
+          break;
+        case "Comma":
+          setPanel("settings");
+          break;
+      }
+    };
+
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (!down.has(e.code)) return;
+      down.delete(e.code);
+      engine.release(`key:${e.code}`);
+    };
+
+    const releaseKeys = () => {
+      for (const code of down) engine.release(`key:${code}`);
+      down.clear();
+    };
+
+    const onVisibility = () => {
+      if (document.hidden) {
+        releaseKeys();
+        engine.releaseAll();
+        if (engine.status === "playing") {
+          engine.pause();
+          toast(tNow("pausedHidden"), "info", 3500);
+        }
+      }
+    };
+
+    const firstGesture = () => {
+      void unlockAudio();
+    };
+
+    // Drag & drop MIDI anywhere.
+    let dragDepth = 0;
+    const hasFiles = (e: DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes("Files");
+    const onDragEnter = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      dragDepth++;
+      useApp.setState({ dragOver: true });
+    };
+    const onDragOver = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+    };
+    const onDragLeave = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      dragDepth = Math.max(0, dragDepth - 1);
+      if (!dragDepth) useApp.setState({ dragOver: false });
+    };
+    const onDrop = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      dragDepth = 0;
+      useApp.setState({ dragOver: false });
+      const files = Array.from(e.dataTransfer?.files ?? []);
+      if (files.length) void importFiles(files).then(() => setPanel(null));
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", releaseKeys);
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pointerdown", firstGesture, { capture: true });
+    window.addEventListener("keydown", firstGesture, { capture: true, once: true });
+    window.addEventListener("dragenter", onDragEnter);
+    window.addEventListener("dragover", onDragOver);
+    window.addEventListener("dragleave", onDragLeave);
+    window.addEventListener("drop", onDrop);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", releaseKeys);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pointerdown", firstGesture, { capture: true });
+      window.removeEventListener("keydown", firstGesture, { capture: true });
+      window.removeEventListener("dragenter", onDragEnter);
+      window.removeEventListener("dragover", onDragOver);
+      window.removeEventListener("dragleave", onDragLeave);
+      window.removeEventListener("drop", onDrop);
+    };
+  }, []);
+}

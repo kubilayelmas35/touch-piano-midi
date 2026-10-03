@@ -1,0 +1,189 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const audio = vi.hoisted(() => ({ currentTime: 0, played: [] as { midi: number; when?: number }[] }));
+
+vi.mock("../audio/context", () => ({
+  getBus: () => ({ ctx: { currentTime: audio.currentTime } }),
+  unlockAudio: async () => {},
+}));
+vi.mock("../audio/click", () => ({ scheduleClick: vi.fn() }));
+vi.mock("../audio/sampler", () => ({
+  isLoaded: () => true,
+  loadInstrument: async () => {},
+  playNote: (_id: string, midi: number, _vel: number, opts: { when?: number } = {}) => {
+    audio.played.push({ midi, when: opts.when });
+    return { done: false, stop: () => {}, bend: () => {}, kill: () => {} };
+  },
+}));
+
+import { Engine } from "./engine";
+import { NoteState } from "./types";
+import { finalizeSong, type Song, type SongNote } from "../midi/song";
+
+let now = 0;
+
+function advance(sec: number, engine: Engine, step = 1 / 60): number {
+  let t = engine.time;
+  for (let s = 0; s < sec; s += step) {
+    now += step * 1000;
+    audio.currentTime += step;
+    t = engine.frame();
+  }
+  return t;
+}
+
+/** One beat per second, melody C4 D4 E4 F4 G4 in track 0, bass C3 on beats 0 and 2 in track 1. */
+function makeSong(): Song {
+  const melody: SongNote[] = [60, 62, 64, 65, 67].map((midi, i) => ({ midi, time: i, duration: 0.9, velocity: 0.8, track: 0 }));
+  const bass: SongNote[] = [0, 2].map((time) => ({ midi: 48, time, duration: 1.8, velocity: 0.7, track: 1 }));
+  const beats = Array.from({ length: 6 }, (_, i) => ({ time: i, downbeat: i % 4 === 0, measure: Math.floor(i / 4) }));
+  return finalizeSong(
+    "test",
+    [...melody, ...bass],
+    [
+      { index: 0, name: "Right hand", instrument: "piano", isDrum: false, noteCount: 5, low: 60, high: 67 },
+      { index: 1, name: "Left hand", instrument: "piano", isDrum: false, noteCount: 2, low: 48, high: 48 },
+    ],
+    beats,
+    60,
+    4
+  );
+}
+
+async function startEngine(cfg: Partial<Engine["config"]> = {}): Promise<Engine> {
+  const engine = new Engine();
+  engine.load(makeSong(), { playTracks: [0], countIn: false, ...cfg });
+  await engine.play();
+  return engine;
+}
+
+beforeEach(() => {
+  now = 1000;
+  audio.currentTime = 0;
+  audio.played = [];
+  vi.spyOn(performance, "now").mockImplementation(() => now);
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+describe("engine", () => {
+  it("starts with a lead-in before the first note", async () => {
+    const engine = await startEngine();
+    expect(engine.startTime).toBeLessThan(0);
+    expect(engine.time).toBeCloseTo(engine.startTime, 3);
+  });
+
+  it("scores an on-time press and misses unplayed notes", async () => {
+    const engine = await startEngine();
+    advance(-engine.startTime, engine);
+    engine.press("k", 60);
+    engine.release("k");
+    expect(engine.stats.perfect).toBe(1);
+    expect(engine.stats.score).toBeGreaterThan(0);
+    advance(1.5, engine);
+    expect(engine.notes[1].state).toBe(NoteState.Missed);
+    expect(engine.stats.miss).toBe(1);
+    expect(engine.stats.combo).toBe(0);
+  });
+
+  it("counts a wrong key without consuming a note", async () => {
+    const engine = await startEngine();
+    advance(-engine.startTime, engine);
+    engine.press("k", 61);
+    expect(engine.stats.wrong).toBe(1);
+    expect(engine.notes[0].state).toBe(NoteState.Pending);
+  });
+
+  it("plays accompaniment for tracks the player is not playing", async () => {
+    const engine = await startEngine();
+    advance(-engine.startTime + 0.1, engine);
+    expect(audio.played.some((p) => p.midi === 48)).toBe(true);
+    expect(audio.played.some((p) => p.midi === 60)).toBe(false);
+  });
+
+  it("wait mode freezes at the next note until it is played", async () => {
+    const engine = await startEngine({ waitMode: true });
+    advance(-engine.startTime + 2, engine);
+    expect(engine.waiting).toBe(true);
+    expect(engine.time).toBeCloseTo(0, 3);
+    expect(engine.notes[0].state).toBe(NoteState.Pending);
+
+    engine.press("k", 60);
+    expect(engine.notes[0].state).toBe(NoteState.Hit);
+    expect(engine.notes[0].judgement).toBe("perfect");
+    const t = advance(0.5, engine);
+    expect(engine.waiting).toBe(false);
+    expect(t).toBeGreaterThan(0.4);
+    advance(2, engine);
+    expect(engine.waiting).toBe(true);
+    expect(engine.time).toBeCloseTo(1, 3);
+    expect(engine.stats.miss).toBe(0);
+  });
+
+  it("turning wait mode off mid-run resumes and marks the run as practice", async () => {
+    const engine = await startEngine({ waitMode: true });
+    advance(-engine.startTime + 1, engine);
+    expect(engine.waiting).toBe(true);
+    engine.configure({ waitMode: false });
+    expect(engine.runDirty).toBe(true);
+    const t = advance(0.5, engine);
+    expect(engine.waiting).toBe(false);
+    expect(t).toBeGreaterThan(0.4);
+  });
+
+  it("A–B loop jumps back with a pre-roll and marks the run dirty", async () => {
+    const engine = await startEngine({ loop: { a: 1, b: 3, enabled: true } });
+    let maxT = -Infinity;
+    for (let i = 0; i < 6 * 60; i++) maxT = Math.max(maxT, advance(1 / 60, engine));
+    expect(maxT).toBeLessThan(3.05);
+    expect(engine.time).toBeLessThan(3.05);
+    expect(engine.runDirty).toBe(true);
+    expect(engine.status).toBe("playing");
+  });
+
+  it("completes and reports results", async () => {
+    const engine = await startEngine();
+    const done = vi.fn();
+    engine.onComplete = done;
+    advance(-engine.startTime + 7, engine);
+    expect(engine.status).toBe("complete");
+    expect(done).toHaveBeenCalledTimes(1);
+    expect(done.mock.calls[0][0].stats.miss).toBe(5);
+    expect(done.mock.calls[0][0].dirty).toBe(false);
+  });
+
+  it("seeking marks a started run as dirty", async () => {
+    const engine = await startEngine();
+    advance(-engine.startTime + 0.01, engine);
+    engine.press("k", 60);
+    engine.seek(3);
+    expect(engine.runDirty).toBe(true);
+    expect(engine.notes[1].state).toBe(NoteState.Skipped);
+    expect(engine.notes[3].state).toBe(NoteState.Pending);
+  });
+
+  it("speed scales song time", async () => {
+    const engine = await startEngine({ speed: 0.5 });
+    const t0 = engine.time;
+    const t1 = advance(1, engine);
+    expect(t1 - t0).toBeCloseTo(0.5, 1);
+  });
+
+  it("auto-play hits every note and never shows wrong presses", async () => {
+    const engine = await startEngine({ autoPlay: true });
+    advance(-engine.startTime + 5, engine);
+    expect(engine.notes.every((n) => n.state === NoteState.Hit)).toBe(true);
+    expect(audio.played.filter((p) => p.midi >= 60).length).toBe(5);
+  });
+
+  it("guitar mode assigns every note a string and fret", async () => {
+    const engine = await startEngine({ instrument: "guitar" });
+    expect(engine.notes.length).toBe(5);
+    for (const n of engine.notes) {
+      expect(n.string).toBeGreaterThanOrEqual(0);
+      expect(n.fret).toBeGreaterThanOrEqual(0);
+    }
+  });
+});

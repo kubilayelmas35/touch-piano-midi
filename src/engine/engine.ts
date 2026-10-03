@@ -1,0 +1,715 @@
+import { getBus, unlockAudio } from "../audio/context";
+import { scheduleClick } from "../audio/click";
+import type { InstrumentId } from "../audio/instruments";
+import { isLoaded, loadInstrument, playNote, type Voice } from "../audio/sampler";
+import { selectAccompanimentNotes, selectPlayerNotes, type Song, type SongNote } from "../midi/song";
+import { GUITAR, VIOLIN, assignFingerings, foldIntoRange, type FrettedSpec } from "./fretting";
+import {
+  JUDGEMENT_POINTS,
+  NoteState,
+  comboMultiplier,
+  emptyStats,
+  judge,
+  type EngineConfig,
+  type Fx,
+  type Judgement,
+  type PlayNote,
+  type Stats,
+  type Status,
+} from "./types";
+
+const GROUP_EPS = 0.035;
+const SCHEDULE_AHEAD = 0.25;
+
+export interface PressPos {
+  string: number;
+  fret: number;
+}
+
+export interface HeldNote {
+  midi: number;
+  string: number;
+  fret: number;
+}
+
+interface GridBeat {
+  time: number;
+  downbeat: boolean;
+}
+
+export const DEFAULT_CONFIG: EngineConfig = {
+  instrument: "piano",
+  guitarTone: "steel",
+  playTracks: [],
+  mutedTracks: [],
+  hand: "both",
+  speed: 1,
+  waitMode: false,
+  autoPlay: false,
+  metronome: false,
+  countIn: true,
+  timingWindowMs: 150,
+  accompVolume: 0.7,
+  playerVolume: 1,
+  loop: { a: -1, b: -1, enabled: false },
+};
+
+export function fretSpecFor(kind: EngineConfig["instrument"]): FrettedSpec | null {
+  return kind === "guitar" ? GUITAR : kind === "violin" ? VIOLIN : null;
+}
+
+export function instrumentIdFor(cfg: Pick<EngineConfig, "instrument" | "guitarTone">): InstrumentId {
+  if (cfg.instrument === "guitar") return cfg.guitarTone === "nylon" ? "guitar-nylon" : "guitar-steel";
+  return cfg.instrument === "violin" ? "violin" : "piano";
+}
+
+function lowerBound<T extends { time: number }>(arr: T[], t: number): number {
+  let lo = 0;
+  let hi = arr.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].time < t) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
+export interface RunResult {
+  stats: Stats;
+  dirty: boolean;
+  config: EngineConfig;
+}
+
+type Listener = () => void;
+
+export class Engine {
+  song: Song | null = null;
+  notes: PlayNote[] = [];
+  accomp: SongNote[] = [];
+  status: Status = "empty";
+  stats: Stats = emptyStats();
+  config: EngineConfig = { ...DEFAULT_CONFIG, loop: { ...DEFAULT_CONFIG.loop } };
+  waiting = false;
+  fx: Fx[] = [];
+  loading = false;
+  loadProgress = 1;
+  loadError: string | null = null;
+  runDirty = false;
+  startTime = 0;
+  endTime = 0;
+  maxNoteDuration = 0;
+  /** Held notes by input source key (for highlighting). */
+  readonly held = new Map<string, HeldNote>();
+  onComplete: ((r: RunResult) => void) | null = null;
+
+  private anchorPerf = 0;
+  private anchorSong = 0;
+  private anchorCtx = 0;
+  private accIdx = 0;
+  private autoIdx = 0;
+  private beatIdx = 0;
+  private scheduledUntil = 0;
+  private scheduled: Voice[] = [];
+  private pendingIdx = 0;
+  private voices = new Map<string, Voice>();
+  private sustain = false;
+  private sustained: Voice[] = [];
+  private beats: GridBeat[] = [];
+  private firstNoteTime = 0;
+  private countInActive = false;
+  private listeners = new Set<Listener>();
+  private loadToken = 0;
+
+  subscribe(fn: Listener): () => void {
+    this.listeners.add(fn);
+    return () => this.listeners.delete(fn);
+  }
+
+  private emit(): void {
+    for (const fn of this.listeners) fn();
+  }
+
+  get instrumentId(): InstrumentId {
+    return instrumentIdFor(this.config);
+  }
+
+  get fretSpec(): FrettedSpec | null {
+    return fretSpecFor(this.config.instrument);
+  }
+
+  /** Current song position in seconds (negative during lead-in). */
+  get time(): number {
+    if (this.status !== "playing") return this.anchorSong;
+    return this.anchorSong + ((performance.now() - this.anchorPerf) / 1000) * this.config.speed;
+  }
+
+  get isRunStart(): boolean {
+    return this.anchorSong <= this.startTime + 0.001 && this.notes.every((n) => n.state === NoteState.Pending);
+  }
+
+  // ---------------------------------------------------------------- loading
+
+  async ensureAudio(): Promise<boolean> {
+    const ids = Array.from(new Set<InstrumentId>([this.instrumentId, "piano"]));
+    const missing = ids.filter((id) => !isLoaded(id));
+    if (!missing.length) return true;
+    const token = ++this.loadToken;
+    this.loading = true;
+    this.loadError = null;
+    this.loadProgress = 0;
+    this.emit();
+    const progress = new Map<InstrumentId, number>();
+    try {
+      await Promise.all(
+        missing.map((id) =>
+          loadInstrument(id, (done, total) => {
+            progress.set(id, done / total);
+            let sum = 0;
+            for (const v of progress.values()) sum += v;
+            this.loadProgress = sum / missing.length;
+            this.emit();
+          })
+        )
+      );
+      return true;
+    } catch (err) {
+      this.loadError = err instanceof Error ? err.message : String(err);
+      return false;
+    } finally {
+      if (token === this.loadToken) {
+        this.loading = false;
+        this.loadProgress = 1;
+        this.emit();
+      }
+    }
+  }
+
+  load(song: Song, cfg: Partial<EngineConfig>): void {
+    this.hardStop();
+    this.song = song;
+    this.config = { ...this.config, ...cfg, loop: { ...(cfg.loop ?? DEFAULT_CONFIG.loop) } };
+    this.rebuild();
+    this.resetRun();
+    this.status = "ready";
+    this.emit();
+  }
+
+  unload(): void {
+    this.hardStop();
+    this.song = null;
+    this.notes = [];
+    this.accomp = [];
+    this.status = "empty";
+    this.emit();
+  }
+
+  private rebuild(): void {
+    const song = this.song;
+    if (!song) return;
+    const cfg = this.config;
+    const spec = this.fretSpec;
+    const raw = selectPlayerNotes(song, cfg.playTracks, cfg.hand);
+    this.accomp = selectAccompanimentNotes(song, cfg.playTracks, cfg.hand, cfg.mutedTracks);
+
+    // Group simultaneous notes, fold into instrument range, drop duplicates.
+    const groups: SongNote[][] = [];
+    for (const n of raw) {
+      const last = groups[groups.length - 1];
+      if (last && n.time - last[0].time <= GROUP_EPS) last.push(n);
+      else groups.push([n]);
+    }
+
+    const notes: PlayNote[] = [];
+    let id = 0;
+    const maxPerGroup = spec ? (cfg.instrument === "violin" ? 2 : spec.tuning.length) : 10;
+    const kept: SongNote[][] = groups.map((g) => {
+      const seen = new Map<number, SongNote>();
+      for (const n of g) {
+        const midi = spec ? foldIntoRange(n.midi, spec) : n.midi;
+        const prev = seen.get(midi);
+        if (!prev || prev.duration < n.duration) seen.set(midi, { ...n, midi });
+      }
+      return [...seen.values()].sort((a, b) => b.midi - a.midi).slice(0, maxPerGroup);
+    });
+    const fingerings = spec ? assignFingerings(kept.map((g) => g.map((n) => n.midi)), spec) : null;
+    kept.forEach((g, gi) => {
+      g.forEach((n, ni) => {
+        const f = fingerings?.[gi][ni];
+        if (fingerings && (!f || f.string < 0)) return;
+        notes.push({
+          ...n,
+          id: id++,
+          group: gi,
+          string: f ? f.string : -1,
+          fret: f ? f.fret : -1,
+          state: NoteState.Pending,
+          judgement: null,
+          resolvedAt: 0,
+        });
+      });
+    });
+    notes.sort((a, b) => a.time - b.time || a.midi - b.midi);
+    this.notes = notes;
+    this.maxNoteDuration = notes.reduce((m, n) => Math.max(m, n.duration), 0);
+
+    const firstPlayer = notes.length ? notes[0].time : Infinity;
+    const firstAcc = this.accomp.length ? this.accomp[0].time : Infinity;
+    this.firstNoteTime = Math.min(firstPlayer, firstAcc, song.duration);
+    if (!Number.isFinite(this.firstNoteTime)) this.firstNoteTime = 0;
+    // Count-in: one measure, halved for slow songs so the first notes are on screen before play.
+    let countBeats = song.beatsPerMeasure;
+    while (countBeats > 2 && countBeats % 2 === 0 && countBeats * song.firstBeatSec > 2.6) countBeats /= 2;
+    const lead = cfg.countIn ? Math.max(countBeats * song.firstBeatSec, 1.2) : 1.6 * cfg.speed;
+    this.startTime = Math.min(0, this.firstNoteTime - lead);
+    const lastPlayer = notes.reduce((m, n) => Math.max(m, n.time + n.duration), 0);
+    const lastAcc = this.accomp.reduce((m, n) => Math.max(m, n.time + n.duration), 0);
+    this.endTime = Math.max(lastPlayer, lastAcc) + 0.6;
+
+    // Beat grid extended backwards for the count-in.
+    const grid: GridBeat[] = song.beats.map((b) => ({ time: b.time, downbeat: b.downbeat }));
+    const first = grid.length ? grid[0].time : 0;
+    const pre: GridBeat[] = [];
+    for (let k = 1; first - k * song.firstBeatSec >= this.startTime - 0.001; k++) {
+      pre.unshift({ time: first - k * song.firstBeatSec, downbeat: k % song.beatsPerMeasure === 0 });
+    }
+    this.beats = [...pre, ...grid];
+  }
+
+  /** Song beat grid (including count-in beats) for drawing measure lines. */
+  get grid(): readonly GridBeat[] {
+    return this.beats;
+  }
+
+  // ------------------------------------------------------------- transport
+
+  private reanchor(songT: number): void {
+    this.anchorSong = songT;
+    this.anchorPerf = performance.now();
+    this.anchorCtx = getBus().ctx.currentTime + 0.01;
+  }
+
+  private ctxAt(songT: number): number {
+    return this.anchorCtx + (songT - this.anchorSong) / this.config.speed;
+  }
+
+  async play(): Promise<void> {
+    if (!this.song || this.status === "playing") return;
+    await unlockAudio();
+    const ok = await this.ensureAudio();
+    if (!ok || !this.song) return;
+    if (this.status === "complete") this.resetRun();
+    if (this.isRunStart) {
+      this.stats = emptyStats(this.notes.length);
+      this.runDirty = false;
+      this.countInActive = this.config.countIn;
+    }
+    this.reanchor(this.anchorSong);
+    this.resetScheduling(this.anchorSong);
+    this.status = "playing";
+    this.emit();
+  }
+
+  pause(): void {
+    if (this.status !== "playing") return;
+    this.anchorSong = this.time;
+    this.status = "paused";
+    this.waiting = false;
+    this.killScheduled();
+    this.emit();
+  }
+
+  toggle(): void {
+    if (this.status === "playing") this.pause();
+    else void this.play();
+  }
+
+  /** Back to the beginning, keeping the song loaded. */
+  stop(): void {
+    if (!this.song) return;
+    this.killScheduled();
+    this.resetRun();
+    this.status = "ready";
+    this.emit();
+  }
+
+  private hardStop(): void {
+    this.killScheduled();
+    this.waiting = false;
+    this.status = this.song ? "ready" : "empty";
+  }
+
+  seek(t: number): void {
+    if (!this.song) return;
+    const target = Math.max(this.startTime, Math.min(this.endTime, t));
+    if (this.notes.some((n) => n.state === NoteState.Hit || n.state === NoteState.Missed)) this.runDirty = true;
+    this.countInActive = false;
+    this.seekInternal(target);
+    if (this.status === "complete") this.status = "paused";
+    this.emit();
+  }
+
+  private seekInternal(t: number): void {
+    this.killScheduled();
+    for (const n of this.notes) {
+      if (n.time >= t - 0.0005) {
+        n.state = NoteState.Pending;
+        n.judgement = null;
+      } else if (n.state === NoteState.Pending) {
+        n.state = NoteState.Skipped;
+      }
+    }
+    this.pendingIdx = 0;
+    this.advancePending();
+    this.waiting = false;
+    this.reanchor(t);
+    this.resetScheduling(t);
+  }
+
+  private resetRun(): void {
+    for (const n of this.notes) {
+      n.state = NoteState.Pending;
+      n.judgement = null;
+      n.resolvedAt = 0;
+    }
+    this.stats = emptyStats(this.notes.length);
+    this.runDirty = false;
+    this.fx = [];
+    this.pendingIdx = 0;
+    this.waiting = false;
+    this.anchorSong = this.startTime;
+    this.resetScheduling(this.startTime);
+  }
+
+  private resetScheduling(t: number): void {
+    this.accIdx = lowerBound(this.accomp, t - 0.0005);
+    this.autoIdx = lowerBound(this.notes, t - 0.0005);
+    this.beatIdx = lowerBound(this.beats, t - 0.0005);
+    this.scheduledUntil = t;
+  }
+
+  private killScheduled(): void {
+    for (const v of this.scheduled) v.stop(0.06);
+    this.scheduled = [];
+  }
+
+  configure(patch: Partial<EngineConfig>): void {
+    const prev = this.config;
+    const t = this.time;
+    const next: EngineConfig = { ...prev, ...patch, loop: { ...(patch.loop ?? prev.loop) } };
+    const notesChanged =
+      next.instrument !== prev.instrument ||
+      next.guitarTone !== prev.guitarTone ||
+      next.hand !== prev.hand ||
+      next.countIn !== prev.countIn ||
+      next.playTracks.join() !== prev.playTracks.join() ||
+      next.mutedTracks.join() !== prev.mutedTracks.join();
+    const timingChanged = next.speed !== prev.speed || next.autoPlay !== prev.autoPlay;
+    const audioChanged = instrumentIdFor(next) !== instrumentIdFor(prev);
+    this.config = next;
+    if (!this.song) {
+      this.emit();
+      return;
+    }
+
+    const wasPlaying = this.status === "playing";
+    if (next.waitMode !== prev.waitMode && !this.isRunStart && this.status !== "ready") this.runDirty = true;
+    if (notesChanged) {
+      const atStart = this.isRunStart;
+      this.rebuild();
+      if (atStart || this.status === "ready" || this.status === "complete") {
+        this.resetRun();
+        if (this.status === "complete") this.status = "ready";
+      } else {
+        this.runDirty = true;
+        this.stats = { ...this.stats, total: this.notes.length };
+        this.seekInternal(Math.max(this.startTime, t));
+      }
+    } else if (timingChanged && this.status !== "ready") {
+      if (next.autoPlay !== prev.autoPlay) this.runDirty = true;
+      this.seekInternalKeepNotes(t);
+    }
+
+    if (audioChanged && wasPlaying && !isLoaded(this.instrumentId)) {
+      this.pause();
+      void this.ensureAudio().then((ok) => {
+        if (ok) void this.play();
+      });
+      return;
+    }
+    if (audioChanged) void this.ensureAudio();
+    this.emit();
+  }
+
+  /** Re-anchors at t without touching note states (speed / autoplay changes). */
+  private seekInternalKeepNotes(t: number): void {
+    this.killScheduled();
+    this.reanchor(t);
+    this.resetScheduling(t);
+  }
+
+  setLoop(loop: EngineConfig["loop"]): void {
+    this.config = { ...this.config, loop: { ...loop } };
+    this.emit();
+  }
+
+  // -------------------------------------------------------------- per frame
+
+  private advancePending(): void {
+    while (this.pendingIdx < this.notes.length && this.notes[this.pendingIdx].state !== NoteState.Pending) {
+      this.pendingIdx++;
+    }
+  }
+
+  private nextPendingTime(): number | null {
+    this.advancePending();
+    return this.pendingIdx < this.notes.length ? this.notes[this.pendingIdx].time : null;
+  }
+
+  /** Advances the game; call once per animation frame. Returns the song time to render. */
+  frame(): number {
+    if (this.status !== "playing" || !this.song) return this.anchorSong;
+    const cfg = this.config;
+    let t = this.time;
+
+    if (cfg.waitMode && !cfg.autoPlay) {
+      const g = this.nextPendingTime();
+      if (g !== null && t >= g) {
+        this.reanchor(g);
+        t = g;
+        if (!this.waiting) {
+          this.waiting = true;
+          this.emit();
+        }
+      } else if (this.waiting) {
+        this.waiting = false;
+        this.emit();
+      }
+    } else if (this.waiting) {
+      this.waiting = false;
+      this.emit();
+    }
+
+    const loop = cfg.loop;
+    if (loop.enabled && loop.b - loop.a > 0.25 && t >= loop.b) {
+      this.runDirty = true;
+      this.countInActive = false;
+      const pre = Math.min(this.song.firstBeatSec, 1);
+      this.seekInternal(Math.max(this.startTime, loop.a - pre));
+      t = this.anchorSong;
+      this.emit();
+    }
+
+    if (cfg.autoPlay) this.markAutoHits(t);
+    else if (!cfg.waitMode) this.scanMisses(t);
+
+    this.schedule(t);
+
+    if (!loop.enabled && t >= this.endTime && this.nextPendingTime() === null) {
+      this.complete();
+    } else if (!loop.enabled && t >= this.endTime + 1.5) {
+      this.scanMisses(Infinity);
+      this.complete();
+    }
+    return t;
+  }
+
+  private markAutoHits(t: number): void {
+    let changed = false;
+    for (let i = this.pendingIdx; i < this.notes.length && this.notes[i].time <= t; i++) {
+      const n = this.notes[i];
+      if (n.state === NoteState.Pending) {
+        n.state = NoteState.Hit;
+        n.judgement = "perfect";
+        n.resolvedAt = performance.now();
+        changed = true;
+      }
+    }
+    if (changed) this.advancePending();
+  }
+
+  private scanMisses(t: number): void {
+    const win = (this.config.timingWindowMs / 1000) * this.config.speed;
+    let changed = false;
+    for (let i = this.pendingIdx; i < this.notes.length && this.notes[i].time < t - win; i++) {
+      const n = this.notes[i];
+      if (n.state !== NoteState.Pending) continue;
+      n.state = NoteState.Missed;
+      n.judgement = "miss";
+      n.resolvedAt = performance.now();
+      this.stats.miss++;
+      this.stats.combo = 0;
+      this.pushFx(n, "miss");
+      changed = true;
+    }
+    if (changed) {
+      this.advancePending();
+      this.stats = { ...this.stats };
+      this.emit();
+    }
+  }
+
+  private schedule(t: number): void {
+    const cfg = this.config;
+    let horizon = t + SCHEDULE_AHEAD * cfg.speed;
+    if (cfg.waitMode && !cfg.autoPlay) {
+      const g = this.nextPendingTime();
+      if (g !== null) horizon = Math.min(horizon, g - 0.0005);
+    }
+    if (horizon <= this.scheduledUntil) return;
+    const ctx = getBus().ctx;
+    const late = ctx.currentTime - 0.04;
+
+    while (this.accIdx < this.accomp.length && this.accomp[this.accIdx].time < horizon) {
+      const n = this.accomp[this.accIdx++];
+      const when = this.ctxAt(n.time);
+      if (when < late) continue;
+      const v = playNote("piano", n.midi, n.velocity, {
+        when,
+        duration: n.duration / cfg.speed,
+        volume: cfg.accompVolume,
+      });
+      if (v) this.scheduled.push(v);
+    }
+
+    if (cfg.autoPlay) {
+      const inst = this.instrumentId;
+      while (this.autoIdx < this.notes.length && this.notes[this.autoIdx].time < horizon) {
+        const n = this.notes[this.autoIdx++];
+        const when = this.ctxAt(n.time);
+        if (when < late) continue;
+        const v = playNote(inst, n.midi, Math.max(0.55, n.velocity), {
+          when,
+          duration: n.duration / cfg.speed,
+          volume: cfg.playerVolume,
+        });
+        if (v) this.scheduled.push(v);
+      }
+    } else {
+      this.autoIdx = lowerBound(this.notes, horizon);
+    }
+
+    while (this.beatIdx < this.beats.length && this.beats[this.beatIdx].time < horizon) {
+      const b = this.beats[this.beatIdx++];
+      const inCountIn = this.countInActive && b.time < this.firstNoteTime - 0.01;
+      if (cfg.metronome || inCountIn) {
+        const when = this.ctxAt(b.time);
+        if (when >= late) scheduleClick(when, b.downbeat);
+      }
+    }
+
+    this.scheduledUntil = horizon;
+    if (this.scheduled.length > 256) this.scheduled = this.scheduled.filter((v) => !v.done);
+  }
+
+  private complete(): void {
+    const t = this.time;
+    this.status = "complete";
+    this.waiting = false;
+    this.anchorSong = Math.min(t, this.endTime);
+    this.scheduled = this.scheduled.filter((v) => !v.done);
+    this.emit();
+    this.onComplete?.({ stats: { ...this.stats }, dirty: this.runDirty, config: { ...this.config } });
+  }
+
+  // ------------------------------------------------------------------ input
+
+  private pushFx(n: { midi: number; string: number; fret: number }, j: Judgement | "wrong"): void {
+    this.fx.push({ midi: n.midi, string: n.string, fret: n.fret, judgement: j, at: performance.now() });
+    if (this.fx.length > 64) this.fx.splice(0, this.fx.length - 64);
+  }
+
+  /** A note was pressed by the player (touch, keyboard or MIDI). */
+  press(sourceKey: string, midi: number, velocity = 0.8, pos?: PressPos): void {
+    const prev = this.voices.get(sourceKey);
+    if (prev) prev.stop();
+    const voice = playNote(this.instrumentId, midi, velocity, { volume: this.config.playerVolume });
+    if (voice) this.voices.set(sourceKey, voice);
+    const spec = this.fretSpec;
+    let place = pos;
+    if (!place && spec) {
+      const s = spec.tuning.findIndex((open, i) => midi >= open && (i === spec.tuning.length - 1 || midi < spec.tuning[i + 1]));
+      if (s >= 0 && midi - spec.tuning[s] <= spec.maxFret) place = { string: s, fret: midi - spec.tuning[s] };
+    }
+    this.held.set(sourceKey, { midi, string: place?.string ?? -1, fret: place?.fret ?? -1 });
+    this.judgePress(midi, place);
+  }
+
+  release(sourceKey: string): void {
+    this.held.delete(sourceKey);
+    const v = this.voices.get(sourceKey);
+    if (!v) return;
+    this.voices.delete(sourceKey);
+    if (this.sustain) this.sustained.push(v);
+    else v.stop();
+  }
+
+  /** Vibrato / slide for a held note, in cents. */
+  bend(sourceKey: string, cents: number): void {
+    this.voices.get(sourceKey)?.bend(cents);
+  }
+
+  setSustain(on: boolean): void {
+    this.sustain = on;
+    if (!on) {
+      for (const v of this.sustained) v.stop(0.35);
+      this.sustained = [];
+    }
+  }
+
+  releaseAll(): void {
+    for (const key of [...this.voices.keys()]) this.release(key);
+    this.held.clear();
+  }
+
+  private judgePress(midi: number, pos?: PressPos): void {
+    if (this.status !== "playing" || this.config.autoPlay) return;
+    const cfg = this.config;
+    const t = this.time;
+    const win = (cfg.timingWindowMs / 1000) * cfg.speed;
+    let best: PlayNote | null = null;
+    let bestDelta = Infinity;
+    const waitGroup = this.waiting && this.pendingIdx < this.notes.length ? this.notes[this.pendingIdx].group : -1;
+    for (let i = this.pendingIdx; i < this.notes.length; i++) {
+      const n = this.notes[i];
+      if (n.time > t + win) break;
+      if (n.state !== NoteState.Pending || n.midi !== midi) continue;
+      const delta = Math.abs(n.time - t);
+      if ((delta <= win || n.group === waitGroup) && delta < bestDelta) {
+        best = n;
+        bestDelta = delta;
+      }
+    }
+    if (!best) {
+      this.stats = { ...this.stats, wrong: this.stats.wrong + 1 };
+      this.pushFx({ midi, string: pos?.string ?? -1, fret: pos?.fret ?? -1 }, "wrong");
+      this.emit();
+      return;
+    }
+    const deltaMs = ((t - best.time) / cfg.speed) * 1000;
+    // Wait mode is about playing the right notes, not timing; wrong presses still cost accuracy.
+    const j: Judgement = cfg.waitMode ? "perfect" : (judge(deltaMs, cfg.timingWindowMs) ?? "good");
+    best.state = NoteState.Hit;
+    best.judgement = j;
+    best.resolvedAt = performance.now();
+    const s = { ...this.stats };
+    s[j]++;
+    s.combo++;
+    s.maxCombo = Math.max(s.maxCombo, s.combo);
+    s.score += JUDGEMENT_POINTS[j] * comboMultiplier(s.combo);
+    this.stats = s;
+    this.pushFx(best, j);
+    this.advancePending();
+    this.emit();
+  }
+
+  // --------------------------------------------------------------- queries
+
+  /** Index range of notes visible between t0 and t1 (accounts for long notes). */
+  visibleRange(t0: number, t1: number): [number, number] {
+    const start = lowerBound(this.notes, t0 - this.maxNoteDuration);
+    const end = lowerBound(this.notes, t1);
+    return [start, end];
+  }
+}
+
+export const engine = new Engine();

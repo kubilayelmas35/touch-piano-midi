@@ -1,0 +1,12 @@
+{
+  "name": "StaveFlow",
+  "short_name": "StaveFlow",
+  "description": "Learn piano, guitar and violin with falling notes",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#05060f",
+  "theme_color": "#0a0d1f",
+  "icons": [{ "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
