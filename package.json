@@ -1,34 +1,32 @@
 {
   "name": "staveflow",
-  "version": "1.1.0",
-  "description": "StaveFlow — Piano, guitar & violin with falling MIDI notes",
-  "main": "electron/main.js",
+  "private": true,
+  "version": "2.0.0",
+  "description": "StaveFlow — piano, guitar & violin with falling MIDI notes",
+  "type": "module",
   "scripts": {
-    "bundle": "node scripts/bundle-renderer.js",
-    "build:pages": "node scripts/build-pages.js",
-    "prestart": "node scripts/bundle-renderer.js",
-    "start": "electron .",
-    "pack": "electron-builder --win portable"
-  },
-  "author": "",
-  "license": "MIT",
-  "devDependencies": {
-    "electron": "^35.0.0",
-    "electron-builder": "^25.1.8"
+    "dev": "vite",
+    "build": "tsc --noEmit && node tools/clean-docs.mjs && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "samples": "node tools/fetch-samples.mjs"
   },
   "dependencies": {
-    "@tonejs/midi": "^2.0.28"
+    "@tonejs/midi": "^2.0.28",
+    "idb": "^8.0.3",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "zustand": "^5.0.15"
   },
-  "build": {
-    "appId": "com.staveflow.app",
-    "productName": "StaveFlow",
-    "directories": {
-      "output": "dist"
-    },
-    "win": {
-      "signAndEditExecutable": false,
-      "target": ["portable"]
-    },
-    "files": ["electron/**/*", "src/**/*", "package.json"]
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.2",
+    "vitest": "^5.0.3"
   }
 }
