@@ -255,6 +255,7 @@ describe("engine", () => {
     advance(-engine.startTime + 5, engine);
     expect(engine.notes.every((n) => n.state === NoteState.Hit)).toBe(true);
     expect(audio.played.filter((p) => p.midi >= 60).length).toBe(5);
+    expect(engine.fx.filter((f) => f.auto && f.judgement === "perfect").length).toBe(5);
   });
 
   it("guitar mode assigns every note a string and fret", async () => {

@@ -134,5 +134,7 @@ export interface Fx {
   judgement: Judgement | "wrong";
   /** Off-beat hits say which way they were off. */
   timing: "early" | "late" | null;
+  /** Played by auto-play: effects only, no judgement label. */
+  auto: boolean;
   at: number;
 }

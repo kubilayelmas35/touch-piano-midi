@@ -3,10 +3,12 @@ import type { GuitarTone, InstrumentKind } from "../engine/types";
 import { readLegacySettings } from "../storage/migrate";
 import { defaultKeymaps, sanitizeKeymaps, type FretKeyMode, type Keymaps } from "../input/keyboard";
 import {
+  APPROACH_STYLES,
   BACKGROUNDS,
   EFFECT_STYLES,
   NOTE_STYLES,
   oneOf,
+  type ApproachStyle,
   type Background,
   type EffectStyle,
   type NoteStyle,
@@ -33,6 +35,9 @@ export interface Settings {
   /** 0.1–1: how many particles / how bright the glows are. */
   effectLevel: number;
   effectStyle: EffectStyle;
+  /** Hits leave a slowly drifting cloud of dust behind the notes. */
+  dustTrail: boolean;
+  approach: ApproachStyle;
   noteStyle: NoteStyle;
   background: Background;
   /** Octave of the computer-keyboard "A" key (C of that octave). */
@@ -78,6 +83,8 @@ export function defaultSettings(): Settings {
     effects: true,
     effectLevel: 0.5,
     effectStyle: "sparks",
+    dustTrail: true,
+    approach: "beam",
     noteStyle: "gem",
     background: "night",
     keyboardOctave: 4,
@@ -129,6 +136,8 @@ function sanitize(s: Settings): Settings {
     fallSeconds: num(s.fallSeconds, 1, 8, d.fallSeconds),
     effectLevel: num(s.effectLevel, 0.1, 1, d.effectLevel),
     effectStyle: oneOf(EFFECT_STYLES, s.effectStyle, d.effectStyle),
+    dustTrail: s.dustTrail !== false,
+    approach: oneOf(APPROACH_STYLES, s.approach, d.approach),
     noteStyle: oneOf(NOTE_STYLES, s.noteStyle, d.noteStyle),
     background: oneOf(BACKGROUNDS, s.background, d.background),
     keyboardOctave: Math.round(num(s.keyboardOctave, 1, 7, d.keyboardOctave)),

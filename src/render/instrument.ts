@@ -239,11 +239,29 @@ export class FretboardRenderer extends CanvasSurface {
     return count - 1 - row;
   }
 
+  /** Auto-play: strings the song is sounding right now (string → fret and 0–1 energy). */
+  private autoStrings(t: number, violin: boolean): Map<number, { fret: number; e: number; start: number }> {
+    const out = new Map<number, { fret: number; e: number; start: number }>();
+    const engine = this.engine;
+    if (!engine.config.autoPlay) return out;
+    const [i0, i1] = engine.visibleRange(t, t + 0.0001);
+    for (let i = i0; i < i1; i++) {
+      const n = engine.notes[i];
+      if (n.string < 0 || n.state !== NoteState.Hit || t < n.time || t >= n.time + n.duration) continue;
+      const age = (t - n.time) / engine.config.speed;
+      const e = violin ? 0.8 : Math.max(0.35, Math.exp(-age / 1.1));
+      const prev = out.get(n.string);
+      if (!prev || n.time > prev.start) out.set(n.string, { fret: n.fret, e, start: n.time });
+    }
+    return out;
+  }
+
   /** 0..1 vibration of a string, for drawing. */
-  private energy(view: FretboardView, s: number): number {
+  private energy(view: FretboardView, s: number, auto: Map<number, { e: number }>): number {
+    const a = auto.get(s)?.e ?? 0;
     const e = view.energyOf(s);
-    if (view.violin) return view.isStruck(s) ? Math.max(0.1, e * 0.7) : 0;
-    return e * e;
+    if (view.violin) return view.isStruck(s) ? Math.max(0.1, e * 0.7) : a * 0.7;
+    return Math.max(e * e, a * a);
   }
 
   draw(view: FretboardView): void {
@@ -255,6 +273,12 @@ export class FretboardRenderer extends CanvasSurface {
     const rowH = h / count;
     const neckW = L.width;
     const marks = collectMarks(this.engine, view.t);
+    const auto = this.autoStrings(view.t, view.violin);
+    let fingers = view.fingers;
+    if (auto.size) {
+      fingers = new Map(fingers);
+      for (const [s, a] of auto) if (!fingers.has(s)) fingers.set(s, a.fret);
+    }
     const colors = view.violin ? VIOLIN_STRING_COLORS : GUITAR_STRING_COLORS;
     const now = performance.now();
     const pulse = 0.5 + 0.5 * Math.sin(now / 160);
@@ -377,7 +401,7 @@ export class FretboardRenderer extends CanvasSurface {
       for (const [pos, c] of marks.targetPos) targetStrings.set(Number(pos.split(":")[0]), c);
       for (let s = 0; s < count; s++) {
         const top = this.rowOf(s, count) * rowH;
-        const e = this.energy(view, s);
+        const e = this.energy(view, s, auto);
         const target = targetStrings.get(s);
         if (target) {
           ctx.fillStyle = withAlpha(target, 0.14 + 0.2 * pulse);
@@ -399,8 +423,8 @@ export class FretboardRenderer extends CanvasSurface {
     for (let s = 0; s < count; s++) {
       const y = this.rowOf(s, count) * rowH + rowH / 2;
       const thick = view.violin ? 1.2 + (count - 1 - s) * 0.45 : 1 + (count - 1 - s) * 0.5;
-      const e = this.energy(view, s);
-      const finger = view.fingers.get(s) ?? 0;
+      const e = this.energy(view, s, auto);
+      const finger = fingers.get(s) ?? 0;
       const xv = finger > 0 ? Math.min(neckW, (finger + 1) * L.colW) : L.colW;
       const color = e > 0.03 ? colors[s] : "rgba(225,225,235,0.75)";
       ctx.fillStyle = "rgba(225,225,235,0.75)";

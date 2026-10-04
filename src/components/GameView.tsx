@@ -145,6 +145,8 @@ export function GameView() {
         effects: s.effects,
         effectLevel: s.effectLevel,
         effectStyle: s.effectStyle,
+        dustTrail: s.dustTrail,
+        approach: s.approach,
         noteStyle: s.noteStyle,
         background: s.background,
         labels,

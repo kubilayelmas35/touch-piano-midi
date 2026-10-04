@@ -566,6 +566,7 @@ export class Engine {
         n.state = NoteState.Hit;
         n.judgement = "perfect";
         n.resolvedAt = performance.now();
+        if (t - n.time < 0.25 * this.config.speed) this.pushFx(n, "perfect", null, true);
         changed = true;
       }
     }
@@ -728,8 +729,8 @@ export class Engine {
 
   // ------------------------------------------------------------------ input
 
-  private pushFx(n: { midi: number; string: number; fret: number }, j: Judgement | "wrong", timing: Fx["timing"] = null): void {
-    this.fx.push({ midi: n.midi, string: n.string, fret: n.fret, judgement: j, timing, at: performance.now() });
+  private pushFx(n: { midi: number; string: number; fret: number }, j: Judgement | "wrong", timing: Fx["timing"] = null, auto = false): void {
+    this.fx.push({ midi: n.midi, string: n.string, fret: n.fret, judgement: j, timing, auto, at: performance.now() });
     if (this.fx.length > 64) this.fx.splice(0, this.fx.length - 64);
   }
 

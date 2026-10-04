@@ -6,14 +6,64 @@ import { INSTRUMENT_HEIGHT_RANGE, defaultSettings } from "../state/settings";
 import { setPanel, useApp } from "../state/store";
 import { IconPlug } from "../ui/icons";
 import { KeyBindings } from "./KeyBindings";
-import { BackgroundSwatch, ChoiceCards, EffectSwatch, NoteSwatch } from "./AppearancePicker";
-import { BACKGROUNDS, EFFECT_STYLES, NOTE_STYLES, type Background, type EffectStyle, type NoteStyle } from "../render/appearance";
+import { ApproachSwatch, BackgroundSwatch, ChoiceCards, EffectSwatch, NoteSwatch } from "./AppearancePicker";
+import {
+  APPROACH_STYLES,
+  BACKGROUNDS,
+  EFFECT_STYLES,
+  NOTE_STYLES,
+  type ApproachStyle,
+  type Background,
+  type EffectStyle,
+  type NoteStyle,
+} from "../render/appearance";
 import type { DictKey } from "../i18n/en";
 import { Button, Dialog, Segmented, Slider, Switch, cx } from "../ui/primitives";
 
-const BG_LABEL: Record<Background, DictKey> = { night: "bgNight", space: "bgSpace", aurora: "bgAurora", synth: "bgSynth", plain: "bgPlain" };
-const NOTE_LABEL: Record<NoteStyle, DictKey> = { gem: "nsGem", neon: "nsNeon", classic: "nsClassic", minimal: "nsMinimal" };
-const FX_LABEL: Record<EffectStyle, DictKey> = { sparks: "fxSparks", stars: "fxStars", fire: "fxFire", glow: "fxGlow" };
+const BG_LABEL: Record<Background, DictKey> = {
+  night: "bgNight",
+  space: "bgSpace",
+  aurora: "bgAurora",
+  synth: "bgSynth",
+  plain: "bgPlain",
+  haze: "bgHaze",
+  ocean: "bgOcean",
+  sunset: "bgSunset",
+  city: "bgCity",
+  matrix: "bgMatrix",
+};
+const NOTE_LABEL: Record<NoteStyle, DictKey> = {
+  gem: "nsGem",
+  neon: "nsNeon",
+  classic: "nsClassic",
+  minimal: "nsMinimal",
+  block: "nsBlock",
+  glass: "nsGlass",
+  capsule: "nsCapsule",
+  pixel: "nsPixel",
+  candy: "nsCandy",
+  crystal: "nsCrystal",
+};
+const FX_LABEL: Record<EffectStyle, DictKey> = {
+  sparks: "fxSparks",
+  stars: "fxStars",
+  fire: "fxFire",
+  glow: "fxGlow",
+  dust: "fxDust",
+  confetti: "fxConfetti",
+  bubbles: "fxBubbles",
+  lightning: "fxLightning",
+  petals: "fxPetals",
+  pixels: "fxPixels",
+};
+const APPROACH_LABEL: Record<ApproachStyle, DictKey> = {
+  off: "apOff",
+  beam: "apBeam",
+  ring: "apRing",
+  comet: "apComet",
+  arrows: "apArrows",
+  keyglow: "apKeyglow",
+};
 
 type Tab = "general" | "look" | "sound" | "gameplay" | "input";
 
@@ -175,8 +225,17 @@ export function SettingsDialog() {
                     onChange={(v) => updateSettings({ effectStyle: v })}
                     options={EFFECT_STYLES.map((e) => ({ value: e, label: t(FX_LABEL[e]), preview: <EffectSwatch style={e} /> }))}
                   />
+                  <Switch label={t("dustTrail")} checked={s.dustTrail} onChange={(v) => updateSettings({ dustTrail: v })} />
                 </>
               )}
+            </Section>
+            <Section>
+              <ChoiceCards
+                label={t("approach")}
+                value={s.approach}
+                onChange={(v) => updateSettings({ approach: v })}
+                options={APPROACH_STYLES.map((a) => ({ value: a, label: t(APPROACH_LABEL[a]), preview: <ApproachSwatch style={a} /> }))}
+              />
             </Section>
           </>
         )}

@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
-import type { Background, EffectStyle, NoteStyle } from "../render/appearance";
+import type { ApproachStyle, Background, EffectStyle, NoteStyle } from "../render/appearance";
 import { cx } from "../ui/primitives";
 
 export interface ChoiceOption<T extends string> {
@@ -60,6 +60,16 @@ const BG_PREVIEW: Record<Background, string> = {
   synth:
     "radial-gradient(circle at 50% 42%, rgba(253,224,71,0.85) 0 16%, transparent 17%), repeating-linear-gradient(0deg, rgba(236,72,153,0.55) 0 1px, transparent 1px 7px) bottom / 100% 55% no-repeat, linear-gradient(#07021a, #2a0a3e)",
   plain: "#090b17",
+  haze:
+    "radial-gradient(1px 1px at 20% 30%, #c4b5fd 50%, transparent), radial-gradient(1px 1px at 40% 70%, #a78bfa 50%, transparent), radial-gradient(1px 1px at 75% 45%, #c4b5fd 50%, transparent), radial-gradient(1px 1px at 88% 20%, #a78bfa 50%, transparent), radial-gradient(circle at 30% 75%, rgba(124,58,237,0.5), transparent 45%), radial-gradient(circle at 75% 60%, rgba(139,92,246,0.4), transparent 40%), #05030c",
+  ocean:
+    "linear-gradient(160deg, transparent 30%, rgba(125,211,252,0.18) 40%, transparent 50%), linear-gradient(200deg, transparent 45%, rgba(125,211,252,0.12) 55%, transparent 62%), radial-gradient(circle at 50% 0%, rgba(56,189,248,0.4), transparent 60%), linear-gradient(#04304d, #010a17)",
+  sunset:
+    "radial-gradient(circle at 50% 62%, #fff1c1 0 9%, transparent 10%), linear-gradient(170deg, transparent 58%, #3a1640 59%) bottom / 100% 100% no-repeat, linear-gradient(#140b2e, #8a2c6b 45%, #f59e5b 62%, #200d2c 63%)",
+  city:
+    "radial-gradient(circle at 80% 22%, #e9ecff 0 6%, transparent 7%), linear-gradient(90deg, #06071a 0 14%, transparent 14% 18%, #06071a 18% 34%, transparent 34% 40%, #06071a 40% 52%, transparent 52% 58%, #06071a 58% 78%, transparent 78% 82%, #06071a 82%) bottom / 100% 45% no-repeat, linear-gradient(#03050f, #2a1450)",
+  matrix:
+    "repeating-linear-gradient(90deg, transparent 0 9px, rgba(34,197,94,0.35) 9px 11px, transparent 11px 22px), linear-gradient(transparent, rgba(34,197,94,0.15)), #010604",
 };
 
 export function BackgroundSwatch({ bg }: { bg: Background }) {
@@ -82,6 +92,36 @@ function swatchNote(style: NoteStyle, color: string, light: string): { head: CSS
       return {
         head: { height: "30%", background: color, borderRadius: 5 },
         tail: { width: "52%", background: `${color}88`, borderRadius: 99 },
+      };
+    case "block":
+      return {
+        head: { height: "100%", background: color, borderRadius: 3, boxShadow: `inset 0 -2px 0 ${light}` },
+        tail: { display: "none" },
+      };
+    case "glass":
+      return {
+        head: { height: "32%", background: `linear-gradient(rgba(255,255,255,0.35), ${color}99)`, border: "1.5px solid rgba(255,255,255,0.7)", borderRadius: 7 },
+        tail: { width: "60%", background: `linear-gradient(transparent, ${color}55)`, border: "1px solid rgba(255,255,255,0.25)", borderRadius: 6 },
+      };
+    case "capsule":
+      return {
+        head: { height: "100%", background: `linear-gradient(90deg, ${color}aa, ${light}, ${color}aa)`, borderRadius: 99, boxShadow: `0 0 8px ${color}88` },
+        tail: { display: "none" },
+      };
+    case "pixel":
+      return {
+        head: { height: "30%", background: color, boxShadow: "inset 2px 2px 0 rgba(255,255,255,0.5), inset -2px -2px 0 rgba(0,0,0,0.3)" },
+        tail: { width: "46%", background: `repeating-linear-gradient(${color}bb 0 6px, transparent 6px 8px)` },
+      };
+    case "candy":
+      return {
+        head: { height: "32%", background: `repeating-linear-gradient(45deg, rgba(255,255,255,0.45) 0 4px, transparent 4px 8px), linear-gradient(${light}, ${color})`, borderRadius: 8 },
+        tail: { width: "60%", background: `repeating-linear-gradient(45deg, rgba(255,255,255,0.3) 0 4px, transparent 4px 8px), ${color}aa`, borderRadius: 99 },
+      };
+    case "crystal":
+      return {
+        head: { height: "36%", background: `linear-gradient(135deg, ${light}, ${color} 50%, ${color}88)`, clipPath: "polygon(50% 0, 100% 30%, 100% 70%, 50% 100%, 0 70%, 0 30%)" },
+        tail: { width: "18%", background: `linear-gradient(transparent, ${color})`, borderRadius: 99 },
       };
     default:
       return {
@@ -111,8 +151,71 @@ export function NoteSwatch({ style }: { style: NoteStyle }) {
   );
 }
 
+/** Deterministic scatter of [left%, top%, size, colour index] for swatch particles. */
+const SCATTER: [number, number, number, number][] = [
+  [12, 30, 5, 0], [24, 60, 4, 1], [33, 18, 6, 2], [44, 46, 4, 3], [52, 12, 5, 4], [61, 64, 6, 5],
+  [70, 28, 4, 0], [79, 52, 5, 1], [87, 20, 4, 2], [18, 80, 4, 3], [83, 78, 5, 4], [40, 74, 4, 5],
+];
+
+function Bits({ colors, shape }: { colors: string[]; shape: (size: number, color: string, i: number) => CSSProperties }) {
+  return (
+    <>
+      {SCATTER.map(([left, top, size, c], i) => (
+        <span key={i} className="absolute" style={{ left: `${left}%`, top: `${top}%`, ...shape(size, colors[c % colors.length], i) }} />
+      ))}
+    </>
+  );
+}
+
 export function EffectSwatch({ style }: { style: EffectStyle }) {
   const base = "absolute inset-0 bg-[linear-gradient(#070a1a,#121633)]";
+  if (style === "dust") {
+    return (
+      <div className={base}>
+        <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 50% 60% at 50% 90%, rgba(139,92,246,0.55), transparent 75%)" }} />
+        <Bits colors={["#c4b5fd", "#8b5cf6", "#ffffff"]} shape={(s, c) => ({ width: s / 2.5, height: s / 2.5, background: c, opacity: 0.8 })} />
+      </div>
+    );
+  }
+  if (style === "confetti") {
+    return (
+      <div className={base}>
+        <Bits colors={["#f472b6", "#facc15", "#38d6ff", "#4ade80", "#a78bfa", "#fb923c"]} shape={(s, c, i) => ({ width: s + 2, height: s / 2, background: c, transform: `rotate(${i * 37}deg)` })} />
+      </div>
+    );
+  }
+  if (style === "bubbles") {
+    return (
+      <div className={base}>
+        <Bits colors={["#7dd3fc", "#ffffff", "#a5f3fc"]} shape={(s, c) => ({ width: s * 1.8, height: s * 1.8, borderRadius: 99, border: `1px solid ${c}` })} />
+      </div>
+    );
+  }
+  if (style === "lightning") {
+    return (
+      <div className={base}>
+        <svg viewBox="0 0 100 56" className="absolute inset-0 h-full w-full" preserveAspectRatio="none" aria-hidden="true">
+          <polyline points="50,56 44,40 54,32 42,18 50,10 44,0" fill="none" stroke="#a5b4fc" strokeWidth="4" opacity="0.5" />
+          <polyline points="50,56 44,40 54,32 42,18 50,10 44,0" fill="none" stroke="#fff" strokeWidth="1.5" />
+          <polyline points="56,56 64,44 58,36 70,24" fill="none" stroke="#fff" strokeWidth="1.2" opacity="0.8" />
+        </svg>
+      </div>
+    );
+  }
+  if (style === "petals") {
+    return (
+      <div className={base}>
+        <Bits colors={["#fbcfe8", "#f9a8d4", "#fda4af", "#ffffff"]} shape={(s, c, i) => ({ width: s + 3, height: (s + 3) / 2, borderRadius: "50%", background: c, transform: `rotate(${i * 53}deg)` })} />
+      </div>
+    );
+  }
+  if (style === "pixels") {
+    return (
+      <div className={base}>
+        <Bits colors={["#38d6ff", "#ffffff", "#c084fc"]} shape={(s, c) => ({ width: s > 5 ? 6 : 4, height: s > 5 ? 6 : 4, background: c })} />
+      </div>
+    );
+  }
   if (style === "fire") {
     return (
       <div className={base}>
@@ -145,6 +248,32 @@ export function EffectSwatch({ style }: { style: EffectStyle }) {
           ✦
         </span>
       ))}
+    </div>
+  );
+}
+
+/** A falling note above the hit line with the lane effect between them. */
+export function ApproachSwatch({ style }: { style: ApproachStyle }) {
+  const c = "#38d6ff";
+  return (
+    <div className="absolute inset-0 bg-[linear-gradient(#070a1a,#121633)]">
+      <div className="absolute inset-x-0 bottom-1 h-[2px] bg-violet-400/80" />
+      {style === "beam" && <div className="absolute bottom-1 left-[40%] h-[60%] w-[20%]" style={{ background: `linear-gradient(transparent, ${c}99)` }} />}
+      {style === "arrows" &&
+        [34, 54, 74].map((top) => (
+          <span key={top} className="absolute left-1/2 -translate-x-1/2 text-[9px] leading-none" style={{ top: `${top}%`, color: c, opacity: 0.3 + top / 120 }}>
+            ▼
+          </span>
+        ))}
+      {style === "comet" &&
+        [6, 12, 2, 16].map((dy, i) => (
+          <span key={i} className="absolute h-1 w-1 rounded-full bg-white" style={{ left: `${42 + i * 5}%`, top: `${dy}%`, opacity: 0.4 + i * 0.12, boxShadow: `0 0 4px ${c}` }} />
+        ))}
+      {style === "ring" && <div className="absolute bottom-0 left-1/2 h-3 w-10 -translate-x-1/2 rounded-[50%] border-2" style={{ borderColor: c }} />}
+      {style === "keyglow" && (
+        <div className="absolute inset-x-0 bottom-0 h-1/2" style={{ background: `radial-gradient(ellipse 22% 70% at 50% 100%, ${c}, transparent 80%)` }} />
+      )}
+      <div className="absolute left-[40%] top-[22%] h-[22%] w-[20%] rounded-md" style={{ background: `linear-gradient(#bdf3ff, ${c})`, boxShadow: `0 0 8px ${c}` }} />
     </div>
   );
 }
