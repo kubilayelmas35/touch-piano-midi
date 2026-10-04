@@ -44,10 +44,34 @@ export interface Progress {
   path: PathStore;
   /** Achievement id → when it was unlocked (ms). */
   unlocked: Record<string, number>;
+  /** Missed days a streak freeze covered ("YYYY-MM-DD"). */
+  frozen: string[];
+  /** Freezes earned by streak weeks (everybody also starts with one). */
+  freezeEarned: number;
+  /** Last day a freeze was earned. */
+  freezeDay: string;
+  /** Day → the daily song played well that day. */
+  daily: Record<string, string>;
 }
 
 export function emptyProgress(): Progress {
-  return { v: 1, seconds: 0, days: {}, inst: {}, notes: 0, runs: 0, bestCombo: 0, songs: {}, recent: [], path: {}, unlocked: {} };
+  return {
+    v: 1,
+    seconds: 0,
+    days: {},
+    inst: {},
+    notes: 0,
+    runs: 0,
+    bestCombo: 0,
+    songs: {},
+    recent: [],
+    path: {},
+    unlocked: {},
+    frozen: [],
+    freezeEarned: 0,
+    freezeDay: "",
+    daily: {},
+  };
 }
 
 /** A song is mastered by a finished run at full speed, without Wait for me, with at least this many stars (85 %+). */
@@ -74,31 +98,76 @@ function shiftDay(d: Date, n: number): Date {
   return x;
 }
 
-/** Days in a row with practice, ending today (or yesterday, while today's practice hasn't happened yet). */
+export function practisedOn(p: Progress, key: string): boolean {
+  return (p.days[key] ?? 0) >= STREAK_MIN_SECONDS;
+}
+
+/**
+ * Days in a row with practice, ending today (or yesterday, while today's practice hasn't happened yet).
+ * Days covered by a streak freeze keep the streak going without adding to it.
+ */
 export function streak(p: Progress, now: Date = new Date()): number {
-  const done = (d: Date) => (p.days[dayKey(d)] ?? 0) >= STREAK_MIN_SECONDS;
+  const frozen = new Set(p.frozen);
+  const done = (d: Date) => practisedOn(p, dayKey(d));
   let d = done(now) ? now : shiftDay(now, -1);
   let n = 0;
-  while (done(d)) {
-    n++;
+  while (done(d) || frozen.has(dayKey(d))) {
+    if (done(d)) n++;
     d = shiftDay(d, -1);
   }
   return n;
 }
 
 export function bestStreak(p: Progress): number {
-  const keys = Object.keys(p.days)
-    .filter((k) => p.days[k] >= STREAK_MIN_SECONDS)
-    .sort();
+  const frozen = new Set(p.frozen);
+  const keys = [...new Set([...Object.keys(p.days).filter((k) => practisedOn(p, k)), ...frozen])].sort();
   let best = 0;
   let run = 0;
   let prev: string | null = null;
   for (const k of keys) {
-    run = prev && dayKey(shiftDay(new Date(`${prev}T12:00:00`), 1)) === k ? run + 1 : 1;
+    const counts = frozen.has(k) && !practisedOn(p, k) ? 0 : 1;
+    run = prev && dayKey(shiftDay(new Date(`${prev}T12:00:00`), 1)) === k ? run + counts : counts;
     best = Math.max(best, run);
     prev = k;
   }
   return best;
+}
+
+/** Streak freezes one can hold at a time. */
+export const FREEZE_MAX = 2;
+/** A freeze is earned every this many streak days. */
+export const FREEZE_EVERY = 7;
+
+export function freezesLeft(p: Progress): number {
+  return Math.max(0, Math.min(FREEZE_MAX, 1 + p.freezeEarned - p.frozen.length));
+}
+
+/** Covers the days missed just before today with freezes, when there are enough to save a streak. */
+export function applyFreezes(p: Progress, now: Date = new Date()): { p: Progress; used: string[] } {
+  const left = freezesLeft(p);
+  if (!left) return { p, used: [] };
+  const frozen = new Set(p.frozen);
+  const gap: string[] = [];
+  let d = shiftDay(now, -1);
+  while (gap.length <= left) {
+    const k = dayKey(d);
+    if (practisedOn(p, k) || frozen.has(k)) break;
+    gap.push(k);
+    d = shiftDay(d, -1);
+  }
+  const k = dayKey(d);
+  const streakBefore = practisedOn(p, k) || frozen.has(k);
+  if (!gap.length || gap.length > left || !streakBefore) return { p, used: [] };
+  return { p: { ...p, frozen: [...p.frozen, ...gap].sort() }, used: gap };
+}
+
+/** Earns a freeze when today completes a streak week (and there is room for one). */
+export function awardFreeze(p: Progress, now: Date = new Date()): Progress | null {
+  const today = dayKey(now);
+  const n = streak(p, now);
+  if (!practisedOn(p, today) || n === 0 || n % FREEZE_EVERY !== 0) return null;
+  if (p.freezeDay === today || freezesLeft(p) >= FREEZE_MAX) return null;
+  return { ...p, freezeEarned: p.freezeEarned + 1, freezeDay: today };
 }
 
 export function addPractice(p: Progress, seconds: number, now: Date = new Date(), instrument?: string): Progress {
@@ -209,6 +278,10 @@ export function mergeProgress(a: Progress, b: Progress): Progress {
     recent,
     path: mergePaths(a.path, b.path),
     unlocked,
+    frozen: [...new Set([...a.frozen, ...b.frozen])].sort(),
+    freezeEarned: Math.max(a.freezeEarned, b.freezeEarned),
+    freezeDay: a.freezeDay > b.freezeDay ? a.freezeDay : b.freezeDay,
+    daily: { ...b.daily, ...a.daily },
   };
 }
 
@@ -248,6 +321,9 @@ export function sanitizeProgress(raw: unknown): Progress {
     .slice(0, RECENT_MAX);
   const unlocked: Record<string, number> = {};
   for (const [id, at] of Object.entries(r.unlocked ?? {})) unlocked[id] = num(at);
+  const isDay = (k: unknown): k is string => typeof k === "string" && /^\d{4}-\d\d-\d\d$/.test(k);
+  const daily: Record<string, string> = {};
+  for (const [k, v] of Object.entries(r.daily ?? {})) if (isDay(k) && typeof v === "string") daily[k] = v;
   return {
     v: 1,
     seconds: num(r.seconds),
@@ -260,5 +336,9 @@ export function sanitizeProgress(raw: unknown): Progress {
     recent,
     path: sanitizePaths(r.path),
     unlocked,
+    frozen: Array.isArray(r.frozen) ? [...new Set(r.frozen.filter(isDay))].sort() : [],
+    freezeEarned: Math.floor(num(r.freezeEarned)),
+    freezeDay: isDay(r.freezeDay) ? r.freezeDay : "",
+    daily,
   };
 }

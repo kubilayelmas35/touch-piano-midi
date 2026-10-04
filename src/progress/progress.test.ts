@@ -1,6 +1,22 @@
 import { describe, expect, it } from "vitest";
 import { ACHIEVEMENTS, newlyUnlocked, steamName, type AchievementContext } from "./achievements";
-import { addPractice, addRun, bestStreak, dayKey, emptyProgress, mergeProgress, sanitizeProgress, streak, type RunRecord } from "./progress";
+import {
+  addPractice,
+  addRun,
+  applyFreezes,
+  awardFreeze,
+  bestStreak,
+  dayKey,
+  emptyProgress,
+  FREEZE_MAX,
+  freezesLeft,
+  mergeProgress,
+  sanitizeProgress,
+  streak,
+  type RunRecord,
+} from "./progress";
+import { dailySong } from "./daily";
+import { BUILTIN_SONGS } from "../midi/builtin";
 
 const at = (s: string) => new Date(`${s}T15:00:00`);
 
@@ -59,6 +75,60 @@ describe("streak", () => {
     let p = emptyProgress();
     for (const d of ["2026-01-01", "2026-01-02", "2026-01-03", "2026-01-04", "2026-01-10", "2026-01-11"]) p = addPractice(p, 60, at(d));
     expect(bestStreak(p)).toBe(4);
+  });
+});
+
+describe("streak freezes", () => {
+  const days = (list: string[]) => list.reduce((p, d) => addPractice(p, 90, at(d)), emptyProgress());
+
+  it("everyone starts with one, which saves a missed day", () => {
+    const p = days(["2026-03-01", "2026-03-02", "2026-03-03"]);
+    expect(freezesLeft(p)).toBe(1);
+    const { p: saved, used } = applyFreezes(p, at("2026-03-05"));
+    expect(used).toEqual(["2026-03-04"]);
+    expect(freezesLeft(saved)).toBe(0);
+    expect(streak(saved, at("2026-03-05"))).toBe(3);
+    expect(streak(addPractice(saved, 90, at("2026-03-05")), at("2026-03-05"))).toBe(4);
+    expect(bestStreak(addPractice(saved, 90, at("2026-03-05")))).toBe(4);
+  });
+
+  it("does nothing without a streak, or when the gap is longer than the freezes", () => {
+    expect(applyFreezes(emptyProgress(), at("2026-03-05")).used).toEqual([]);
+    const p = days(["2026-03-01"]);
+    expect(applyFreezes(p, at("2026-03-05")).used).toEqual([]);
+    expect(applyFreezes(p, at("2026-03-02")).used).toEqual([]);
+  });
+
+  it("earns one per streak week, up to the maximum", () => {
+    let p = days(["2026-03-01", "2026-03-02", "2026-03-03", "2026-03-04", "2026-03-05", "2026-03-06"]);
+    expect(awardFreeze(p, at("2026-03-06"))).toBeNull();
+    p = addPractice(p, 90, at("2026-03-07"));
+    const earned = awardFreeze(p, at("2026-03-07"))!;
+    expect(freezesLeft(earned)).toBe(FREEZE_MAX);
+    expect(awardFreeze(earned, at("2026-03-07"))).toBeNull();
+  });
+
+  it("merges without losing used days or earned freezes", () => {
+    const a = { ...emptyProgress(), frozen: ["2026-03-04"], freezeEarned: 1 };
+    const b = { ...emptyProgress(), frozen: ["2026-02-10"], freezeEarned: 2, daily: { "2026-03-01": "twinkle" } };
+    const m = mergeProgress(a, b);
+    expect(m.frozen).toEqual(["2026-02-10", "2026-03-04"]);
+    expect(m.freezeEarned).toBe(2);
+    expect(m.daily["2026-03-01"]).toBe("twinkle");
+    expect(sanitizeProgress(JSON.parse(JSON.stringify(m)))).toEqual(m);
+  });
+});
+
+describe("song of the day", () => {
+  it("is the same all day, fits the skill, and changes from one day to the next", () => {
+    const d1 = dailySong("new", at("2026-03-01"));
+    expect(dailySong("new", new Date("2026-03-01T08:00:00"))).toBe(d1);
+    for (let i = 1; i < 28; i++) {
+      const a = dailySong("some", at(`2026-03-${String(i).padStart(2, "0")}`));
+      const b = dailySong("some", at(`2026-03-${String(i + 1).padStart(2, "0")}`));
+      expect(a).not.toBe(b);
+    }
+    expect(BUILTIN_SONGS.find((s) => s.id === d1)?.level).toBe(1);
   });
 });
 

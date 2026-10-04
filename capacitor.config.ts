@@ -18,6 +18,10 @@ const config: CapacitorConfig = {
       androidScaleType: "CENTER_CROP",
       showSpinner: false,
     },
+    LocalNotifications: {
+      smallIcon: "ic_stat_sonatrio",
+      iconColor: "#8b5cf6",
+    },
     SystemBars: {
       style: "DARK",
       initialViewportFitValueHint: "cover",

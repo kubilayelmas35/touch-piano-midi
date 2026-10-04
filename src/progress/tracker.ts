@@ -5,7 +5,19 @@ import { desktop } from "../lib/platform";
 import { BUILTIN_SONGS } from "../midi/builtin";
 import { toast, useApp } from "../state/store";
 import { ACHIEVEMENTS, newlyUnlocked, steamName, type AchievementContext } from "./achievements";
-import { addPractice, addRun, dayKey, mergeProgress, sanitizeProgress, streak, type Progress, type RunRecord } from "./progress";
+import {
+  addPractice,
+  addRun,
+  applyFreezes,
+  awardFreeze,
+  dayKey,
+  mergeProgress,
+  sanitizeProgress,
+  streak,
+  STREAK_MIN_SECONDS,
+  type Progress,
+  type RunRecord,
+} from "./progress";
 import { saveProgress as save } from "./storage";
 import type { PathState } from "../coach/path";
 
@@ -58,24 +70,62 @@ export function recordRun(run: RunRecord): string[] {
   return commit(addRun(useApp.getState().progress, run), run, false);
 }
 
+/** A good run of today's daily song; true the first time today. */
+export function recordDaily(songId: string): boolean {
+  const p = useApp.getState().progress;
+  const today = dayKey();
+  if (p.daily[today]) return false;
+  commit({ ...p, daily: { ...p.daily, [today]: songId } }, null, true);
+  return true;
+}
+
+/** Spends freezes on days missed since the last visit, telling the player it happened. */
+function spendFreezes(): void {
+  const { p, used } = applyFreezes(useApp.getState().progress);
+  if (!used.length) return;
+  commit(p, null, false);
+  toast(tNow(used.length > 1 ? "freezeUsedMany" : "freezeUsed", { n: used.length, streak: streak(p) }), "info", 7000);
+}
+
 let pending = 0;
+let lastDay = dayKey();
 
 function tick(): void {
   const st = useApp.getState();
+  const day = dayKey();
+  if (day !== lastDay) {
+    lastDay = day;
+    spendFreezes();
+    dayListeners.forEach((fn) => fn());
+  }
   if (engine.status !== "playing" || st.session.autoPlay || document.hidden) return;
   const before = st.progress;
   const goal = st.settings.dailyGoalMin * 60;
-  const today = before.days[dayKey()] ?? 0;
-  const next = addPractice(before, 1, new Date(), st.settings.instrument);
+  const today = before.days[day] ?? 0;
+  let next = addPractice(before, 1, new Date(), st.settings.instrument);
+  const reachedGoal = today < goal && today + 1 >= goal;
+  const counted = today < STREAK_MIN_SECONDS && today + 1 >= STREAK_MIN_SECONDS;
   pending++;
-  // Save every few seconds; check achievements right away when today's goal is reached.
-  if (pending >= 10 || (today < goal && today + 1 >= goal)) {
+  // Save every few seconds; right away when today starts counting for the streak or the goal is reached.
+  if (pending >= 10 || reachedGoal || counted) {
     pending = 0;
+    const earned = counted ? awardFreeze(next) : null;
+    if (earned) next = earned;
     commit(next, null, true);
-    if (today < goal && today + 1 >= goal) toast(tNow("goalReached"), "success", 4000);
+    if (reachedGoal) toast(tNow("goalReached"), "success", 4000);
+    if (earned) toast(tNow("freezeEarned", { n: streak(next) }), "success", 6000);
+    if (counted) dayListeners.forEach((fn) => fn());
   } else {
     useApp.setState({ progress: next });
   }
+}
+
+const dayListeners = new Set<() => void>();
+
+/** Called when a new day starts or today starts counting for the streak (reminders follow this). */
+export function onStreakDay(fn: () => void): () => void {
+  dayListeners.add(fn);
+  return () => dayListeners.delete(fn);
 }
 
 // ----------------------------------------------------------------- account copy
@@ -116,11 +166,13 @@ async function pull(): Promise<void> {
   }
   const merged = data ? mergeProgress(useApp.getState().progress, sanitizeProgress(data.data)) : useApp.getState().progress;
   commit(merged, null, false);
+  spendFreezes();
   await upload();
 }
 
 export function initProgress(): void {
   window.setInterval(tick, 1000);
+  spendFreezes();
   window.addEventListener("pagehide", () => save(useApp.getState().progress));
   // Steam may have missed unlocks earned on another device or before the Steam build.
   mirrorToSteam(Object.keys(useApp.getState().progress.unlocked));

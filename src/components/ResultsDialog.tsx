@@ -3,7 +3,7 @@ import type { DictKey } from "../i18n";
 import { useT } from "../i18n";
 import { closeResults, openSong, updateSession } from "../state/actions";
 import { setPanel, useApp } from "../state/store";
-import { IconPlay, IconStar, IconTrophy } from "../ui/icons";
+import { IconCheck, IconPlay, IconStar, IconTrophy } from "../ui/icons";
 import { Button, Dialog } from "../ui/primitives";
 import { CoachResult, CoachResultActions } from "./CoachUI";
 import { SignInNudge } from "./SignInNudge";
@@ -133,6 +133,13 @@ export function ResultsDialog() {
             {t("best")}: <span className="font-semibold text-mist-200">{bestScore.toLocaleString()}</span>
           </div>
         ) : null}
+        {results.daily && (
+          <div className="mt-2 flex justify-center">
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400/20 px-3 py-1 text-sm font-bold text-emerald-200 animate-pop">
+              <IconCheck size={14} /> {t("dailyDoneNow")}
+            </div>
+          </div>
+        )}
 
         <div className="mt-5 grid grid-cols-2 gap-2">
           <div className="rounded-2xl bg-white/[0.04] px-3 py-3">

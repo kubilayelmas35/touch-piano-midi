@@ -339,6 +339,18 @@ export const IconFlame = ({ filled, ...p }: IconProps & { filled?: boolean }) =>
     />
   </Svg>
 );
+export const IconSnowflake = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 2v20M4.2 7l15.6 10M4.2 17 19.8 7" />
+    <path d="m9 4 3 2 3-2M9 20l3-2 3 2M3.6 10.4l3.3-.6-.9-3.4M20.4 13.6l-3.3.6.9 3.4M3.6 13.6l3.3.6-.9 3.4M20.4 10.4l-3.3-.6.9-3.4" />
+  </Svg>
+);
+export const IconBell = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+    <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+  </Svg>
+);
 export const IconLock = (p: IconProps) => (
   <Svg {...p}>
     <rect x="5" y="11" width="14" height="10" rx="2" />

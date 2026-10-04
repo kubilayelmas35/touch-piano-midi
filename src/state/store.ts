@@ -31,6 +31,8 @@ export interface Results {
   coach?: CoachOutcome;
   /** Where the run went wrong, for the coach notes. */
   insights?: import("../coach/insights").RunInsights;
+  /** This run completed today's daily song. */
+  daily?: boolean;
 }
 
 /** Drilling a hard stretch: it loops, a notch faster after each clean pass, until it is clean at `target` speed. */

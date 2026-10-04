@@ -84,6 +84,9 @@ export interface Settings {
   compactKeys: boolean;
   /** Minutes of practice a day that count as the daily goal. */
   dailyGoalMin: number;
+  /** App: a notification on days without practice yet, at `reminderAt` (minutes after midnight). */
+  reminder: boolean;
+  reminderAt: number;
   /** Phones in portrait: suggest turning the device sideways. */
   rotateHint: boolean;
   /** App: keep the screen in landscape. */
@@ -167,6 +170,8 @@ export function defaultSettings(): Settings {
     keyZoom: 1,
     compactKeys: false,
     dailyGoalMin: 10,
+    reminder: false,
+    reminderAt: 19 * 60,
     rotateHint: true,
     landscapeLock: false,
     pianoPedal: true,
@@ -268,6 +273,8 @@ function sanitize(s: Settings): Settings {
     keyZoom: num(s.keyZoom, 1, KEY_ZOOM_MAX, d.keyZoom),
     compactKeys: s.compactKeys === true,
     dailyGoalMin: Math.round(num(s.dailyGoalMin, 5, 60, d.dailyGoalMin)),
+    reminder: s.reminder === true,
+    reminderAt: Math.round(num(s.reminderAt, 0, 24 * 60 - 1, d.reminderAt)),
     rotateHint: s.rotateHint !== false,
     landscapeLock: s.landscapeLock === true,
     pianoPedal: s.pianoPedal !== false,

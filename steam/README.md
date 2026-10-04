@@ -25,11 +25,13 @@ Bitirdikten sonra *Publish* düğmesine basmayı unutma.
 | ACH_FIVE_STARS | Beş yıldız | Five stars | Get 5 stars on any song. |
 | ACH_DAILY_GOAL | Hedef avcısı | Goal getter | Reach your daily practice goal. |
 | ACH_STREAK_3 | Isınıyorsun | On a roll | Practise 3 days in a row. |
+| ACH_DAILY_3 | Günün müzisyeni | Daily player | Play the song of the day well on 3 days. |
 | ACH_COMBO_50 | 50 kombo | Combo 50 | Hit 50 notes in a row. |
 | ACH_NOTES_1K | Bin nota | A thousand notes | Play 1,000 notes correctly. |
 | ACH_HOUR_1 | İlk saat | First hour | Practise for one hour in total. |
 | ACH_SONGS_10 | Repertuvar | Repertoire | Finish 10 different songs. |
 | ACH_STREAK_7 | Haftanın yıldızı | Week warrior | Practise 7 days in a row. |
+| ACH_DAILY_15 | Her günün şarkısı | Song a day | Play the song of the day well on 15 days. |
 | ACH_COMBO_200 | Durdurulamaz | Unstoppable | Hit 200 notes in a row. |
 | ACH_EXPLORER | Kâşif | Explorer | Finish a song from every category. |
 | ACH_TRIO | Üçlü | Trio | Finish songs on piano, guitar and violin. |

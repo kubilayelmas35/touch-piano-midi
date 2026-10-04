@@ -10,6 +10,7 @@ import { isNativeApp } from "../lib/platform";
 import { IconMessage, IconPlug, IconSparkles, IconVideo } from "../ui/icons";
 import { KeyBindings } from "./KeyBindings";
 import { LegalLinks } from "./LegalLinks";
+import { ReminderSettings } from "./ReminderToggle";
 import { ApproachSwatch, BackgroundSwatch, ChoiceCards, ColorPicker, ColorSwatch, DustSwatch, EffectSwatch, NoteSwatch } from "./AppearancePicker";
 import {
   APPROACH_STYLES,
@@ -254,6 +255,7 @@ export function SettingsDialog() {
                 checked={s.noteKeyLabels}
                 onChange={(v) => updateSettings({ noteKeyLabels: v })}
               />
+              <ReminderSettings />
               {fs.supported && <Switch label={t("fullscreen")} hint="F11" checked={fs.full} onChange={fs.toggle} />}
               {isNativeApp && (
                 <Switch

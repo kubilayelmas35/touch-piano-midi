@@ -6,11 +6,23 @@ import { useT, type DictKey } from "../i18n";
 import { desktop } from "../lib/platform";
 import { BUILTIN_SONGS, builtinTitle } from "../midi/builtin";
 import { ACHIEVEMENTS } from "../progress/achievements";
-import { bestStreak, dayKey, lastDays, masteredSongs, MASTERY_STARS, streak, type Progress } from "../progress/progress";
+import {
+  bestStreak,
+  dayKey,
+  FREEZE_EVERY,
+  FREEZE_MAX,
+  freezesLeft,
+  lastDays,
+  masteredSongs,
+  MASTERY_STARS,
+  streak,
+  type Progress,
+} from "../progress/progress";
+import { ReminderToggle } from "./ReminderToggle";
 import { achievementContext } from "../progress/tracker";
 import { openSong, updateSettings } from "../state/actions";
 import { setPanel, useApp } from "../state/store";
-import { IconFlame, IconGuitar, IconLock, IconPiano, IconPlay, IconRoute, IconStar, IconTrophy, IconViolin, IconWait } from "../ui/icons";
+import { IconFlame, IconGuitar, IconLock, IconPiano, IconPlay, IconRoute, IconSnowflake, IconStar, IconTrophy, IconViolin, IconWait } from "../ui/icons";
 import { Button, Dialog, Segmented, cx } from "../ui/primitives";
 import { useStageText } from "./CoachUI";
 import { SignInNudge } from "./SignInNudge";
@@ -240,10 +252,15 @@ function Overview({ p, goalMin, onOpen }: { p: Progress; goalMin: number; onOpen
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
         <div className="col-span-3 flex items-center gap-3 rounded-2xl bg-gradient-to-br from-orange-500/25 to-rose-500/10 px-4 py-3 sm:col-span-1 sm:flex-col sm:items-start sm:gap-1">
           <IconFlame size={30} filled={st > 0} className={st > 0 ? "text-orange-400" : "text-white/25"} />
-          <div>
+          <div className="min-w-0 flex-1">
             <div className="text-xl font-extrabold tabular-nums">{t("streakDays", { n: st })}</div>
             <div className="text-[11px] text-mist-300">{t("bestStreak", { n: Math.max(st, bestStreak(p)) })}</div>
+            <div className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-sky-200" title={t("freezeHint", { n: FREEZE_EVERY })}>
+              <IconSnowflake size={12} />
+              {t("freezesLeft", { n: freezesLeft(p), max: FREEZE_MAX })}
+            </div>
           </div>
+          <ReminderToggle />
         </div>
         <div className="min-w-0 rounded-2xl bg-white/[0.04] px-2.5 py-3 sm:px-3">
           <div className="text-lg font-extrabold tabular-nums sm:text-xl">

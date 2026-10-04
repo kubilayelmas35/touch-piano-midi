@@ -27,7 +27,9 @@ import { canImport } from "../auth/account";
 import { cloudAfterDelete, cloudAfterImport, cloudAfterRename } from "../auth/cloud";
 import { initSettingsSync, pushSettings } from "../auth/settingsSync";
 import { OVERLAY_EVENT } from "../ui/primitives";
-import { initProgress, recordRun } from "../progress/tracker";
+import { initProgress, recordDaily, recordRun } from "../progress/tracker";
+import { DAILY_STARS, dailySong } from "../progress/daily";
+import { initReminders } from "../lib/reminders";
 import { coachAfterRun } from "../coach/coach";
 import { drillAfterPass } from "../coach/drill";
 import { analyzeRun, type Hand } from "../coach/insights";
@@ -102,6 +104,7 @@ export async function initApp(): Promise<void> {
   window.addEventListener(OVERLAY_EVENT, () => engine.pause());
   initSettingsSync(applyRemoteSettings);
   initProgress();
+  initReminders();
 
   const migrated = await migrateLegacyLibrary();
   await refreshLibrary();
@@ -393,6 +396,8 @@ function handleComplete(r: { stats: import("../engine/types").Stats; dirty: bool
   // Skipping around or looping doesn't say how the whole step went.
   const coach = r.dirty || r.config.loop.enabled ? undefined : coachAfterRun({ accuracy, stars, speed: r.config.speed, wait: r.config.waitMode });
   const insights = runInsights(r.config);
+  const daily =
+    !practice && !partial && stars >= DAILY_STARS && currentId === dailySong(useApp.getState().settings.skill) && recordDaily(currentId);
   useApp.setState({
     results: {
       stats: r.stats,
@@ -404,6 +409,7 @@ function handleComplete(r: { stats: import("../engine/types").Stats; dirty: bool
       achievements,
       coach,
       insights,
+      daily,
     },
   });
   if (newBest && currentId) {
