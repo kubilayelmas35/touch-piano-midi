@@ -6,6 +6,7 @@ import { setPanel, useApp } from "../state/store";
 import { IconPlay, IconStar, IconTrophy } from "../ui/icons";
 import { Button, Dialog } from "../ui/primitives";
 import { CoachResult, CoachResultActions } from "./CoachUI";
+import { SignInNudge } from "./SignInNudge";
 import { startCoach } from "../coach/coach";
 import { SPEEDS } from "../coach/path";
 import { MASTERY_STARS } from "../progress/progress";
@@ -177,6 +178,7 @@ export function ResultsDialog() {
             </ul>
           </button>
         )}
+        {!dirty && <SignInNudge periodic beforeOpen={closeResults} />}
       </div>
     </Dialog>
   );

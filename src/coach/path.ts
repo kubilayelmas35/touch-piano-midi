@@ -126,23 +126,13 @@ export function judgeRun(
   return { verdict: "retry", next: { ...base, tries: state.tries + 1 } };
 }
 
-const KEY = "sonatrio-path-v1";
+/** Saved path per "instrument:skill"; lives in the progress copy so it syncs with the account. */
+export type PathStore = Record<string, PathState & { at?: number }>;
 
-type Store = Record<string, PathState>;
+export const pathKey = (instrument: InstrumentKind, skill: Skill) => `${instrument}:${skill}`;
 
-function readAll(): Store {
-  try {
-    const raw = JSON.parse(localStorage.getItem(KEY) ?? "{}");
-    return raw && typeof raw === "object" ? raw : {};
-  } catch {
-    return {};
-  }
-}
-
-const keyOf = (instrument: InstrumentKind, skill: Skill) => `${instrument}:${skill}`;
-
-export function loadPath(instrument: InstrumentKind, skill: Skill): PathState {
-  const s = readAll()[keyOf(instrument, skill)];
+export function readPath(all: PathStore | undefined, instrument: InstrumentKind, skill: Skill): PathState {
+  const s = all?.[pathKey(instrument, skill)];
   if (!s || typeof s.step !== "number") return freshState(skill);
   const max = pathSteps(instrument, skill).length - 1;
   return {
@@ -154,10 +144,44 @@ export function loadPath(instrument: InstrumentKind, skill: Skill): PathState {
   };
 }
 
-export function savePath(instrument: InstrumentKind, skill: Skill, state: PathState): void {
+export function sanitizePaths(raw: unknown): PathStore {
+  const out: PathStore = {};
+  if (!raw || typeof raw !== "object") return out;
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (!/^(piano|guitar|violin):(new|some|good)$/.test(k) || !v || typeof v !== "object") continue;
+    const s = v as Partial<PathState & { at: number }>;
+    if (typeof s.step !== "number" || !Number.isFinite(s.step)) continue;
+    const stars: Record<number, number> = {};
+    for (const [i, n] of Object.entries(s.stars ?? {})) if (typeof n === "number") stars[Number(i)] = Math.max(0, Math.min(5, n));
+    out[k] = {
+      step: Math.max(0, Math.round(s.step)),
+      speed: typeof s.speed === "number" ? s.speed : 0.5,
+      wait: s.wait === true,
+      tries: typeof s.tries === "number" ? s.tries : 0,
+      stars,
+      at: typeof s.at === "number" ? s.at : 0,
+    };
+  }
+  return out;
+}
+
+/** The most recently saved state wins per instrument, so a restart on one device isn't undone by another. */
+export function mergePaths(a: PathStore, b: PathStore): PathStore {
+  const out: PathStore = { ...a };
+  for (const [k, s] of Object.entries(b)) {
+    const o = out[k];
+    if (!o || (s.at ?? 0) > (o.at ?? 0) || ((s.at ?? 0) === (o.at ?? 0) && s.step > o.step)) out[k] = s;
+  }
+  return out;
+}
+
+const LEGACY_KEY = "sonatrio-path-v1";
+
+/** Paths saved before they moved into the progress copy. */
+export function legacyPaths(): PathStore {
   try {
-    localStorage.setItem(KEY, JSON.stringify({ ...readAll(), [keyOf(instrument, skill)]: state }));
+    return sanitizePaths(JSON.parse(localStorage.getItem(LEGACY_KEY) ?? "null"));
   } catch {
-    /* storage full / private mode */
+    return {};
   }
 }

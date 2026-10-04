@@ -125,6 +125,26 @@ describe("mergeProgress", () => {
   });
 });
 
+describe("learning path in the progress copy", () => {
+  const state = (step: number, at: number) => ({ step, speed: 0.6, wait: false, tries: 0, stars: { 0: 4 }, at });
+
+  it("keeps the most recently saved path, so a restart elsewhere sticks", () => {
+    const a = { ...emptyProgress(), path: { "piano:new": state(12, 100), "guitar:new": state(3, 50) } };
+    const b = { ...emptyProgress(), path: { "piano:new": state(0, 200), "violin:some": state(5, 10) } };
+    const m = mergeProgress(a, b);
+    expect(m.path["piano:new"].step).toBe(0);
+    expect(m.path["guitar:new"].step).toBe(3);
+    expect(m.path["violin:some"].step).toBe(5);
+    expect(mergeProgress(m, m)).toEqual(m);
+  });
+
+  it("drops unknown keys and broken states", () => {
+    const p = sanitizeProgress({ path: { "piano:new": state(4, 1), "drums:new": state(1, 1), "guitar:good": { step: "x" } } });
+    expect(Object.keys(p.path)).toEqual(["piano:new"]);
+    expect(p.path["piano:new"]).toMatchObject({ step: 4, stars: { 0: 4 } });
+  });
+});
+
 describe("sanitizeProgress", () => {
   it("drops junk and clamps values", () => {
     const p = sanitizeProgress({ seconds: -5, days: { bad: 3, "2026-01-01": 50 }, songs: { x: { stars: 9, plays: 1, instruments: [1, "piano"] } } });

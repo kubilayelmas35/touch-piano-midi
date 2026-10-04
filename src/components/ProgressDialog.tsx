@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { startCoach } from "../coach/coach";
-import { loadPath, pathSteps, stagesFor } from "../coach/path";
+import { pathSteps, readPath, stagesFor } from "../coach/path";
 import type { InstrumentKind } from "../engine/types";
 import { useT, type DictKey } from "../i18n";
 import { desktop } from "../lib/platform";
@@ -13,6 +13,7 @@ import { setPanel, useApp } from "../state/store";
 import { IconFlame, IconGuitar, IconLock, IconPiano, IconPlay, IconRoute, IconStar, IconTrophy, IconViolin, IconWait } from "../ui/icons";
 import { Button, Dialog, Segmented, cx } from "../ui/primitives";
 import { useStageText } from "./CoachUI";
+import { SignInNudge } from "./SignInNudge";
 
 const GOALS = [5, 10, 20, 30, 60] as const;
 const TIER = ["", "text-amber-600", "text-slate-200", "text-amber-300"] as const;
@@ -292,18 +293,17 @@ function PathProgress({ onClose }: { onClose: () => void }) {
   const t = useT();
   const instrument = useApp((s) => s.settings.instrument);
   const skill = useApp((s) => s.settings.skill);
-  const rev = useApp((s) => s.pathRev);
+  const all = useApp((s) => s.progress.path);
   const text = useStageText();
   const paths = useMemo(
     () =>
       INSTRUMENTS.map((i) => {
         const steps = pathSteps(i, skill);
-        const state = loadPath(i, skill);
+        const state = readPath(all, i, skill);
         const per = stagesFor(i, skill).length;
         return { i, steps, state, lessons: steps.length / per, done: Math.floor(state.step / per) };
       }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [skill, rev]
+    [skill, all]
   );
   const mine = paths.find((x) => x.i === instrument)!;
   const others = paths.filter((x) => x.i !== instrument && x.state.step > 0);
@@ -557,8 +557,9 @@ export function ProgressDialog() {
       {open && tab === "overview" && <Overview p={p} goalMin={goalMin} onOpen={play} />}
       {open && tab === "songs" && <Songs p={p} onOpen={play} onClose={close} />}
       {open && tab === "ach" && <Achievements p={p} />}
+      <SignInNudge />
       <p className="mt-4 text-[11px] leading-relaxed text-mist-400/80">
-        {accountsOn ? (signedIn ? t("progressSynced") : t("progressLocal")) : null}
+        {accountsOn && signedIn ? t("progressSynced") : null}
         {desktop?.steam ? ` ${t("steamAchievements")}` : ""}
       </p>
     </Dialog>

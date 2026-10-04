@@ -1,4 +1,5 @@
 /** Practice history: time per day, finished songs and unlocked achievements. Pure data helpers. */
+import { mergePaths, sanitizePaths, type PathStore } from "../coach/path";
 
 export interface SongProgress {
   /** Best stars over all finished (non-practice) runs. */
@@ -39,12 +40,14 @@ export interface Progress {
   songs: Record<string, SongProgress>;
   /** Latest finished runs, newest first. */
   recent: RecentRun[];
+  /** Learning path per instrument and skill. */
+  path: PathStore;
   /** Achievement id → when it was unlocked (ms). */
   unlocked: Record<string, number>;
 }
 
 export function emptyProgress(): Progress {
-  return { v: 1, seconds: 0, days: {}, inst: {}, notes: 0, runs: 0, bestCombo: 0, songs: {}, recent: [], unlocked: {} };
+  return { v: 1, seconds: 0, days: {}, inst: {}, notes: 0, runs: 0, bestCombo: 0, songs: {}, recent: [], path: {}, unlocked: {} };
 }
 
 /** A song is mastered by a finished run at full speed, without Wait for me, with at least this many stars (85 %+). */
@@ -204,6 +207,7 @@ export function mergeProgress(a: Progress, b: Progress): Progress {
     bestCombo: Math.max(a.bestCombo, b.bestCombo),
     songs,
     recent,
+    path: mergePaths(a.path, b.path),
     unlocked,
   };
 }
@@ -254,6 +258,7 @@ export function sanitizeProgress(raw: unknown): Progress {
     bestCombo: num(r.bestCombo),
     songs,
     recent,
+    path: sanitizePaths(r.path),
     unlocked,
   };
 }

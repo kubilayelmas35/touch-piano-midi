@@ -138,8 +138,6 @@ export interface AppState {
   recording: { startedAt: number; notes: number } | null;
   take: Take | null;
   coach: CoachRun | null;
-  /** Bumped whenever the saved learning path changes, so views re-read it. */
-  pathRev: number;
 }
 
 export const DEFAULT_SESSION: Session = {
@@ -201,7 +199,6 @@ export const useApp = create<AppState>(() => ({
   recording: null,
   take: null,
   coach: null,
-  pathRev: 0,
 }));
 
 let toastId = 1;

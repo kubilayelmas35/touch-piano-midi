@@ -2,18 +2,19 @@ import { engine } from "../engine/engine";
 import type { InstrumentKind } from "../engine/types";
 import { handTracks, NO_LOOP, openFreePlay, openSong, setHand, updateSession, updateSettings } from "../state/actions";
 import { setPanel, useApp, type CoachOutcome } from "../state/store";
-import { freshState, judgeRun, loadPath, pathSteps, savePath, type PathState, type PathStep, type Skill, type Stage } from "./path";
+import { savePathState } from "../progress/tracker";
+import { freshState, judgeRun, pathKey, pathSteps, readPath, type PathState, type PathStep, type Skill, type Stage } from "./path";
 
 export function coachContext() {
-  const { instrument, skill } = useApp.getState().settings;
+  const { settings, progress } = useApp.getState();
+  const { instrument, skill } = settings;
   const steps = pathSteps(instrument, skill);
-  const state = loadPath(instrument, skill);
+  const state = readPath(progress.path, instrument, skill);
   return { instrument, skill, steps, state, step: steps[state.step] as PathStep };
 }
 
 function save(instrument: InstrumentKind, skill: Skill, state: PathState): void {
-  savePath(instrument, skill, state);
-  useApp.setState((s) => ({ pathRev: s.pathRev + 1 }));
+  savePathState(pathKey(instrument, skill), state);
 }
 
 function applyStage(stage: Stage): void {

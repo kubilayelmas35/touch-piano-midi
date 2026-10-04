@@ -1,6 +1,6 @@
 import { useMemo, type ReactNode } from "react";
 import { resetCoach, skipStep, startCoach } from "../coach/coach";
-import { goalSpeed, loadPath, PASS, pathSteps, type PathStep, type Stage } from "../coach/path";
+import { goalSpeed, PASS, pathSteps, readPath, type PathStep, type Stage } from "../coach/path";
 import type { DictKey } from "../i18n";
 import { useT } from "../i18n";
 import { engine } from "../engine/engine";
@@ -9,6 +9,7 @@ import { closeResults } from "../state/actions";
 import { setPanel, useApp, type CoachOutcome } from "../state/store";
 import { IconCheck, IconLock, IconPlay, IconRoute, IconStar, IconWait } from "../ui/icons";
 import { Button, Dialog, cx } from "../ui/primitives";
+import { SignInNudge } from "./SignInNudge";
 
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 
@@ -16,12 +17,12 @@ const pct = (v: number) => `${Math.round(v * 100)}%`;
 export function usePath() {
   const instrument = useApp((s) => s.settings.instrument);
   const skill = useApp((s) => s.settings.skill);
-  const rev = useApp((s) => s.pathRev);
+  const all = useApp((s) => s.progress.path);
   return useMemo(() => {
     const steps = pathSteps(instrument, skill);
-    const state = loadPath(instrument, skill);
-    return { steps, state, step: steps[state.step] as PathStep | undefined, skill, rev };
-  }, [instrument, skill, rev]);
+    const state = readPath(all, instrument, skill);
+    return { steps, state, step: steps[state.step] as PathStep | undefined, skill };
+  }, [instrument, skill, all]);
 }
 
 export function useStageText() {
@@ -295,6 +296,7 @@ export function PathDialog() {
           {t("pathChangeAnswers")}
         </button>
       </div>
+      {state.step > 0 && <SignInNudge />}
       <ol className="mt-4 space-y-1.5">
         {lessons.map((l) => {
           const done = l.steps.every((s) => s.index < state.step);
