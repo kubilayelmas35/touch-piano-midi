@@ -14,6 +14,11 @@ export interface InstrumentDef {
   sustained: boolean;
   /** Loop window inside the sample, seconds (only for sustained instruments). */
   loop?: { start: number; end: number; crossfade: number };
+  /**
+   * Plucked samples that should keep sounding while the player keeps the string moving: an early slice of
+   * the decaying sample is levelled out and looped. Scheduled (autoplay) notes still decay with this time constant.
+   */
+  pluckSustain?: { decay: number };
   /** Natural decay is inside the sample; cap ring time after release. */
   maxRing: number;
   /** Whether velocity also darkens the tone (lowpass). */
@@ -44,6 +49,7 @@ export const INSTRUMENTS: Record<InstrumentId, InstrumentDef> = {
     attack: 0.002,
     minRelease: 0.12,
     sustained: false,
+    pluckSustain: { decay: 1.1 },
     maxRing: 6,
     velocityTone: true,
   },
@@ -54,6 +60,7 @@ export const INSTRUMENTS: Record<InstrumentId, InstrumentDef> = {
     attack: 0.002,
     minRelease: 0.12,
     sustained: false,
+    pluckSustain: { decay: 1.3 },
     maxRing: 6,
     velocityTone: true,
   },

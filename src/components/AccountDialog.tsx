@@ -311,7 +311,7 @@ export function ProDialog() {
           <IconCrown size={28} />
         </div>
         <h2 className="mt-3 text-xl font-extrabold tracking-tight">
-          StaveFlow <span className="text-amber-300">Pro</span>
+          Sonatrio <span className="text-amber-300">Pro</span>
         </h2>
         <p className="mt-1 text-sm text-mist-300">{account.pro ? t("proActive") : t("proBody")}</p>
       </div>

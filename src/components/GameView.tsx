@@ -132,6 +132,8 @@ export function GameView() {
       labels.great = t("great");
       labels.good = t("good");
       labels.miss = t("miss");
+      labels.early = t("early");
+      labels.late = t("late");
       r.hw.resize(v.w, v.hwH);
       r.hw.draw({
         t: time,
@@ -141,6 +143,10 @@ export function GameView() {
         naming: s.noteNaming,
         showNames: s.showNoteNames,
         effects: s.effects,
+        effectLevel: s.effectLevel,
+        effectStyle: s.effectStyle,
+        noteStyle: s.noteStyle,
+        background: s.background,
         labels,
       });
       const rev = keyLabelRevision();

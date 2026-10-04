@@ -28,22 +28,17 @@ import { Timeline } from "./Timeline";
 
 function Logo() {
   return (
-    <div className="flex shrink-0 items-center gap-2 pr-1 select-none" aria-label="StaveFlow">
-      <svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true">
-        <defs>
-          <linearGradient id="lg" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stopColor="#38d6ff" />
-            <stop offset="1" stopColor="#8b5cf6" />
-          </linearGradient>
-        </defs>
-        <rect x="2" y="2" width="28" height="28" rx="9" fill="url(#lg)" />
-        <rect x="8" y="7" width="4" height="12" rx="2" fill="#fff" opacity="0.95" />
-        <rect x="14" y="11" width="4" height="9" rx="2" fill="#fff" opacity="0.8" />
-        <rect x="20" y="5" width="4" height="15" rx="2" fill="#fff" opacity="0.65" />
-        <rect x="6" y="22" width="20" height="3" rx="1.5" fill="#fff" />
-      </svg>
-      <span className="hidden text-[17px] font-extrabold tracking-tight md:inline">
-        Stave<span className="text-brand-300">Flow</span>
+    <div className="flex shrink-0 items-center gap-2 pr-1 select-none" aria-label="Sonatrio">
+      <img
+        src={`${import.meta.env.BASE_URL}favicon.svg`}
+        width={30}
+        height={30}
+        alt=""
+        draggable={false}
+        className="rounded-[7px] shadow-[0_0_14px_rgba(139,92,246,0.45)]"
+      />
+      <span className="hidden bg-gradient-to-r from-white via-violet-200 to-violet-400 bg-clip-text text-[17px] font-extrabold tracking-tight text-transparent md:inline">
+        Sonatrio
       </span>
     </div>
   );

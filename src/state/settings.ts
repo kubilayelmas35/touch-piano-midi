@@ -2,6 +2,15 @@ import type { NoteNaming } from "../lib/notes";
 import type { GuitarTone, InstrumentKind } from "../engine/types";
 import { readLegacySettings } from "../storage/migrate";
 import { defaultKeymaps, sanitizeKeymaps, type FretKeyMode, type Keymaps } from "../input/keyboard";
+import {
+  BACKGROUNDS,
+  EFFECT_STYLES,
+  NOTE_STYLES,
+  oneOf,
+  type Background,
+  type EffectStyle,
+  type NoteStyle,
+} from "../render/appearance";
 
 export type Language = "tr" | "en";
 
@@ -21,6 +30,11 @@ export interface Settings {
   showNoteNames: boolean;
   showKeyLabels: boolean;
   effects: boolean;
+  /** 0.1–1: how many particles / how bright the glows are. */
+  effectLevel: number;
+  effectStyle: EffectStyle;
+  noteStyle: NoteStyle;
+  background: Background;
   /** Octave of the computer-keyboard "A" key (C of that octave). */
   keyboardOctave: number;
   keymaps: Keymaps;
@@ -62,6 +76,10 @@ export function defaultSettings(): Settings {
     showNoteNames: true,
     showKeyLabels: true,
     effects: true,
+    effectLevel: 0.5,
+    effectStyle: "sparks",
+    noteStyle: "gem",
+    background: "night",
     keyboardOctave: 4,
     keymaps: defaultKeymaps(),
     fretKeyMode: "strings",
@@ -109,6 +127,10 @@ function sanitize(s: Settings): Settings {
     clickVolume: num(s.clickVolume, 0, 1, d.clickVolume),
     timingWindowMs: num(s.timingWindowMs, 60, 300, d.timingWindowMs),
     fallSeconds: num(s.fallSeconds, 1, 8, d.fallSeconds),
+    effectLevel: num(s.effectLevel, 0.1, 1, d.effectLevel),
+    effectStyle: oneOf(EFFECT_STYLES, s.effectStyle, d.effectStyle),
+    noteStyle: oneOf(NOTE_STYLES, s.noteStyle, d.noteStyle),
+    background: oneOf(BACKGROUNDS, s.background, d.background),
     keyboardOctave: Math.round(num(s.keyboardOctave, 1, 7, d.keyboardOctave)),
     keymaps: sanitizeKeymaps(s.keymaps),
     fretKeyMode: s.fretKeyMode === "chromatic" ? "chromatic" : "strings",

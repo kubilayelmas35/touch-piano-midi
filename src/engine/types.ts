@@ -74,6 +74,8 @@ export function accuracyOf(s: Stats): number {
 /** Hits may land a bit early and noticeably late (people react to the note reaching the line). */
 export const EARLY_FACTOR = 1.2;
 export const LATE_FACTOR = 1.8;
+/** A press this far (song seconds at 1×) ahead of a note's window still lands if it's held until the note arrives. */
+export const EARLY_HOLD_SEC = 0.5;
 
 export function starsFor(accuracy: number): number {
   if (accuracy >= 0.95) return 5;
@@ -130,5 +132,7 @@ export interface Fx {
   string: number;
   fret: number;
   judgement: Judgement | "wrong";
+  /** Off-beat hits say which way they were off. */
+  timing: "early" | "late" | null;
   at: number;
 }

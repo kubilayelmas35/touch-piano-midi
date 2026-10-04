@@ -1,8 +1,8 @@
 {
-  "name": "staveflow",
+  "name": "sonatrio",
   "private": true,
   "version": "2.0.0",
-  "description": "StaveFlow — piano, guitar & violin with falling MIDI notes",
+  "description": "Sonatrio — piano, guitar & violin with falling MIDI notes",
   "type": "module",
   "scripts": {
     "dev": "vite",

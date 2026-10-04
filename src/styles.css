@@ -23,6 +23,13 @@
   --animate-slide-up: slideUp 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 @keyframes pop {
   from {
     opacity: 0;

@@ -6,9 +6,16 @@ import { INSTRUMENT_HEIGHT_RANGE, defaultSettings } from "../state/settings";
 import { setPanel, useApp } from "../state/store";
 import { IconPlug } from "../ui/icons";
 import { KeyBindings } from "./KeyBindings";
+import { BackgroundSwatch, ChoiceCards, EffectSwatch, NoteSwatch } from "./AppearancePicker";
+import { BACKGROUNDS, EFFECT_STYLES, NOTE_STYLES, type Background, type EffectStyle, type NoteStyle } from "../render/appearance";
+import type { DictKey } from "../i18n/en";
 import { Button, Dialog, Segmented, Slider, Switch, cx } from "../ui/primitives";
 
-type Tab = "general" | "sound" | "gameplay" | "input";
+const BG_LABEL: Record<Background, DictKey> = { night: "bgNight", space: "bgSpace", aurora: "bgAurora", synth: "bgSynth", plain: "bgPlain" };
+const NOTE_LABEL: Record<NoteStyle, DictKey> = { gem: "nsGem", neon: "nsNeon", classic: "nsClassic", minimal: "nsMinimal" };
+const FX_LABEL: Record<EffectStyle, DictKey> = { sparks: "fxSparks", stars: "fxStars", fire: "fxFire", glow: "fxGlow" };
+
+type Tab = "general" | "look" | "sound" | "gameplay" | "input";
 
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 
@@ -42,6 +49,7 @@ export function SettingsDialog() {
 
   const tabs: { id: Tab; label: string }[] = [
     { id: "general", label: t("general") },
+    { id: "look", label: t("appearance") },
     { id: "sound", label: t("sound") },
     { id: "gameplay", label: t("gameplay") },
     { id: "input", label: t("input") },
@@ -67,7 +75,7 @@ export function SettingsDialog() {
       width="max-w-xl"
       closeLabel={t("close")}
       toolbar={
-        <div role="tablist" aria-label={t("settings")} className="flex gap-1 rounded-2xl bg-white/[0.04] p-1">
+        <div role="tablist" aria-label={t("settings")} className="no-scrollbar flex gap-1 overflow-x-auto rounded-2xl bg-white/[0.04] p-1">
           {tabs.map((x) => (
             <button
               key={x.id}
@@ -76,7 +84,7 @@ export function SettingsDialog() {
               aria-selected={tab === x.id}
               onClick={() => setTab(x.id)}
               className={cx(
-                "h-9 flex-1 rounded-xl text-sm font-semibold transition-colors",
+                "h-9 min-w-[3.5rem] flex-1 shrink-0 rounded-xl px-1.5 text-[13px] font-semibold whitespace-nowrap transition-colors sm:text-sm",
                 tab === x.id ? "bg-brand-500/25 text-brand-200 ring-1 ring-brand-400/40" : "text-mist-300 hover:bg-white/[0.06]"
               )}
             >
@@ -113,7 +121,6 @@ export function SettingsDialog() {
                 />
               </Row>
               <Switch label={t("showNoteNames")} checked={s.showNoteNames} onChange={(v) => updateSettings({ showNoteNames: v })} />
-              <Switch label={t("effects")} checked={s.effects} onChange={(v) => updateSettings({ effects: v })} />
             </Section>
             <Section title={t("about")}>
               <p className="py-2 text-xs leading-relaxed text-mist-400">{t("aboutBody")}</p>
@@ -129,6 +136,47 @@ export function SettingsDialog() {
                   {t("resetSettings")}
                 </Button>
               </div>
+            </Section>
+          </>
+        )}
+
+        {tab === "look" && (
+          <>
+            <Section>
+              <ChoiceCards
+                label={t("background")}
+                value={s.background}
+                onChange={(v) => updateSettings({ background: v })}
+                options={BACKGROUNDS.map((b) => ({ value: b, label: t(BG_LABEL[b]), preview: <BackgroundSwatch bg={b} /> }))}
+              />
+              <ChoiceCards
+                label={t("noteStyle")}
+                value={s.noteStyle}
+                onChange={(v) => updateSettings({ noteStyle: v })}
+                options={NOTE_STYLES.map((n) => ({ value: n, label: t(NOTE_LABEL[n]), preview: <NoteSwatch style={n} /> }))}
+              />
+            </Section>
+            <Section>
+              <Switch label={t("effects")} checked={s.effects} onChange={(v) => updateSettings({ effects: v })} />
+              {s.effects && (
+                <>
+                  <Slider
+                    label={t("effectLevel")}
+                    value={s.effectLevel}
+                    min={0.1}
+                    max={1}
+                    step={0.05}
+                    onChange={(v) => updateSettings({ effectLevel: v })}
+                    format={pct}
+                  />
+                  <ChoiceCards
+                    label={t("effectStyle")}
+                    value={s.effectStyle}
+                    onChange={(v) => updateSettings({ effectStyle: v })}
+                    options={EFFECT_STYLES.map((e) => ({ value: e, label: t(FX_LABEL[e]), preview: <EffectSwatch style={e} /> }))}
+                  />
+                </>
+              )}
             </Section>
           </>
         )}

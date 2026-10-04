@@ -137,6 +137,36 @@ describe("engine", () => {
     expect(engine.stats.holdPossible).toBeCloseTo(possible, 5);
   });
 
+  it("lands an early press that is held until the note arrives, tagged early", async () => {
+    const engine = await startEngine();
+    advance(-engine.startTime - 0.45, engine);
+    engine.press("k", 60);
+    expect(engine.notes[0].state).toBe(NoteState.Pending);
+    expect(engine.stats.wrong).toBe(0);
+    advance(0.4, engine);
+    expect(engine.notes[0].state).toBe(NoteState.Hit);
+    expect(engine.notes[0].judgement).toBe("good");
+    expect(engine.fx[engine.fx.length - 1].timing).toBe("early");
+    expect(engine.stats.wrong).toBe(0);
+  });
+
+  it("counts an early tap that was let go as a wrong note", async () => {
+    const engine = await startEngine();
+    advance(-engine.startTime - 0.45, engine);
+    engine.press("k", 60);
+    engine.release("k");
+    advance(0.4, engine);
+    expect(engine.stats.wrong).toBe(1);
+    expect(engine.notes[0].state).toBe(NoteState.Pending);
+  });
+
+  it("tags off-beat hits as late", async () => {
+    const engine = await startEngine();
+    advance(-engine.startTime + 0.2, engine);
+    engine.press("k", 60);
+    expect(engine.fx[engine.fx.length - 1].timing).toBe("late");
+  });
+
   it("counts a wrong key without consuming a note", async () => {
     const engine = await startEngine();
     advance(-engine.startTime, engine);

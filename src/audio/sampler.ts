@@ -24,9 +24,15 @@ export interface Voice {
   readonly done: boolean;
 }
 
+interface Sample {
+  buffer: AudioBuffer;
+  /** Seconds where the loop restarts (it runs to the end of the buffer); null plays once. */
+  loopStart: number | null;
+}
+
 interface LoadedInstrument {
   def: InstrumentDef;
-  buffers: Map<number, AudioBuffer>;
+  buffers: Map<number, Sample>;
 }
 
 const loaded = new Map<InstrumentId, LoadedInstrument>();
@@ -58,6 +64,65 @@ function makeLoopBuffer(ctx: BaseAudioContext, src: AudioBuffer, def: Instrument
   return out;
 }
 
+/**
+ * Turns a decaying pluck into one that can sustain: the slice right after the attack (until it has dropped to
+ * about a third) is levelled to a constant loudness and crossfade-looped.
+ */
+function makePluckLoop(ctx: BaseAudioContext, src: AudioBuffer): Sample {
+  const rate = src.sampleRate;
+  const win = Math.max(1, Math.floor(rate * 0.02));
+  const nWin = Math.floor(src.length / win);
+  const env = new Float32Array(nWin);
+  const first = src.getChannelData(0);
+  for (let w = 0; w < nWin; w++) {
+    let s = 0;
+    for (let i = w * win; i < (w + 1) * win; i++) s += first[i] * first[i];
+    env[w] = Math.sqrt(s / win);
+  }
+  const smooth = (w: number) => {
+    const a = env[Math.max(0, w - 1)];
+    const b = env[Math.min(nWin - 1, w + 1)];
+    return Math.max(1e-6, (a + 2 * env[w] + b) / 4);
+  };
+  let peak = 0;
+  for (let w = 1; w < Math.min(nWin, 8); w++) if (env[w] > env[peak]) peak = w;
+  const startW = Math.min(nWin - 20, Math.max(peak + 3, 5));
+  const startLevel = smooth(startW);
+  let endW = startW + 12;
+  while (endW < nWin - 2 && endW - startW < 60 && smooth(endW) > startLevel * 0.32) endW++;
+  if (startW < 2 || endW >= nWin) return { buffer: src, loopStart: null };
+
+  const start = startW * win;
+  const end = endW * win;
+  const xf = Math.min(Math.floor(rate * 0.08), Math.floor((end - start) / 3));
+  const p0 = start - xf;
+  const ref = smooth(Math.floor(p0 / win));
+  const out = ctx.createBuffer(src.numberOfChannels, end, rate);
+  for (let ch = 0; ch < src.numberOfChannels; ch++) {
+    const a = src.getChannelData(ch);
+    const b = out.getChannelData(ch);
+    b.set(a.subarray(0, end));
+    for (let i = p0; i < end; i++) {
+      const fw = i / win - 0.5;
+      const w0 = Math.max(0, Math.floor(fw));
+      const k = Math.min(1, Math.max(0, fw - w0));
+      const e = smooth(w0) * (1 - k) + smooth(Math.min(nWin - 1, w0 + 1)) * k;
+      b[i] *= Math.min(40, ref / e);
+    }
+    for (let i = 0; i < xf; i++) {
+      const t = i / xf;
+      b[end - xf + i] = b[end - xf + i] * Math.cos((t * Math.PI) / 2) + b[start - xf + i] * Math.sin((t * Math.PI) / 2);
+    }
+  }
+  return { buffer: out, loopStart: start / rate };
+}
+
+function prepare(ctx: BaseAudioContext, decoded: AudioBuffer, def: InstrumentDef): Sample {
+  if (def.sustained && def.loop) return { buffer: makeLoopBuffer(ctx, decoded, def), loopStart: Math.max(0, def.loop.start) };
+  if (def.pluckSustain) return makePluckLoop(ctx, decoded);
+  return { buffer: decoded, loopStart: null };
+}
+
 export function isLoaded(id: InstrumentId): boolean {
   return loaded.has(id);
 }
@@ -75,7 +140,7 @@ export function loadInstrument(
   const { ctx } = getBus();
   let done = 0;
   const promise = (async () => {
-    const buffers = new Map<number, AudioBuffer>();
+    const buffers = new Map<number, Sample>();
     const queue = [...def.notes];
     const worker = async () => {
       while (queue.length) {
@@ -84,7 +149,7 @@ export function loadInstrument(
           const res = await fetch(sampleUrl(id, midi));
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const decoded = await ctx.decodeAudioData(await res.arrayBuffer());
-          buffers.set(midi, def.sustained ? makeLoopBuffer(ctx, decoded, def) : decoded);
+          buffers.set(midi, prepare(ctx, decoded, def));
         } catch (err) {
           console.warn(`[sampler] ${id} ${midi} failed`, err);
         }
@@ -104,7 +169,7 @@ export function loadInstrument(
   return promise;
 }
 
-function nearestSample(inst: LoadedInstrument, midi: number): [number, AudioBuffer] {
+function nearestSample(inst: LoadedInstrument, midi: number): [number, Sample] {
   let best = -1;
   let bestDist = Infinity;
   for (const m of inst.buffers.keys()) {
@@ -213,7 +278,8 @@ export function playNote(id: InstrumentId, midi: number, velocity: number, opts:
   const { ctx, input } = getBus();
   const def = inst.def;
   const when = Math.max(ctx.currentTime, opts.when ?? ctx.currentTime);
-  const [sampleMidi, buffer] = nearestSample(inst, midi);
+  const [sampleMidi, sample] = nearestSample(inst, midi);
+  const buffer = sample.buffer;
 
   if (active.size >= MAX_VOICES) {
     let oldest: VoiceImpl | null = null;
@@ -228,9 +294,9 @@ export function playNote(id: InstrumentId, midi: number, velocity: number, opts:
   source.buffer = buffer;
   const detune = (midi - sampleMidi) * 100;
   source.detune.value = detune;
-  if (def.sustained && def.loop) {
+  if (sample.loopStart !== null) {
     source.loop = true;
-    source.loopStart = Math.max(0, def.loop.start);
+    source.loopStart = sample.loopStart;
     source.loopEnd = buffer.duration;
   }
 
@@ -238,6 +304,10 @@ export function playNote(id: InstrumentId, midi: number, velocity: number, opts:
   const peak = velocityGain(velocity) * def.gain * (opts.volume ?? 1);
   env.gain.setValueAtTime(0, when);
   env.gain.linearRampToValueAtTime(peak, when + def.attack);
+  // Scheduled plucks have nobody keeping the string alive, so they fade like a real string.
+  if (def.pluckSustain && sample.loopStart !== null && opts.duration != null) {
+    env.gain.setTargetAtTime(0, when + def.attack + sample.loopStart, def.pluckSustain.decay);
+  }
 
   const level = ctx.createGain();
   const nodes: AudioNode[] = [source, env, level];

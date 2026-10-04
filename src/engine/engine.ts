@@ -6,6 +6,7 @@ import { selectAccompanimentNotes, selectPlayerNotes, type Song, type SongNote }
 import { GUITAR, VIOLIN, assignFingerings, foldIntoRange, type FrettedSpec } from "./fretting";
 import {
   EARLY_FACTOR,
+  EARLY_HOLD_SEC,
   HOLD_POINTS_PER_SEC,
   JUDGEMENT_POINTS,
   LATE_FACTOR,
@@ -127,6 +128,8 @@ export class Engine {
   /** Long notes that were hit and are still running. */
   private holds: PlayNote[] = [];
   private holdScore = 0;
+  /** Presses that came before their note's window; they count once the note arrives if still held. */
+  private preHolds: { src: string; note: PlayNote; pos?: PressPos }[] = [];
   private lastFrameT = 0;
   private lastHoldEmit = 0;
   private beats: GridBeat[] = [];
@@ -389,6 +392,7 @@ export class Engine {
     }
     for (const n of this.holds) n.holding = false;
     this.holds = [];
+    this.preHolds = [];
     this.pendingIdx = 0;
     this.advancePending();
     this.waiting = false;
@@ -404,6 +408,7 @@ export class Engine {
       this.resetHold(n);
     }
     this.holds = [];
+    this.preHolds = [];
     this.holdScore = 0;
     this.stats = emptyStats(this.notes.length);
     this.runDirty = false;
@@ -537,6 +542,7 @@ export class Engine {
     this.lastFrameT = t;
     if (cfg.autoPlay) this.markAutoHits(t);
     else {
+      this.settlePreHolds(t);
       if (!cfg.waitMode) this.scanMisses(t);
       this.trackHolds(t, dt > 0 && dt < 0.25 ? dt : 0);
     }
@@ -608,6 +614,31 @@ export class Engine {
       this.stats = { ...s };
       this.emit();
     }
+  }
+
+  /** Early presses: still held when their note comes into range → an early hit; let go before → a wrong note. */
+  private settlePreHolds(t: number): void {
+    if (!this.preHolds.length) return;
+    const early = (this.config.timingWindowMs / 1000) * this.config.speed * EARLY_FACTOR;
+    const keep: typeof this.preHolds = [];
+    let changed = false;
+    for (const p of this.preHolds) {
+      const n = p.note;
+      if (n.state !== NoteState.Pending) continue;
+      const sounding = this.isSounding(p.src, n.midi);
+      if (sounding && t < n.time - early) {
+        keep.push(p);
+        continue;
+      }
+      if (sounding) this.hitNote(n, p.src, this.config.waitMode ? "perfect" : "good", this.config.waitMode ? null : "early");
+      else {
+        this.stats = { ...this.stats, wrong: this.stats.wrong + 1 };
+        this.pushFx({ midi: n.midi, string: p.pos?.string ?? -1, fret: p.pos?.fret ?? -1 }, "wrong");
+      }
+      changed = true;
+    }
+    this.preHolds = keep;
+    if (changed) this.emit();
   }
 
   private scanMisses(t: number): void {
@@ -697,8 +728,8 @@ export class Engine {
 
   // ------------------------------------------------------------------ input
 
-  private pushFx(n: { midi: number; string: number; fret: number }, j: Judgement | "wrong"): void {
-    this.fx.push({ midi: n.midi, string: n.string, fret: n.fret, judgement: j, at: performance.now() });
+  private pushFx(n: { midi: number; string: number; fret: number }, j: Judgement | "wrong", timing: Fx["timing"] = null): void {
+    this.fx.push({ midi: n.midi, string: n.string, fret: n.fret, judgement: j, timing, at: performance.now() });
     if (this.fx.length > 64) this.fx.splice(0, this.fx.length - 64);
   }
 
@@ -834,6 +865,15 @@ export class Engine {
         const n = this.notes[i];
         if (n.state === NoteState.Missed && n.midi === midi && t - n.time <= late + 0.35) return;
       }
+      // Too early for the window, but if it's still held when the note arrives it counts (as early).
+      const ahead = early + EARLY_HOLD_SEC * cfg.speed;
+      for (let i = this.pendingIdx; i < this.notes.length; i++) {
+        const n = this.notes[i];
+        if (n.time > t + ahead) break;
+        if (n.state !== NoteState.Pending || n.midi !== midi || this.preHolds.some((p) => p.note === n)) continue;
+        this.preHolds.push({ src: sourceKey, note: n, pos });
+        return;
+      }
       this.stats = { ...this.stats, wrong: this.stats.wrong + 1 };
       this.pushFx({ midi, string: pos?.string ?? -1, fret: pos?.fret ?? -1 }, "wrong");
       this.emit();
@@ -842,15 +882,21 @@ export class Engine {
     const deltaMs = ((t - best.time) / cfg.speed) * 1000;
     // Wait mode is about playing the right notes, not timing; wrong presses still cost accuracy.
     const j: Judgement = cfg.waitMode ? "perfect" : (judge(deltaMs, cfg.timingWindowMs) ?? "good");
-    best.state = NoteState.Hit;
-    best.judgement = j;
-    best.resolvedAt = performance.now();
-    if (holdWeight(best.duration) > 0) {
-      best.holdSrc = sourceKey;
-      best.holdStart = Math.max(best.time, Math.min(t, best.time + best.duration));
-      best.held = 0;
-      best.holding = true;
-      this.holds.push(best);
+    const timing = cfg.waitMode || j === "perfect" ? null : deltaMs < 0 ? "early" : "late";
+    this.hitNote(best, sourceKey, j, timing);
+  }
+
+  private hitNote(n: PlayNote, sourceKey: string, j: Judgement, timing: Fx["timing"]): void {
+    const t = this.time;
+    n.state = NoteState.Hit;
+    n.judgement = j;
+    n.resolvedAt = performance.now();
+    if (holdWeight(n.duration) > 0) {
+      n.holdSrc = sourceKey;
+      n.holdStart = Math.max(n.time, Math.min(t, n.time + n.duration));
+      n.held = 0;
+      n.holding = true;
+      this.holds.push(n);
     }
     const s = { ...this.stats };
     s[j]++;
@@ -858,7 +904,7 @@ export class Engine {
     s.maxCombo = Math.max(s.maxCombo, s.combo);
     s.score += JUDGEMENT_POINTS[j] * comboMultiplier(s.combo);
     this.stats = s;
-    this.pushFx(best, j);
+    this.pushFx(n, j, timing);
     this.advancePending();
     this.emit();
   }

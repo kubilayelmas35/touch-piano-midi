@@ -983,7 +983,7 @@ export default function AdminPanel() {
           </span>
           <div className="min-w-0 flex-1">
             <h2 className="truncate text-lg font-extrabold tracking-tight">{t("admTitle")}</h2>
-            <p className="truncate text-xs text-mist-400">StaveFlow</p>
+            <p className="truncate text-xs text-mist-400">Sonatrio</p>
           </div>
           <IconButton label={t("admRefresh")} onClick={bump}>
             <IconSync size={18} />
