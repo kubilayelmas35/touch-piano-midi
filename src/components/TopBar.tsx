@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { engine } from "../engine/engine";
 import type { InstrumentKind } from "../engine/types";
 import { useT } from "../i18n";
+import { micSupported, toggleMic } from "../input/mic";
 import { formatTime } from "../lib/notes";
 import { dayKey, streak } from "../progress/progress";
 import { cycleLoop, NO_LOOP, openFreePlay, updateSession, updateSettings } from "../state/actions";
@@ -17,6 +18,7 @@ import {
   IconLibrary,
   IconLoop,
   IconMetronome,
+  IconMic,
   IconMore,
   IconRoute,
   IconPause,
@@ -132,6 +134,19 @@ function PedalButton() {
   );
 }
 
+/** Listens to a real instrument through the microphone instead of the on-screen one. */
+function MicButton() {
+  const t = useT();
+  const mic = useApp((s) => s.mic);
+  if (!micSupported()) return null;
+  return (
+    <IconButton label={t("micListen")} active={mic === "on"} onClick={() => void toggleMic()}>
+      <IconMic size={19} />
+      {mic === "on" && <span className="absolute top-1 right-1 h-2 w-2 animate-pulse rounded-full bg-rose-400" />}
+    </IconButton>
+  );
+}
+
 function PracticeToggles() {
   const t = useT();
   const waitMode = useApp((s) => s.session.waitMode);
@@ -147,6 +162,7 @@ function PracticeToggles() {
         <IconMetronome size={19} />
       </IconButton>
       <PedalButton />
+      <MicButton />
       <IconButton label={t("autoPlay")} active={autoPlay} onClick={() => updateSession({ autoPlay: !autoPlay })}>
         <IconHeadphones size={19} />
       </IconButton>
@@ -161,7 +177,8 @@ function PracticeMenu() {
   const metronome = useApp((s) => s.settings.metronome);
   const piano = useApp((s) => s.settings.instrument === "piano");
   const pedal = useApp((s) => s.settings.pianoPedal);
-  const active = session.waitMode || session.autoPlay || session.loop.a >= 0 || metronome || session.speed !== 1;
+  const mic = useApp((s) => s.mic);
+  const active = session.waitMode || session.autoPlay || session.loop.a >= 0 || metronome || session.speed !== 1 || mic === "on";
   return (
     <Popover
       label={t("practice")}
@@ -183,6 +200,9 @@ function PracticeMenu() {
           <Switch label={t("metronome")} checked={metronome} onChange={(v) => updateSettings({ metronome: v })} />
           {piano && (
             <Switch label={t("pianoPedal")} hint={t("pianoPedalHint")} checked={pedal} onChange={(v) => updateSettings({ pianoPedal: v })} />
+          )}
+          {micSupported() && (
+            <Switch label={t("micListen")} hint={t("micListenHint")} checked={mic === "on"} onChange={() => void toggleMic()} />
           )}
           <Switch
             label={t("autoPlay")}

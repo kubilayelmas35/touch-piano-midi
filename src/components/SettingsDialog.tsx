@@ -1,13 +1,14 @@
 import { useState, type ReactNode } from "react";
 import { useT } from "../i18n";
 import { keyboardOctaveNow, pianoKeyMap } from "../input/keyboardBase";
+import { micSupported, toggleMic } from "../input/mic";
 import { startMidi } from "../input/midi";
 import { useFullscreen } from "../lib/fullscreen";
 import { updateSettings } from "../state/actions";
 import { INSTRUMENT_HEIGHT_RANGE, KEY_ZOOM_MAX, defaultSettings } from "../state/settings";
 import { openVideo, setPanel, useApp } from "../state/store";
 import { isNativeApp } from "../lib/platform";
-import { IconMessage, IconPlug, IconSparkles, IconVideo } from "../ui/icons";
+import { IconMessage, IconMic, IconPlug, IconSparkles, IconVideo } from "../ui/icons";
 import { KeyBindings } from "./KeyBindings";
 import { LegalLinks } from "./LegalLinks";
 import { ReminderSettings } from "./ReminderToggle";
@@ -152,6 +153,7 @@ export function SettingsDialog() {
   const midiSupported = useApp((st) => st.midiSupported);
   const midiDevices = useApp((st) => st.midiDevices);
   const midiAccess = useApp((st) => st.midiAccess);
+  const mic = useApp((st) => st.mic);
   const fs = useFullscreen();
   const [tab, setTab] = useState<Tab>("general");
   const [askHideFrets, setAskHideFrets] = useState<"piano" | "fret" | null>(null);
@@ -575,6 +577,25 @@ export function SettingsDialog() {
                 </div>
               )}
             </Section>
+            {micSupported() && (
+              <Section title={t("micListen")}>
+                <div className="flex flex-wrap items-center gap-2 py-2">
+                  <Button size="sm" variant={mic === "on" ? "primary" : "subtle"} onClick={() => void toggleMic()}>
+                    <IconMic size={15} /> {mic === "on" ? t("micStop") : t("micStart")}
+                  </Button>
+                  <span className="text-xs text-mist-400">{mic === "denied" ? t("micDenied") : t("micListenHint")}</span>
+                </div>
+                <Slider
+                  label={t("micSensitivity")}
+                  value={s.micSensitivity}
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  onChange={(v) => updateSettings({ micSensitivity: v })}
+                  format={(v) => `${Math.round(v * 100)}%`}
+                />
+              </Section>
+            )}
             <Section title={t("computerKeyboard")}>
               <Switch label={t("showKeyLabels")} checked={s.showKeyLabels} onChange={(v) => updateSettings({ showKeyLabels: v })} />
               <Switch label={t("songKeys")} hint={t("songKeysHint")} checked={s.songKeys} onChange={(v) => updateSettings({ songKeys: v })} />

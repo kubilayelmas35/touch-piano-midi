@@ -141,6 +141,8 @@ export interface AppState {
   /** "idle" until access is requested, then "ready" or "denied". */
   midiAccess: "idle" | "ready" | "denied";
   midiDevices: MidiDevice[];
+  /** Listening to a real instrument through the microphone. */
+  mic: "off" | "starting" | "on" | "denied";
   dragOver: boolean;
   audioLocked: boolean;
   account: Account;
@@ -197,6 +199,7 @@ export const useApp = create<AppState>(() => ({
   midiSupported: typeof navigator !== "undefined" && "requestMIDIAccess" in navigator,
   midiAccess: "idle",
   midiDevices: [],
+  mic: "off",
   dragOver: false,
   audioLocked: false,
   account: {

@@ -350,6 +350,36 @@ describe("engine", () => {
     expect(audio.bends.at(-1)).toBeCloseTo(0);
   });
 
+  it("scores notes heard by the microphone without playing a sound, forgiving octaves and stray pitches", async () => {
+    const engine = await startEngine();
+    advance(-engine.startTime, engine);
+    const sounds = audio.played.length;
+    engine.hear("mic", 72);
+    expect(engine.notes[0].state).toBe(NoteState.Hit);
+    expect(audio.played.length).toBe(sounds);
+    engine.hear("mic", 66);
+    expect(engine.stats.wrong).toBe(0);
+    engine.unhear("mic");
+    advance(1, engine);
+    const late = (engine.time - engine.notes[1].time) * 1000;
+    engine.hear("mic", 62, 0.8, 0.05);
+    expect(engine.notes[1].state).toBe(NoteState.Hit);
+    expect(engine.notes[1].offsetMs).toBeCloseTo(late - 50, 0);
+  });
+
+  it("credits a whole chord for one heard note and holds it while heard", async () => {
+    const engine = await startEngine({ playTracks: [0, 1] });
+    advance(-engine.startTime, engine);
+    engine.hear("mic", 60);
+    const first = engine.notes.filter((n) => n.time === 0);
+    expect(first.map((n) => n.state)).toEqual([NoteState.Hit, NoteState.Hit]);
+    advance(0.5, engine);
+    expect(first.every((n) => n.holding)).toBe(true);
+    engine.unhear("mic");
+    advance(0.1, engine);
+    expect(first.some((n) => n.holding)).toBe(false);
+  });
+
   it("guitar mode assigns every note a string and fret", async () => {
     const engine = await startEngine({ instrument: "guitar" });
     expect(engine.notes.length).toBe(5);

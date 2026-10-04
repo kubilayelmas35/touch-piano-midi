@@ -74,6 +74,8 @@ export interface Settings {
   /** Guitar/violin touch: a finger presses its whole fret column (barre). */
   columnPress: boolean;
   midiInput: string;
+  /** Microphone listening: 0 only loud notes … 1 picks up quiet playing. */
+  micSensitivity: number;
   /** Instrument panel height as a fraction of the game area. */
   instrumentHeight: number;
   /** Hides the drag handle so the panel can't be resized by accident while playing. */
@@ -169,6 +171,7 @@ export function defaultSettings(): Settings {
     multiNote: false,
     columnPress: false,
     midiInput: "all",
+    micSensitivity: 0.5,
     instrumentHeight: 0.3,
     lockHeight: false,
     keyZoom: 1,
@@ -285,6 +288,7 @@ function sanitize(s: Settings): Settings {
     landscapeLock: s.landscapeLock === true,
     pianoPedal: s.pianoPedal !== false,
     pianoSustain: num(s.pianoSustain, 0, 1, d.pianoSustain),
+    micSensitivity: num(s.micSensitivity, 0, 1, d.micSensitivity),
     noteKeyLabels: typeof s.noteKeyLabels === "boolean" ? s.noteKeyLabels : d.noteKeyLabels,
     fingerNumbers: s.fingerNumbers === true,
     staffView: s.staffView === true,

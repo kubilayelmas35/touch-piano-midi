@@ -168,7 +168,9 @@ export class Engine {
   private holds: PlayNote[] = [];
   private holdScore = 0;
   /** Presses that came before their note's window; they count once the note arrives if still held. */
-  private preHolds: { src: string; note: PlayNote; pos?: PressPos }[] = [];
+  private preHolds: { src: string; note: PlayNote; pos?: PressPos; forgiving?: boolean }[] = [];
+  /** Microphone notes by source key: the pitches each one is credited with. */
+  private heard = new Map<string, Set<number>>();
   private lastFrameT = 0;
   private lastHoldEmit = 0;
   private beats: GridBeat[] = [];
@@ -709,7 +711,7 @@ export class Engine {
         continue;
       }
       if (sounding) this.hitNote(n, p.src, this.config.waitMode ? "perfect" : "good", this.config.waitMode ? null : "early");
-      else {
+      else if (!p.forgiving) {
         this.stats = { ...this.stats, wrong: this.stats.wrong + 1 };
         this.wrongTimes.push(t);
         this.pushFx({ midi: n.midi, string: p.pos?.string ?? -1, fret: p.pos?.fret ?? -1 }, "wrong");
@@ -883,6 +885,7 @@ export class Engine {
 
   /** Whether the note a source played is still audibly going (held, ringing or pedaled). */
   isSounding(sourceKey: string, midi: number): boolean {
+    if (this.heard.get(sourceKey)?.has(midi)) return true;
     const v = this.voices.get(sourceKey) ?? this.ringing.get(sourceKey) ?? this.pedaled.get(sourceKey);
     const note = this.glides.get(sourceKey)?.note ?? v?.midi;
     return !!v && !v.done && note === midi && (this.levels.get(sourceKey) ?? 1) > 0.15;
@@ -962,13 +965,65 @@ export class Engine {
   releaseAll(): void {
     for (const key of [...this.voices.keys()]) this.release(key);
     for (const key of [...this.ringing.keys()]) this.mute(key);
+    for (const key of [...this.heard.keys()]) this.unhear(key);
     this.held.clear();
   }
 
-  private judgePress(sourceKey: string, midi: number, pos?: PressPos): void {
-    if (this.status !== "playing" || this.config.autoPlay) return;
-    const cfg = this.config;
+  /**
+   * A note heard from a real instrument (microphone). Nothing is synthesised; pitch trackers slip octaves and
+   * hear one note of a chord, so a matching pitch class counts and one heard note plays its whole chord.
+   * Misdetections never count as wrong notes.
+   */
+  hear(sourceKey: string, midi: number, velocity = 0.8, lagSec = 0): void {
+    if (this.heard.has(sourceKey)) this.unhear(sourceKey);
+    const m = this.heardTarget(midi);
+    const set = new Set([m]);
+    this.heard.set(sourceKey, set);
+    this.held.set(sourceKey, { midi: m, string: -1, fret: -1 });
+    this.onInput?.({ type: "on", key: sourceKey, midi: m, velocity });
+    const hit = this.judgePress(sourceKey, m, undefined, true, lagSec);
+    if (!hit) return;
+    for (let i = this.pendingIdx; i < this.notes.length; i++) {
+      const n = this.notes[i];
+      if (n.time > hit.time + 0.05) break;
+      if (n.group !== hit.group || n.state !== NoteState.Pending) continue;
+      set.add(n.midi);
+      this.hitNote(n, sourceKey, hit.judgement ?? "good", null, hit.offsetMs);
+    }
+  }
+
+  unhear(sourceKey: string): void {
+    if (!this.heard.delete(sourceKey)) return;
+    if (this.held.delete(sourceKey)) this.onInput?.({ type: "off", key: sourceKey, ring: false });
+  }
+
+  /** The pending note a heard pitch most likely means: the same pitch, else the nearest octave of it in the window. */
+  private heardTarget(midi: number): number {
+    if (this.status !== "playing" || this.config.autoPlay) return midi;
+    const win = (this.config.timingWindowMs / 1000) * this.config.speed;
     const t = this.time;
+    let best = midi;
+    let bestD = Infinity;
+    const waitGroup = this.waiting && this.pendingIdx < this.notes.length ? this.notes[this.pendingIdx].group : -1;
+    for (let i = this.pendingIdx; i < this.notes.length; i++) {
+      const n = this.notes[i];
+      if (n.time > t + win * EARLY_FACTOR) break;
+      if (n.state !== NoteState.Pending || (t - n.time > win * LATE_FACTOR && n.group !== waitGroup)) continue;
+      const d = Math.abs(n.midi - midi);
+      if (d === 0) return midi;
+      if (d % 12 === 0 && d <= 24 && d < bestD) {
+        best = n.midi;
+        bestD = d;
+      }
+    }
+    return best;
+  }
+
+  /** `lagSec`: the press really happened that long ago (slow detectors such as the microphone). */
+  private judgePress(sourceKey: string, midi: number, pos?: PressPos, forgiving = false, lagSec = 0): PlayNote | null {
+    if (this.status !== "playing" || this.config.autoPlay) return null;
+    const cfg = this.config;
+    const t = this.time - lagSec * cfg.speed;
     const win = (cfg.timingWindowMs / 1000) * cfg.speed;
     const early = win * EARLY_FACTOR;
     const late = win * LATE_FACTOR;
@@ -999,13 +1054,13 @@ export class Engine {
         tail.holding = true;
         if (!this.holds.includes(tail)) this.holds.push(tail);
         this.emit();
-        return;
+        return null;
       }
       // A press just after a note slipped past is a late attempt, not a stray key; the miss already counted.
       const [m0, m1] = this.visibleRange(t - late - 0.35, t);
       for (let i = m0; i < m1; i++) {
         const n = this.notes[i];
-        if (n.state === NoteState.Missed && n.midi === midi && t - n.time <= late + 0.35) return;
+        if (n.state === NoteState.Missed && n.midi === midi && t - n.time <= late + 0.35) return null;
       }
       // Too early for the window, but if it's still held when the note arrives it counts (as early).
       const ahead = early + EARLY_HOLD_SEC * cfg.speed;
@@ -1013,20 +1068,22 @@ export class Engine {
         const n = this.notes[i];
         if (n.time > t + ahead) break;
         if (n.state !== NoteState.Pending || n.midi !== midi || this.preHolds.some((p) => p.note === n)) continue;
-        this.preHolds.push({ src: sourceKey, note: n, pos });
-        return;
+        this.preHolds.push({ src: sourceKey, note: n, pos, forgiving });
+        return null;
       }
+      if (forgiving) return null;
       this.stats = { ...this.stats, wrong: this.stats.wrong + 1 };
       this.wrongTimes.push(t);
       this.pushFx({ midi, string: pos?.string ?? -1, fret: pos?.fret ?? -1 }, "wrong");
       this.emit();
-      return;
+      return null;
     }
     const deltaMs = ((t - best.time) / cfg.speed) * 1000;
     // Wait mode is about playing the right notes, not timing; wrong presses still cost accuracy.
     const j: Judgement = cfg.waitMode ? "perfect" : (judge(deltaMs, cfg.timingWindowMs) ?? "good");
     const timing = cfg.waitMode || j === "perfect" ? null : deltaMs < 0 ? "early" : "late";
     this.hitNote(best, sourceKey, j, timing, cfg.waitMode ? null : deltaMs);
+    return best;
   }
 
   private hitNote(n: PlayNote, sourceKey: string, j: Judgement, timing: Fx["timing"], offsetMs: number | null = null): void {
