@@ -17,6 +17,7 @@ import {
   IconLoop,
   IconMetronome,
   IconPause,
+  IconPedal,
   IconPiano,
   IconPlay,
   IconRestart,
@@ -115,6 +116,19 @@ function LoopButton() {
   );
 }
 
+/** Piano only: toggles the soft sustain of released keys. */
+function PedalButton() {
+  const t = useT();
+  const piano = useApp((s) => s.settings.instrument === "piano");
+  const pedal = useApp((s) => s.settings.pianoPedal);
+  if (!piano) return null;
+  return (
+    <IconButton label={`${t("pianoPedal")} (Shift)`} active={pedal} onClick={() => updateSettings({ pianoPedal: !pedal })}>
+      <IconPedal size={19} />
+    </IconButton>
+  );
+}
+
 function PracticeToggles() {
   const t = useT();
   const waitMode = useApp((s) => s.session.waitMode);
@@ -129,6 +143,7 @@ function PracticeToggles() {
       <IconButton label={t("metronome")} active={metronome} onClick={() => updateSettings({ metronome: !metronome })}>
         <IconMetronome size={19} />
       </IconButton>
+      <PedalButton />
       <IconButton label={t("autoPlay")} active={autoPlay} onClick={() => updateSession({ autoPlay: !autoPlay })}>
         <IconHeadphones size={19} />
       </IconButton>
@@ -141,6 +156,8 @@ function PracticeMenu() {
   const t = useT();
   const session = useApp((s) => s.session);
   const metronome = useApp((s) => s.settings.metronome);
+  const piano = useApp((s) => s.settings.instrument === "piano");
+  const pedal = useApp((s) => s.settings.pianoPedal);
   const active = session.waitMode || session.autoPlay || session.loop.a >= 0 || metronome || session.speed !== 1;
   return (
     <Popover
@@ -161,6 +178,9 @@ function PracticeMenu() {
             onChange={(v) => updateSession({ waitMode: v })}
           />
           <Switch label={t("metronome")} checked={metronome} onChange={(v) => updateSettings({ metronome: v })} />
+          {piano && (
+            <Switch label={t("pianoPedal")} hint={t("pianoPedalHint")} checked={pedal} onChange={(v) => updateSettings({ pianoPedal: v })} />
+          )}
           <Switch
             label={t("autoPlay")}
             hint={t("autoPlayHint")}
@@ -407,6 +427,7 @@ export function TopBar() {
           <span className="text-mist-400"> / {formatTime(Math.max(0, endTime - 0.6))}</span>
         </div>
         <div className="flex-1" />
+        <PedalButton />
         <StreakButton />
         <InstrumentSwitch compact />
       </div>

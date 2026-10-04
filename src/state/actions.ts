@@ -39,6 +39,7 @@ export function engineConfig(): Partial<EngineConfig> {
     countIn: settings.countIn,
     timingWindowMs: settings.timingWindowMs,
     accompVolume: settings.accompVolume,
+    pianoPedal: settings.pianoPedal,
     playTracks: session.playTracks,
     mutedTracks: session.mutedTracks,
     // On guitar/violin the hands split the playing technique (strike vs. fret), not the notes.

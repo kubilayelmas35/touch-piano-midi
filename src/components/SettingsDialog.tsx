@@ -168,6 +168,7 @@ export function SettingsDialog() {
     [["B"], t("scLoop")],
     [["N"], t("scWait")],
     [["M"], t("scMetro")],
+    [["Shift"], t("scPedal")],
     [["/"], t("scLibrary")],
     [["Esc"], t("scEsc")],
   ];
@@ -364,6 +365,7 @@ export function SettingsDialog() {
             <Slider label={t("accompVolume")} value={s.accompVolume} min={0} max={1} step={0.05} onChange={(v) => updateSettings({ accompVolume: v })} format={pct} />
             <Slider label={t("reverb")} value={s.reverb} min={0} max={0.6} step={0.02} onChange={(v) => updateSettings({ reverb: v })} format={(v) => pct(v / 0.6)} />
             <Slider label={t("clickVolume")} value={s.clickVolume} min={0} max={1} step={0.05} onChange={(v) => updateSettings({ clickVolume: v })} format={pct} />
+            <Switch label={t("pianoPedal")} hint={t("pianoPedalHint")} checked={s.pianoPedal} onChange={(v) => updateSettings({ pianoPedal: v })} />
             <Row label={t("guitarTone")}>
               <Segmented
                 label={t("guitarTone")}

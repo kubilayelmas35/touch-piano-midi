@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const audio = vi.hoisted(() => ({ currentTime: 0, played: [] as { midi: number; when?: number }[] }));
+const audio = vi.hoisted(() => ({
+  currentTime: 0,
+  played: [] as { midi: number; when?: number }[],
+  stops: [] as { midi: number; release?: number }[],
+}));
 
 vi.mock("../audio/context", () => ({
   getBus: () => ({ ctx: { currentTime: audio.currentTime } }),
@@ -12,7 +16,8 @@ vi.mock("../audio/sampler", () => ({
   loadInstrument: async () => {},
   playNote: (_id: string, midi: number, _vel: number, opts: { when?: number } = {}) => {
     audio.played.push({ midi, when: opts.when });
-    return { midi, done: false, stop: () => {}, bend: () => {}, kill: () => {}, setLevel: () => {} };
+    const stop = (release?: number) => void audio.stops.push({ midi, release });
+    return { midi, done: false, stop, bend: () => {}, kill: () => {}, setLevel: () => {} };
   },
 }));
 
@@ -61,6 +66,7 @@ beforeEach(() => {
   now = 1000;
   audio.currentTime = 0;
   audio.played = [];
+  audio.stops = [];
   vi.spyOn(performance, "now").mockImplementation(() => now);
 });
 
@@ -256,6 +262,34 @@ describe("engine", () => {
     expect(engine.notes.every((n) => n.state === NoteState.Hit)).toBe(true);
     expect(audio.played.filter((p) => p.midi >= 60).length).toBe(5);
     expect(engine.fx.filter((f) => f.auto && f.judgement === "perfect").length).toBe(5);
+  });
+
+  it("piano pedal mode lets released keys fade slowly and damps them when struck again", async () => {
+    const engine = new Engine();
+    engine.press("k", 60);
+    engine.release("k");
+    expect(audio.stops.at(-1)?.release).toBeUndefined();
+
+    engine.configure({ pianoPedal: true });
+    engine.press("k", 60);
+    engine.release("k");
+    expect(audio.stops.at(-1)?.release).toBeGreaterThan(1);
+    const before = audio.stops.length;
+    engine.press("j", 60);
+    expect(audio.stops.length).toBe(before + 1);
+    expect(audio.stops.at(-1)?.release).toBeUndefined();
+  });
+
+  it("holds the sustain pedal while any source keeps it down", async () => {
+    const engine = new Engine();
+    engine.setSustain(true);
+    engine.setSustain(true, "shift");
+    engine.press("k", 60);
+    engine.release("k");
+    engine.setSustain(false, "shift");
+    expect(audio.stops.length).toBe(0);
+    engine.setSustain(false);
+    expect(audio.stops.length).toBe(1);
   });
 
   it("guitar mode assigns every note a string and fret", async () => {

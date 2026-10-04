@@ -124,6 +124,8 @@ export interface EngineConfig {
   timingWindowMs: number;
   accompVolume: number;
   playerVolume: number;
+  /** Piano: released keys keep ringing and fade slowly, like playing with the pedal down. */
+  pianoPedal: boolean;
   loop: LoopRange;
 }
 

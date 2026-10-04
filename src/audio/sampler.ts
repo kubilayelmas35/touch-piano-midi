@@ -190,7 +190,7 @@ function velocityGain(v: number): number {
 class VoiceImpl implements Voice {
   readonly id = nextId++;
   done = false;
-  private released = false;
+  private releaseEnd = Infinity;
   private readonly baseDetune: number;
   private readonly startedAt: number;
   private readonly level: GainNode;
@@ -219,11 +219,13 @@ class VoiceImpl implements Voice {
   }
 
   stop(release?: number, when?: number): void {
-    if (this.released || this.done) return;
-    this.released = true;
+    if (this.done) return;
     const ctx = this.env.context as AudioContext;
     const t = Math.max(when ?? ctx.currentTime, this.startedAt + 0.005);
     const rel = Math.max(this.def.minRelease, Math.min(this.def.maxRing, release ?? this.def.minRelease));
+    // A later stop may only shorten the fade (re-striking a ringing key), never stretch it.
+    if (t + rel >= this.releaseEnd) return;
+    this.releaseEnd = t + rel;
     const g = this.env.gain;
     if (typeof g.cancelAndHoldAtTime === "function") {
       g.cancelAndHoldAtTime(t);

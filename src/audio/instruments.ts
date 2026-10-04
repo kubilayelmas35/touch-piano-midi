@@ -37,7 +37,7 @@ export const INSTRUMENTS: Record<InstrumentId, InstrumentDef> = {
     notes: range(21, 108, 3),
     gain: 1.15,
     attack: 0.003,
-    minRelease: 0.18,
+    minRelease: 0.5,
     sustained: false,
     maxRing: 10,
     velocityTone: true,

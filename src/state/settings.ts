@@ -81,6 +81,8 @@ export interface Settings {
   rotateHint: boolean;
   /** App: keep the screen in landscape. */
   landscapeLock: boolean;
+  /** Piano: let go keys keep ringing softly, as with the sustain pedal. */
+  pianoPedal: boolean;
   onboarded: boolean;
 }
 
@@ -137,6 +139,7 @@ export function defaultSettings(): Settings {
     dailyGoalMin: 10,
     rotateHint: true,
     landscapeLock: false,
+    pianoPedal: true,
     onboarded: false,
   };
 }
@@ -209,6 +212,7 @@ function sanitize(s: Settings): Settings {
     dailyGoalMin: Math.round(num(s.dailyGoalMin, 5, 60, d.dailyGoalMin)),
     rotateHint: s.rotateHint !== false,
     landscapeLock: s.landscapeLock === true,
+    pianoPedal: s.pianoPedal !== false,
   };
 }
 

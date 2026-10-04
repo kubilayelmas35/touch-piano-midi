@@ -75,6 +75,13 @@ export const IconWait = (p: IconProps) => (
     <path d="M7 22v-4a5 5 0 0 1 10 0v4" />
   </Svg>
 );
+export const IconPedal = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 3v9" />
+    <rect x="4" y="12" width="16" height="5" rx="2.5" />
+    <path d="M8 21h8" />
+  </Svg>
+);
 export const IconHeadphones = (p: IconProps) => (
   <Svg {...p}>
     <path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3" />

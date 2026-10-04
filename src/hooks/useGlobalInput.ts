@@ -36,6 +36,10 @@ export function useGlobalInput(): void {
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (isEditableTarget(e.target)) return;
+      if (e.code === "ShiftLeft" || e.code === "ShiftRight") {
+        if (!e.repeat) engine.setSustain(true, "shift");
+        return;
+      }
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const st = useApp.getState();
 
@@ -119,11 +123,13 @@ export function useGlobalInput(): void {
     };
 
     const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === "ShiftLeft" || e.code === "ShiftRight") engine.setSustain(false, "shift");
       if (down.has(e.code)) releaseKey(e.code);
     };
 
     const releaseKeys = () => {
       for (const code of [...down.keys()]) releaseKey(code);
+      engine.setSustain(false, "shift");
     };
 
     const onVisibility = () => {

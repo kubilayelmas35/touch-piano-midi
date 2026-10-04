@@ -56,8 +56,12 @@ export const DEFAULT_CONFIG: EngineConfig = {
   timingWindowMs: 150,
   accompVolume: 0.7,
   playerVolume: 1,
+  pianoPedal: false,
   loop: { a: -1, b: -1, enabled: false },
 };
+
+/** Fade of a key let go with the piano pedal mode on (seconds to silence). */
+const PEDAL_TAIL = 3;
 
 export function fretSpecFor(kind: EngineConfig["instrument"]): FrettedSpec | null {
   return kind === "guitar" ? GUITAR : kind === "violin" ? VIOLIN : null;
@@ -128,9 +132,13 @@ export class Engine {
   /** Released strings that keep ringing until re-plucked or muted. */
   private ringing = new Map<string, Voice>();
   private sustain = false;
+  /** What is holding the sustain pedal down (a MIDI pedal, the Shift key). */
+  private sustainBy = new Set<string>();
   private sustained: Voice[] = [];
   /** Voices kept alive by the sustain pedal, by the key that played them. */
   private pedaled = new Map<string, Voice>();
+  /** Piano notes fading out under pedal mode, by pitch, so striking the key again damps the old one. */
+  private tails = new Map<number, Voice>();
   /** Loudness set through setLevel (string energy / bow pressure). */
   private levels = new Map<string, number>();
   /** Long notes that were hit and are still running. */
@@ -747,7 +755,10 @@ export class Engine {
     const prev = this.voices.get(sourceKey);
     if (prev) prev.stop();
     this.mute(sourceKey, 0.04);
+    this.pedaled.get(sourceKey)?.stop();
     this.pedaled.delete(sourceKey);
+    this.tails.get(midi)?.stop();
+    this.tails.delete(midi);
     this.levels.delete(sourceKey);
     const voice = playNote(this.instrumentId, midi, velocity, { volume: this.config.playerVolume });
     if (voice) this.voices.set(sourceKey, voice);
@@ -764,7 +775,8 @@ export class Engine {
 
   /** Lets go of a note; with `ring` the voice decays naturally (a plucked string) instead of stopping. */
   release(sourceKey: string, ring = false): void {
-    if (this.held.delete(sourceKey)) this.onInput?.({ type: "off", key: sourceKey, ring });
+    const tail = !ring && !this.sustain && this.config.pianoPedal && this.instrumentId === "piano";
+    if (this.held.delete(sourceKey)) this.onInput?.({ type: "off", key: sourceKey, ring: ring || tail });
     const v = this.voices.get(sourceKey);
     if (!v) return;
     this.voices.delete(sourceKey);
@@ -774,6 +786,11 @@ export class Engine {
     } else if (this.sustain) {
       this.sustained.push(v);
       this.pedaled.set(sourceKey, v);
+      this.levels.delete(sourceKey);
+    } else if (tail) {
+      v.stop(PEDAL_TAIL);
+      this.tails.get(v.midi)?.stop();
+      this.tails.set(v.midi, v);
       this.levels.delete(sourceKey);
     } else {
       v.stop();
@@ -819,11 +836,16 @@ export class Engine {
     (this.voices.get(sourceKey) ?? this.ringing.get(sourceKey))?.bend(cents);
   }
 
-  setSustain(on: boolean): void {
+  /** Sustain pedal from one source; the pedal is down while any source holds it. */
+  setSustain(down: boolean, source = "pedal"): void {
+    if (down) this.sustainBy.add(source);
+    else this.sustainBy.delete(source);
+    const on = this.sustainBy.size > 0;
     if (this.sustain !== on) this.onInput?.({ type: "sustain", on });
     this.sustain = on;
     if (!on) {
-      for (const v of this.sustained) v.stop(0.35);
+      const fade = this.config.pianoPedal && this.instrumentId === "piano" ? PEDAL_TAIL : 0.35;
+      for (const v of this.sustained) v.stop(fade);
       this.sustained = [];
       this.pedaled.clear();
     }
