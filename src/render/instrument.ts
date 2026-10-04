@@ -100,6 +100,10 @@ export interface KeyboardView {
   naming: NoteNaming;
   showAllNames: boolean;
   keyLabels: Map<number, string> | null;
+  /** Fretless piano with the keys hidden: one white surface. */
+  bare?: boolean;
+  /** x of each finger on the surface (bare mode). */
+  fingers?: number[];
 }
 
 export class KeyboardRenderer extends CanvasSurface {
@@ -112,6 +116,10 @@ export class KeyboardRenderer extends CanvasSurface {
     ctx.clearRect(0, 0, w, h);
     ctx.fillStyle = "#05060f";
     ctx.fillRect(0, 0, w, h);
+    if (view.bare) {
+      this.drawBare(view, marks);
+      return;
+    }
 
     const blackH = h * BLACK_KEY_RATIO;
     const now = performance.now();
@@ -211,12 +219,66 @@ export class KeyboardRenderer extends CanvasSurface {
       }
     }
 
-    // Top shadow to separate from the highway.
-    const shade = ctx.createLinearGradient(0, 0, 0, 10);
+    this.topShade();
+  }
+
+  private drawBare(view: KeyboardView, marks: Marks): void {
+    const { ctx, w, h } = this;
+    const L = view.layout;
+    const first = L.lane(L.keys[0])!;
+    const last = L.lane(L.keys[L.keys.length - 1])!;
+    const x0 = Math.max(0, first.x) + 0.5;
+    const x1 = Math.min(w, last.x + last.w) - 0.5;
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, "#f4f6ff");
+    grad.addColorStop(0.85, "#e3e7f7");
+    grad.addColorStop(1, "#c9cee4");
+    ctx.fillStyle = grad;
+    roundRect(ctx, x0, -6, x1 - x0, h + 5, 6);
+    ctx.fill();
+
+    const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 160);
+    const bw = Math.max(6, L.whiteW * 0.7);
+    const fingers = view.fingers ?? [];
+    for (const m of L.keys) {
+      const lane = L.lane(m)!;
+      const c = lane.x + lane.w / 2;
+      if (c + bw < 0 || c - bw > w) continue;
+      const sound = marks.sounding.get(m);
+      const target = marks.target.get(m);
+      const pressed = marks.pressed.has(m) && fingers.length === 0;
+      const col = sound ?? (pressed ? "#a78bfa" : target);
+      if (!col) continue;
+      const a = sound || pressed ? 0.75 : 0.25 + 0.3 * pulse;
+      const band = ctx.createLinearGradient(0, 0, 0, h);
+      band.addColorStop(0, withAlpha(col, a * 0.35));
+      band.addColorStop(1, withAlpha(col, a));
+      ctx.fillStyle = band;
+      roundRect(ctx, c - bw / 2, 0, bw, h - 4, Math.min(6, bw * 0.3));
+      ctx.fill();
+    }
+
+    for (const fx of fingers) {
+      const r = Math.max(14, Math.min(34, h * 0.22));
+      const glow = ctx.createRadialGradient(fx, h * 0.6, 0, fx, h * 0.6, r * 1.8);
+      glow.addColorStop(0, "rgba(139,92,246,0.85)");
+      glow.addColorStop(0.45, "rgba(139,92,246,0.35)");
+      glow.addColorStop(1, "rgba(139,92,246,0)");
+      ctx.fillStyle = glow;
+      ctx.fillRect(fx - r * 2, 0, r * 4, h);
+      ctx.fillStyle = "rgba(139,92,246,0.9)";
+      ctx.fillRect(fx - 1, 0, 2, h - 4);
+    }
+    this.topShade();
+  }
+
+  /** Top shadow to separate from the highway. */
+  private topShade(): void {
+    const shade = this.ctx.createLinearGradient(0, 0, 0, 10);
     shade.addColorStop(0, "rgba(0,0,0,0.55)");
     shade.addColorStop(1, "rgba(0,0,0,0)");
-    ctx.fillStyle = shade;
-    ctx.fillRect(0, 0, w, 10);
+    this.ctx.fillStyle = shade;
+    this.ctx.fillRect(0, 0, this.w, 10);
   }
 }
 

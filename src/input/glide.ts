@@ -29,7 +29,9 @@ class GlideController {
   /** The finger landed at `pitch`; with snap it starts in tune. */
   start(key: string, pitch: number, place?: Glide["place"]): void {
     const shown = this.snap ? Math.round(pitch) : pitch;
-    this.items.set(key, { target: pitch, shown, movedAt: performance.now(), sent: NaN, sentSettled: false, place });
+    // With snap a fresh press counts as resting, so it sounds in tune instead of scooping up to the note.
+    const movedAt = performance.now() - (this.snap ? REST_MS + 1 : 0);
+    this.items.set(key, { target: pitch, shown, movedAt, sent: NaN, sentSettled: false, place });
   }
 
   move(key: string, pitch: number): void {

@@ -160,7 +160,7 @@ export function GameView() {
       labels.miss = t("miss");
       labels.early = t("early");
       labels.late = t("late");
-      const fretless = s.instrument === "violin" ? s.glideViolin : s.instrument === "guitar" && s.glideGuitar;
+      const fretless = v.layout.piano ? s.glidePiano : s.instrument === "violin" ? s.glideViolin : s.instrument === "guitar" && s.glideGuitar;
       const hideFrets = fretless && s.hideFrets;
       r.hw.resize(v.w, v.hwH);
       r.hw.draw({
@@ -196,6 +196,8 @@ export function GameView() {
           naming: s.noteNaming,
           showAllNames: false,
           keyLabels: s.showKeyLabels ? pianoLabels.map : null,
+          bare: hideFrets,
+          fingers: hideFrets ? [...pointers.current.values()].filter((p) => p.zone === "keys").map((p) => p.lastX) : undefined,
         });
       } else if (v.layout.fret) {
         fretted.autoFret = s.autoFret;
@@ -262,11 +264,14 @@ export function GameView() {
     const y = e.clientY - rect.top;
     const key = `ptr:${e.pointerId}`;
     if (v.layout.piano) {
-      const midi = v.layout.piano.hit(x, y, v.instH * BLACK_KEY_RATIO);
+      const L = v.layout.piano;
+      const s = useApp.getState().settings;
+      const bare = s.glidePiano && s.hideFrets;
+      const midi = bare && !L.compact ? Math.round(L.pitchAt(x)) : L.hit(x, y, v.instH * BLACK_KEY_RATIO);
       if (midi == null) return;
       const vel = e.pressure && e.pressure !== 0.5 ? e.pressure : 0.55 + 0.4 * Math.min(1, y / v.instH);
       engine.press(key, midi, vel);
-      if (useApp.getState().settings.glidePiano) glider.start(key, midi);
+      if (s.glidePiano) glider.start(key, bare && !L.compact ? L.pitchAt(x) : midi);
       pointers.current.set(e.pointerId, { key, midi, x0: x, y0: y, string: -1, fret: -1, zone: "keys", lastX: x, lastY: y, lastT: e.timeStamp });
     } else if (v.layout.fret && renderers.current) {
       const L = v.layout.fret;
@@ -293,9 +298,12 @@ export function GameView() {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     if (v.layout.piano) {
+      p.lastX = x;
       if (glider.has(p.key)) {
         const L = v.layout.piano;
-        glider.move(p.key, p.midi + L.pitchAt(x) - L.pitchAt(p.x0));
+        const s = useApp.getState().settings;
+        const bare = s.hideFrets && !L.compact;
+        glider.move(p.key, bare ? L.pitchAt(x) : p.midi + L.pitchAt(x) - L.pitchAt(p.x0));
         return;
       }
       const midi = v.layout.piano.hit(x, y, v.instH * BLACK_KEY_RATIO);

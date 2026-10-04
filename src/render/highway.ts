@@ -202,7 +202,7 @@ export class Highway {
       paintBackdrop(g, this.w, this.h, view.background);
       this.backdrop = g.canvas;
     }
-    const key = `${size}|${view.piano ? `p${view.piano.sig}` : ""}|${
+    const key = `${size}|${view.piano ? `p${view.piano.sig}:${view.hideFrets ? 1 : 0}` : ""}|${
       view.fret ? `f${view.fret.columns}:${view.fret.pluckW}:${view.fret.spec.tuning.length}:${view.naming}:${view.hideFrets ? 1 : 0}` : ""
     }`;
     if (key === this.lanesKey && this.lanes) return;
@@ -211,7 +211,7 @@ export class Highway {
 
     if (view.piano) {
       const p = view.piano;
-      for (const m of p.keys) {
+      for (const m of view.hideFrets ? [] : p.keys) {
         const lane = p.lane(m)!;
         if (lane.black) {
           g.fillStyle = COLORS.laneBlack;

@@ -42,6 +42,13 @@ describe("glide", () => {
     expect(calls.at(-1)?.settled).toBe(true);
   });
 
+  it("with snap, a press between notes sounds in tune right away", () => {
+    glider.snap = true;
+    glider.start("k", 60.4);
+    run(16);
+    expect(calls).toEqual([{ key: "k", pitch: 60, settled: true }]);
+  });
+
   it("free tuning keeps the exact pitch", () => {
     glider.snap = false;
     glider.start("k", 60.3);
