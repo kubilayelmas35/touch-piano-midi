@@ -15,7 +15,7 @@ const strKey = (s: number) => `str:${s}`;
  */
 class FrettedController {
   /** Fingers on the neck: the string under the fingertip, the strings it frets and the strings it has touched. */
-  private neck = new Map<Source, { string: number; fret: number; strings: Set<number>; touched: Set<number> }>();
+  private neck = new Map<Source, { string: number; fret: number; strings: Set<number>; touched: Set<number>; pos?: number }>();
   /** Fret keys held on the computer keyboard; they fret every string (like a barre). */
   private kbFrets = new Map<string, number>();
   /** Strings each source is currently striking. */
@@ -60,7 +60,7 @@ class FrettedController {
     return Math.max(0, f);
   }
 
-  /** Frets held by fingers (for drawing finger dots); auto-fret positions included. */
+  /** Frets held by fingers (for drawing finger dots); auto-fret positions included, fretless fingers exact. */
   heldFrets(): Map<number, number> {
     const out = new Map<number, number>();
     const spec = this.spec;
@@ -68,6 +68,12 @@ class FrettedController {
     for (let s = 0; s < spec.tuning.length; s++) {
       const f = this.fretOf(s);
       if (f > 0) out.set(s, f);
+    }
+    if (this.glide) {
+      for (const p of this.neck.values()) {
+        if (p.pos === undefined) continue;
+        for (const s of p.strings) if (out.get(s) === p.fret) out.set(s, p.pos);
+      }
     }
     return out;
   }
@@ -304,6 +310,7 @@ class FrettedController {
     const p = this.neck.get(source);
     const spec = this.spec;
     if (!p || !spec) return;
+    p.pos = pos;
     for (const s of p.strings) {
       const key = strKey(s);
       if (this.fretOf(s) !== p.fret) {

@@ -23,6 +23,8 @@ export interface HighwayView {
   fallSeconds: number;
   piano: PianoLayout | null;
   fret: FretLayout | null;
+  /** Fretless: no fret column lines or inlay lanes. */
+  hideFrets?: boolean;
   naming: NoteNaming;
   showNames: boolean;
   effects: boolean;
@@ -201,7 +203,7 @@ export class Highway {
       this.backdrop = g.canvas;
     }
     const key = `${size}|${view.piano ? `p${view.piano.sig}` : ""}|${
-      view.fret ? `f${view.fret.columns}:${view.fret.pluckW}:${view.fret.spec.tuning.length}:${view.naming}` : ""
+      view.fret ? `f${view.fret.columns}:${view.fret.pluckW}:${view.fret.spec.tuning.length}:${view.naming}:${view.hideFrets ? 1 : 0}` : ""
     }`;
     if (key === this.lanesKey && this.lanes) return;
     this.lanesKey = key;
@@ -226,10 +228,11 @@ export class Highway {
     } else if (view.fret) {
       const f = view.fret;
       for (let i = 0; i <= f.columns; i++) {
+        if (view.hideFrets && i > 1 && i < f.columns) continue;
         g.fillStyle = i === 1 ? "rgba(255,255,255,0.16)" : COLORS.laneLine;
         g.fillRect(Math.round(i * f.colW), 0, i === 1 ? 2 : 1, this.h);
       }
-      for (const fret of [3, 5, 7, 9, 12, 15]) {
+      for (const fret of view.hideFrets ? [] : [3, 5, 7, 9, 12, 15]) {
         if (fret >= f.columns) continue;
         g.fillStyle = COLORS.lane;
         g.fillRect(fret * f.colW, 0, f.colW, this.h);

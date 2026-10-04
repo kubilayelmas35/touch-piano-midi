@@ -152,6 +152,13 @@ export function SettingsDialog() {
   const midiAccess = useApp((st) => st.midiAccess);
   const fs = useFullscreen();
   const [tab, setTab] = useState<Tab>("general");
+  const [askHideFrets, setAskHideFrets] = useState(false);
+  /** Turning fretless guitar / violin on asks whether the fret wires should go too. */
+  const setFretless = (patch: { glideGuitar: boolean } | { glideViolin: boolean }) => {
+    updateSettings(patch);
+    const next = { ...s, ...patch };
+    setAskHideFrets(Object.values(patch)[0] && !s.hideFrets ? true : askHideFrets && (next.glideGuitar || next.glideViolin));
+  };
   const close = () => setPanel(null);
   const choice = { solid: s.solidColor, from: s.gradFrom, to: s.gradTo };
 
@@ -445,8 +452,32 @@ export function SettingsDialog() {
           <Section title={t("glideSection")}>
             <p className="text-xs leading-relaxed text-mist-400">{t("glideIntro")}</p>
             <Switch label={t("glidePiano")} hint={t("glidePianoHint")} checked={s.glidePiano} onChange={(v) => updateSettings({ glidePiano: v })} />
-            <Switch label={t("glideGuitar")} checked={s.glideGuitar} onChange={(v) => updateSettings({ glideGuitar: v })} />
-            <Switch label={t("glideViolin")} checked={s.glideViolin} onChange={(v) => updateSettings({ glideViolin: v })} />
+            <Switch label={t("glideGuitar")} checked={s.glideGuitar} onChange={(v) => setFretless({ glideGuitar: v })} />
+            <Switch label={t("glideViolin")} checked={s.glideViolin} onChange={(v) => setFretless({ glideViolin: v })} />
+            {askHideFrets && (
+              <div className="my-1 rounded-xl border border-brand-400/30 bg-brand-500/10 p-3" role="alertdialog" aria-label={t("hideFretsAsk")}>
+                <div className="text-sm font-semibold">{t("hideFretsAsk")}</div>
+                <div className="mt-0.5 text-xs text-mist-400">{t("hideFretsAskHint")}</div>
+                <div className="mt-2.5 flex justify-end gap-2">
+                  <Button size="sm" variant="ghost" onClick={() => setAskHideFrets(false)}>
+                    {t("hideFretsKeep")}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    onClick={() => {
+                      updateSettings({ hideFrets: true });
+                      setAskHideFrets(false);
+                    }}
+                  >
+                    {t("hideFretsYes")}
+                  </Button>
+                </div>
+              </div>
+            )}
+            {(s.glideGuitar || s.glideViolin) && !askHideFrets && (
+              <Switch label={t("hideFrets")} hint={t("hideFretsHint")} checked={s.hideFrets} onChange={(v) => updateSettings({ hideFrets: v })} />
+            )}
             {(s.glidePiano || s.glideGuitar || s.glideViolin) && (
               <Row label={t("glideTuning")} hint={s.glideSnap ? t("glideSnapHint") : t("glideFreeHint")}>
                 <Segmented

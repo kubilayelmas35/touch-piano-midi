@@ -89,6 +89,8 @@ export interface Settings {
   glideViolin: boolean;
   /** Fretless: a resting finger settles on the nearest note (false = pitch stays exactly where the finger is). */
   glideSnap: boolean;
+  /** Fretless guitar / violin: hide the fret wires, numbers and inlays. */
+  hideFrets: boolean;
   onboarded: boolean;
 }
 
@@ -150,6 +152,7 @@ export function defaultSettings(): Settings {
     glideGuitar: false,
     glideViolin: false,
     glideSnap: true,
+    hideFrets: false,
     onboarded: false,
   };
 }
@@ -227,6 +230,7 @@ function sanitize(s: Settings): Settings {
     glideGuitar: s.glideGuitar === true,
     glideViolin: s.glideViolin === true,
     glideSnap: s.glideSnap !== false,
+    hideFrets: s.hideFrets === true,
   };
 }
 

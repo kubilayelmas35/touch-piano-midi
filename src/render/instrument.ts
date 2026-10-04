@@ -234,6 +234,8 @@ export interface FretboardView {
   energyOf: (string: number) => number;
   /** Computer-keyboard labels per string and per fret (from fret 1), when string mode is on. */
   keyLabels: { strings: string[]; frets: string[] } | null;
+  /** Fretless: no fret wires, numbers or inlays (the nut stays). */
+  hideFrets?: boolean;
 }
 
 export class FretboardRenderer extends CanvasSurface {
@@ -310,7 +312,8 @@ export class FretboardRenderer extends CanvasSurface {
     ctx.fillRect(0, 0, L.colW, h);
 
     // Inlays / position markers.
-    const inlays = view.violin ? [2, 4, 5, 7, 9, 12] : [3, 5, 7, 9, 15];
+    const bare = !!view.hideFrets;
+    const inlays = bare ? [] : view.violin ? [2, 4, 5, 7, 9, 12] : [3, 5, 7, 9, 15];
     for (const f of inlays) {
       if (f >= L.columns) continue;
       const cx = f * L.colW + L.colW / 2;
@@ -322,7 +325,7 @@ export class FretboardRenderer extends CanvasSurface {
         ctx.fill();
       }
     }
-    if (!view.violin && 12 < L.columns) {
+    if (!bare && !view.violin && 12 < L.columns) {
       const cx = 12 * L.colW + L.colW / 2;
       ctx.fillStyle = "rgba(235,225,205,0.22)";
       for (const y of [h * 0.3, h * 0.7]) {
@@ -338,6 +341,8 @@ export class FretboardRenderer extends CanvasSurface {
       if (f === 1) {
         ctx.fillStyle = "#e8e0cc";
         ctx.fillRect(x - 2, 0, 4, h);
+      } else if (bare) {
+        continue;
       } else if (!view.violin) {
         ctx.fillStyle = "rgba(200,200,215,0.55)";
         ctx.fillRect(x - 1, 0, 2, h);
@@ -349,7 +354,7 @@ export class FretboardRenderer extends CanvasSurface {
 
     // Fret numbers, plus the fret key when it differs from the number.
     ctx.textBaseline = "top";
-    for (let f = 1; f < L.columns; f++) {
+    for (let f = 1; f < (bare ? 0 : L.columns); f++) {
       if (L.colW < 22 && f % 2 === 0 && f !== 12) continue;
       const cx = f * L.colW + L.colW / 2;
       ctx.font = "600 9px system-ui, sans-serif";
@@ -515,7 +520,7 @@ export class FretboardRenderer extends CanvasSurface {
       drawDot(s, f, withAlpha(c, 0.55), "rgba(255,255,255,0.9)", false, String(f));
       ctx.globalAlpha = 1;
     }
-    for (const [s, f] of view.fingers) drawDot(s, f, withAlpha(colors[s], 0.92), "rgba(255,255,255,0.85)", false, String(f));
+    for (const [s, f] of view.fingers) drawDot(s, f, withAlpha(colors[s], 0.92), "rgba(255,255,255,0.85)", false, String(Math.round(f)));
     for (const [pos, c] of marks.soundingPos) {
       const [s, f] = pos.split(":").map(Number);
       drawDot(s, f, c, null, true, String(f));

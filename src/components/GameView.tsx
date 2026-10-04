@@ -160,12 +160,15 @@ export function GameView() {
       labels.miss = t("miss");
       labels.early = t("early");
       labels.late = t("late");
+      const fretless = s.instrument === "violin" ? s.glideViolin : s.instrument === "guitar" && s.glideGuitar;
+      const hideFrets = fretless && s.hideFrets;
       r.hw.resize(v.w, v.hwH);
       r.hw.draw({
         t: time,
         fallSeconds: s.fallSeconds,
         piano: v.layout.piano,
         fret: v.layout.fret,
+        hideFrets,
         naming: s.noteNaming,
         showNames: s.showNoteNames,
         effects: s.effects,
@@ -199,7 +202,7 @@ export function GameView() {
         fretted.tapToPlay = s.tapToPlay;
         fretted.multiNote = s.multiNote;
         fretted.columnPress = s.columnPress;
-        fretted.glide = s.instrument === "violin" ? s.glideViolin : s.glideGuitar;
+        fretted.glide = fretless;
         fretted.tick(now);
         const km = s.instrument === "violin" ? s.keymaps.violin : s.keymaps.guitar;
         if (!fretLabels || fretLabels.src !== km || fretLabels.rev !== rev) {
@@ -216,6 +219,7 @@ export function GameView() {
           isStruck: (str) => fretted.isStruck(str),
           energyOf: (str) => fretted.energyOf(str),
           keyLabels: s.showKeyLabels && s.fretKeyMode === "strings" ? fretLabels : null,
+          hideFrets,
         });
       }
       glider.snap = s.glideSnap;
