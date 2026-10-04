@@ -3,10 +3,21 @@ import type { FretLayout, PianoLayout } from "../engine/layout";
 import { NoteState, type PlayNote } from "../engine/types";
 import { HAND_SPLIT } from "../midi/song";
 import { isBlack, noteName, type NoteNaming } from "../lib/notes";
-import type { ApproachStyle, Background, EffectStyle, NoteStyle } from "./appearance";
+import type { ApproachStyle, Background, DustStyle, EffectStyle, NoteColor, NoteStyle } from "./appearance";
 import { BackdropAnimator, paintBackdrop } from "./backgrounds";
 import { drawNote, labelHeight, lightInk } from "./noteStyles";
-import { COLORS, GUITAR_STRING_COLORS, JUDGEMENT_COLORS, TRACK_COLORS, VIOLIN_STRING_COLORS, glowSprite, withAlpha } from "./theme";
+import {
+  COLORS,
+  GUITAR_STRING_COLORS,
+  JUDGEMENT_COLORS,
+  TRACK_COLORS,
+  VIOLIN_STRING_COLORS,
+  glowSprite,
+  hslHex,
+  mixHex,
+  softSprite,
+  withAlpha,
+} from "./theme";
 
 export interface HighwayView {
   t: number;
@@ -19,9 +30,12 @@ export interface HighwayView {
   /** 0.1–1 intensity of particles and glows. */
   effectLevel: number;
   effectStyle: EffectStyle;
-  dustTrail: boolean;
+  dust: DustStyle;
+  /** 0.1–1 density of the dust cloud. */
+  dustLevel: number;
   approach: ApproachStyle;
   noteStyle: NoteStyle;
+  noteColor: NoteColor;
   background: Background;
   labels: Record<string, string>;
 }
@@ -34,14 +48,18 @@ type ParticleKind =
   | "ring"
   | "mote"
   | "haze"
+  | "puff"
+  | "ember"
+  | "twinkle"
+  | "glyph"
   | "confetti"
   | "bubble"
   | "bolt"
   | "petal"
   | "pixel";
 
-/** Drawn behind the notes: the dust that lingers after hits. */
-const BACK_KINDS: ReadonlySet<ParticleKind> = new Set<ParticleKind>(["mote", "haze"]);
+/** Drawn behind the notes: the dust clouds that linger after hits. */
+const BACK_KINDS: ReadonlySet<ParticleKind> = new Set<ParticleKind>(["mote", "haze", "puff", "ember", "twinkle"]);
 /** Opaque-looking kinds that would wash out with additive blending. */
 const SOLID_KINDS: ReadonlySet<ParticleKind> = new Set<ParticleKind>(["confetti", "petal", "pixel"]);
 
@@ -64,11 +82,18 @@ interface Particle {
   drag?: number;
   /** Random sideways drift per second. */
   wander?: number;
+  /** Height/width of a puff (fog is wide and flat). */
+  squash?: number;
+  /** Peak opacity for clouds. */
+  peak?: number;
+  text?: string;
 }
 
 interface SprayLane {
   x: number;
   w: number;
+  /** Top of the held note on screen. */
+  top: number;
   color: string;
 }
 
@@ -82,7 +107,7 @@ interface Popup {
   born: number;
 }
 
-const MAX_PARTICLES = 900;
+const MAX_PARTICLES = 1200;
 /** Particles per second thrown off a held note at full effect level. */
 const SPRAY_RATE = 70;
 /** How much of SPRAY_RATE each style uses while a note is held. */
@@ -91,7 +116,7 @@ const SPRAY_SHARE: Record<EffectStyle, number> = {
   stars: 0.4,
   fire: 1,
   glow: 0,
-  dust: 0.6,
+  notes: 0.15,
   confetti: 0.3,
   bubbles: 0.3,
   lightning: 0.12,
@@ -101,6 +126,9 @@ const SPRAY_SHARE: Record<EffectStyle, number> = {
 const FIRE = ["#fff7c2", "#fde047", "#fb923c", "#ef4444"];
 const CONFETTI = ["#f472b6", "#facc15", "#38d6ff", "#4ade80", "#a78bfa", "#fb923c"];
 const PETALS = ["#fbcfe8", "#f9a8d4", "#fda4af", "#ffffff"];
+const NEBULA = ["#ec4899", "#3b82f6", "#a855f7", "#22d3ee"];
+const EMBERS = ["#fde68a", "#fb923c", "#f97316"];
+const NOTE_GLYPHS = ["♪", "♫", "♩", "♬"];
 
 export class Highway {
   private readonly ctx: CanvasRenderingContext2D;
@@ -118,6 +146,7 @@ export class Highway {
   private popups: Popup[] = [];
   private lastFxAt = 0;
   private lastFrame = 0;
+  private palette: NoteColor = "auto";
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -229,7 +258,8 @@ export class Highway {
     return { x: f.pluckX + n.string * sw + pad, w: sw - pad * 2 };
   }
 
-  private noteColor(n: PlayNote): string {
+  /** Hand/track or string colour, before the colour palette is applied. */
+  private baseColor(n: PlayNote): string {
     const e = this.engine;
     if (n.string >= 0) {
       const colors = e.config.instrument === "violin" ? VIOLIN_STRING_COLORS : GUITAR_STRING_COLORS;
@@ -239,6 +269,27 @@ export class Highway {
     const idx = tracks.length > 1 ? Math.max(0, tracks.indexOf(n.track)) : n.midi >= HAND_SPLIT ? 0 : 1;
     const pair = TRACK_COLORS[idx % TRACK_COLORS.length];
     return isBlack(n.midi) ? pair[1] : pair[0];
+  }
+
+  /** Note colour in the chosen palette; gradient palettes depend on the height `y` (default: at the hit line). */
+  private noteColor(n: PlayNote, y = this.h): string {
+    const k = Math.max(0, Math.min(1, y / Math.max(1, this.h)));
+    switch (this.palette) {
+      case "violet":
+        return isBlack(n.midi) ? "#7c3aed" : "#8b5cf6";
+      case "rainbow":
+        return hslHex((n.midi % 12) * 30, 0.85, 0.62);
+      case "gradient":
+        return mixHex("#38d6ff", "#e879f9", k);
+      case "sunset":
+        return mixHex("#facc15", "#f43f5e", k);
+      case "ice":
+        return mixHex(this.baseColor(n), "#e0f2fe", 0.6);
+      case "pastel":
+        return mixHex(this.baseColor(n), "#ffffff", 0.42);
+      default:
+        return this.baseColor(n);
+    }
   }
 
   /**
@@ -301,6 +352,7 @@ export class Highway {
     const dt = this.lastFrame ? Math.min(0.05, (now - this.lastFrame) / 1000) : 0.016;
     this.lastFrame = now;
     this.ensureBackground(view);
+    this.palette = view.noteColor;
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.drawImage(this.backdrop!, 0, 0);
@@ -389,7 +441,7 @@ export class Highway {
       const height = yBottom - yTop;
       if (height <= 0 || yTop > hitY || yBottom < -4) continue;
 
-      const color = this.noteColor(n);
+      const color = this.noteColor(n, yBottom);
       let alpha = 1;
       let fill = color;
       if (missed) {
@@ -420,13 +472,13 @@ export class Highway {
         glow,
       };
       drawNote(ctx, view.noteStyle, draw);
-      if (holdingNow) holdingLanes.push({ x: lane.x, w: lane.w, color: fill });
+      if (holdingNow) holdingLanes.push({ x: lane.x, w: lane.w, top: Math.max(0, yTop), color: fill });
 
       // Matching marker in the string lane above the strike zone, in the same style.
       const sl = this.stringLaneOf(n, view);
       if (sl) {
         drawNote(ctx, view.noteStyle, { ...draw, lane: sl, alpha: alpha * (brokenHold ? 0.6 : 1), target: false });
-        if (holdingNow) holdingLanes.push({ x: sl.x, w: sl.w, color: fill });
+        if (holdingNow) holdingLanes.push({ x: sl.x, w: sl.w, top: Math.max(0, yTop), color: fill });
       }
 
       // Label on the head.
@@ -461,7 +513,8 @@ export class Highway {
     ctx.fillRect(0, hitY - 1, this.w, 3);
 
     this.drawApproach(approaching, view.approach, hitY, now, dt, false);
-    if (level > 0) this.spray(holdingLanes, hitY, dt, now, view.effectStyle, level, view.dustTrail);
+    if (level > 0) this.spray(holdingLanes, hitY, dt, now, view.effectStyle, level);
+    if (view.dust !== "off") this.dustHold(holdingLanes, hitY, dt, view.dust, view.dustLevel);
     this.consumeFx(view, hitY, level);
     this.drawParticles(now, false);
     this.drawPopups(now, hitY);
@@ -485,7 +538,7 @@ export class Highway {
       if (ahead > span) break;
       const p = Math.max(0, Math.min(1, 1 - ahead / span));
       const y = Math.min(hitY, yOf(n.time));
-      const color = this.noteColor(n);
+      const color = this.noteColor(n, y);
       const lane = this.laneOf(n, view);
       if (lane) out.push({ lane, y, p, color });
       const sl = this.stringLaneOf(n, view);
@@ -618,36 +671,57 @@ export class Highway {
     if (this.particles.length < MAX_PARTICLES) this.particles.push({ ...p, life: 0 });
   }
 
-  /** Lingering dust and a soft haze rising behind the notes from a lane. */
-  private dust(lane: { x: number; w: number }, color: string, hitY: number, count: number, haze: boolean): void {
+  /**
+   * About `n` pieces of a dust cloud rising behind the notes from a lane, spread between the hit
+   * line `y0` and `y1` above it (held notes fill their whole column).
+   */
+  private cloud(lane: { x: number; w: number }, color: string, y0: number, y1: number, n: number, style: DustStyle): void {
     const r = Math.random;
+    const count = Math.floor(n) + (r() < n % 1 ? 1 : 0);
+    const yAt = () => y0 - 4 - r() * Math.max(12, y0 - y1);
+    const cx = lane.x + lane.w / 2;
+    const light = mixHex(color, "#ffffff", 0.45);
     for (let i = 0; i < count; i++) {
-      const a = -Math.PI / 2 + (r() - 0.5) * 1.8;
-      const sp = 40 + r() * 140;
-      this.emit({
-        kind: "mote",
-        x: lane.x + r() * lane.w,
-        y: hitY - 4 - r() * 16,
-        vx: Math.cos(a) * sp,
-        vy: Math.sin(a) * sp,
-        g: -6,
-        drag: 1.6,
-        wander: 50,
-        max: 1.6 + r() * 2.2,
-        size: 1.2 + r() * 2.2,
-        color: r() < 0.3 ? "#ffffff" : color,
-      });
+      if (style === "sparkle") {
+        const a = -Math.PI / 2 + (r() - 0.5) * 1.8;
+        const sp = 40 + r() * 140;
+        this.emit({ kind: "mote", x: lane.x + r() * lane.w, y: yAt(), vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, g: -6, drag: 1.6, wander: 50, max: 1.6 + r() * 2.2, size: 1.2 + r() * 2.2, color: r() < 0.3 ? "#ffffff" : color });
+        if (r() < 0.12) this.emit({ kind: "haze", x: cx, y: yAt(), vx: (r() - 0.5) * 10, vy: -18 - r() * 14, g: 0, drag: 0.4, max: 1.8 + r() * 0.8, size: Math.max(70, lane.w * 3.5), color });
+      } else if (style === "smoke") {
+        this.emit({ kind: "puff", x: cx + (r() - 0.5) * lane.w * 1.3, y: yAt(), vx: (r() - 0.5) * 16, vy: -(10 + r() * 22), g: -2, drag: 0.3, wander: 18, max: 2.4 + r() * 2, size: Math.max(55, lane.w * (2 + r() * 1.8)), squash: 1.4, peak: 0.34, color });
+        for (let k = 0; k < 3; k++) {
+          this.emit({ kind: "mote", x: cx + (r() - 0.5) * lane.w * 2, y: yAt(), vx: (r() - 0.5) * 14, vy: -(6 + r() * 26), g: -3, drag: 0.6, wander: 30, max: 2 + r() * 2.5, size: 0.8 + r() * 1.2, color: r() < 0.4 ? light : color });
+        }
+      } else if (style === "nebula") {
+        const tint = r() < 0.4 ? color : NEBULA[Math.floor(r() * NEBULA.length)];
+        this.emit({ kind: "puff", x: cx + (r() - 0.5) * lane.w * 2, y: yAt(), vx: (r() - 0.5) * 12, vy: -(5 + r() * 12), g: 0, drag: 0.2, wander: 10, max: 3.2 + r() * 2, size: Math.max(80, lane.w * (2.8 + r() * 2.2)), squash: 1, peak: 0.3, color: tint });
+        if (r() < 0.5) this.emit({ kind: "twinkle", x: cx + (r() - 0.5) * lane.w * 2.4, y: yAt(), vx: 0, vy: -(4 + r() * 10), g: 0, max: 2 + r() * 2, size: 1.5 + r() * 2.5, color: "#ffffff" });
+      } else if (style === "fog") {
+        this.emit({ kind: "puff", x: cx + (r() - 0.5) * lane.w, y: y0 - 6 - r() * 26, vx: (r() - 0.5) * 70, vy: -(2 + r() * 7), g: 0, drag: 0.5, max: 3 + r() * 1.6, size: Math.max(90, lane.w * (3.5 + r() * 2)), squash: 0.32, peak: 0.24, color: mixHex(color, "#c7d2fe", 0.5) });
+      } else if (style === "embers") {
+        this.emit({ kind: "ember", x: lane.x + r() * lane.w, y: y0 - 4 - r() * Math.min(40, y0 - y1 + 12), vx: (r() - 0.5) * 30, vy: -(30 + r() * 60), g: -8, drag: 0.4, wander: 70, max: 1.5 + r() * 1.6, size: 1.4 + r() * 1.8, color: r() < 0.3 ? color : EMBERS[Math.floor(r() * EMBERS.length)] });
+      } else if (style === "stardust") {
+        this.emit({ kind: "twinkle", x: cx + (r() - 0.5) * lane.w * 1.8, y: yAt(), vx: (r() - 0.5) * 16, vy: -(5 + r() * 18), g: 0, drag: 0.3, wander: 8, max: 2 + r() * 1.8, size: 1.6 + r() * 2.8, color: r() < 0.5 ? "#ffffff" : light });
+      }
     }
-    if (haze) {
-      this.emit({ kind: "haze", x: lane.x + lane.w / 2, y: hitY - 20, vx: (r() - 0.5) * 10, vy: -18 - r() * 14, g: 0, drag: 0.4, max: 1.8 + r() * 0.8, size: Math.max(70, lane.w * 3.5), color });
-    }
+  }
+
+  /** Clouds keep gathering around held notes, from the hit line up their column. */
+  private dustHold(lanes: SprayLane[], hitY: number, dt: number, style: DustStyle, level: number): void {
+    const rate: Record<DustStyle, number> = { off: 0, smoke: 7, sparkle: 16, nebula: 3, fog: 3, embers: 18, stardust: 10 };
+    for (const l of lanes) this.cloud(l, l.color, hitY, Math.max(l.top, hitY - 260), rate[style] * level * dt, style);
   }
 
   /** Throws `count` particles of the chosen style off a lane at the hit line. */
   private burst(lane: { x: number; w: number }, color: string, hitY: number, count: number, style: EffectStyle, power = 1): void {
     const r = Math.random;
-    if (style === "dust") {
-      this.dust(lane, color, hitY, count * 2, count > 3);
+    if (style === "notes") {
+      for (let i = 0; i < Math.max(1, Math.round(count / 3)); i++) {
+        const a = 1.1 + r() * 0.9;
+        const sp = (90 + r() * 160) * power;
+        const side = r() < 0.5 ? -1 : 1;
+        this.emit({ kind: "glyph", x: lane.x + r() * lane.w, y: hitY - 6, vx: side * Math.cos(a) * sp, vy: -Math.sin(a) * sp, g: 60, drag: 1.2, wander: 30, max: 1 + r() * 0.8, size: 12 + r() * 10, rot: (r() - 0.5) * 0.6, vr: (r() - 0.5) * 2, text: NOTE_GLYPHS[Math.floor(r() * NOTE_GLYPHS.length)], color: r() < 0.35 ? "#ffffff" : color });
+      }
       return;
     }
     if (style === "lightning") {
@@ -691,7 +765,7 @@ export class Highway {
   }
 
   /** Held notes: a hot bloom where they meet the hit line and a steady stream of particles. */
-  private spray(lanes: SprayLane[], hitY: number, dt: number, now: number, style: EffectStyle, level: number, dustTrail: boolean): void {
+  private spray(lanes: SprayLane[], hitY: number, dt: number, now: number, style: EffectStyle, level: number): void {
     if (!lanes.length) return;
     const { ctx } = this;
     ctx.globalCompositeOperation = "lighter";
@@ -707,10 +781,6 @@ export class Highway {
       ctx.drawImage(glowSprite("#ffffff", 64), cx - ww / 2, hitY - ww * 0.4, ww, ww * 0.8);
       const n = SPRAY_RATE * level * level * SPRAY_SHARE[style] * dt;
       if (n > 0) this.burst(l, l.color, hitY, Math.floor(n) + (Math.random() < n % 1 ? 1 : 0), style, 0.85);
-      if (dustTrail && style !== "dust") {
-        const d = 14 * level * dt;
-        if (Math.random() < d) this.dust(l, l.color, hitY, 1, false);
-      }
     }
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = "source-over";
@@ -737,14 +807,21 @@ export class Highway {
         });
         if (this.popups.length > 8) this.popups.shift();
       }
-      if (level > 0 && fx.judgement !== "miss" && fx.judgement !== "wrong") {
+      if (fx.judgement === "miss" || fx.judgement === "wrong") continue;
+      const scale = fx.judgement === "perfect" ? 1 : fx.judgement === "great" ? 0.7 : 0.45;
+      const lanes = [lane];
+      const sl = this.stringLaneOf(fx, view);
+      if (sl) lanes.push(sl);
+      if (view.dust !== "off") {
+        const burst: Record<DustStyle, number> = { off: 0, smoke: 5, sparkle: 10, nebula: 4, fog: 3, embers: 12, stardust: 10 };
+        const tint = this.fxColor(fx);
+        const reach = view.dust === "smoke" || view.dust === "nebula" ? 90 : 40;
+        for (const l of lanes) this.cloud(l, tint, hitY, hitY - reach, burst[view.dust] * scale * view.dustLevel * 2, view.dust);
+      }
+      if (level > 0) {
         const style = view.effectStyle;
-        const scale = fx.judgement === "perfect" ? 1 : fx.judgement === "great" ? 0.7 : 0.45;
         // Auto-play paints in the note's own colour; the player's hits in the judgement colour.
         const tint = fx.auto ? this.fxColor(fx) : color;
-        const lanes = [lane];
-        const sl = this.stringLaneOf(fx, view);
-        if (sl) lanes.push(sl);
         for (const l of lanes) {
           const lx = l.x + l.w / 2;
           // A ring flash for every style; it is all the "glow" style shows.
@@ -757,7 +834,6 @@ export class Highway {
             this.emit({ kind: "dot", x: lx + (Math.random() - 0.5) * 10, y: hitY - 2, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, g: 260, max: 0.35 + Math.random() * 0.45, size: 6 + Math.random() * 10, color: tint });
           }
           this.burst(l, tint, hitY, Math.round(26 * scale * level), style, 1.15);
-          if (view.dustTrail && style !== "dust") this.dust(l, tint, hitY, Math.round(8 * scale * level), scale >= 0.7);
         }
       }
     }
@@ -848,6 +924,44 @@ export class Highway {
           ctx.globalAlpha = Math.min(1, age * 5) * (1 - age) * 0.3;
           const s = p.size * (0.7 + 0.6 * age);
           ctx.drawImage(glowSprite(p.color, 64), p.x - s / 2, p.y - s * 0.6, s, s * 1.2);
+          break;
+        }
+        case "puff": {
+          const age = p.life / p.max;
+          ctx.globalAlpha = Math.min(1, age * 4) * (1 - age) * (p.peak ?? 0.2);
+          const s = p.size * (0.6 + 0.9 * age);
+          const sq = p.squash ?? 1;
+          ctx.drawImage(softSprite(p.color, 64), p.x - s / 2, p.y - (s * sq) / 2, s, s * sq);
+          break;
+        }
+        case "ember": {
+          ctx.globalAlpha = k * (0.55 + 0.45 * Math.sin(now / 45 + p.x * 3));
+          ctx.fillStyle = p.color;
+          ctx.fillRect(p.x, p.y, p.size, p.size);
+          ctx.drawImage(glowSprite(p.color, 32), p.x - p.size * 2.5, p.y - p.size * 2.5, p.size * 6, p.size * 6);
+          break;
+        }
+        case "twinkle": {
+          const age = p.life / p.max;
+          const tw = 0.5 + 0.5 * Math.sin(now / 90 + p.x * 7);
+          ctx.globalAlpha = Math.min(1, age * 5) * (1 - age) * (0.35 + 0.65 * tw);
+          const s = p.size * (0.7 + 0.5 * tw);
+          ctx.fillStyle = p.color;
+          ctx.fillRect(p.x - s, p.y - 0.5, s * 2, 1);
+          ctx.fillRect(p.x - 0.5, p.y - s, 1, s * 2);
+          ctx.drawImage(glowSprite(p.color, 32), p.x - s, p.y - s, s * 2, s * 2);
+          break;
+        }
+        case "glyph": {
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate(p.rot ?? 0);
+          ctx.font = `700 ${Math.round(p.size)}px system-ui, sans-serif`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillStyle = p.color;
+          ctx.fillText(p.text ?? "♪", 0, 0);
+          ctx.restore();
           break;
         }
         case "confetti": {

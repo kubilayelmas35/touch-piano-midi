@@ -5,12 +5,16 @@ import { defaultKeymaps, sanitizeKeymaps, type FretKeyMode, type Keymaps } from 
 import {
   APPROACH_STYLES,
   BACKGROUNDS,
+  DUST_STYLES,
   EFFECT_STYLES,
+  NOTE_COLORS,
   NOTE_STYLES,
   oneOf,
   type ApproachStyle,
   type Background,
+  type DustStyle,
   type EffectStyle,
+  type NoteColor,
   type NoteStyle,
 } from "../render/appearance";
 
@@ -35,10 +39,13 @@ export interface Settings {
   /** 0.1–1: how many particles / how bright the glows are. */
   effectLevel: number;
   effectStyle: EffectStyle;
-  /** Hits leave a slowly drifting cloud of dust behind the notes. */
-  dustTrail: boolean;
+  /** Cloud left floating behind the notes after hits and around held notes. */
+  dust: DustStyle;
+  /** 0.1–1 density of the dust cloud. */
+  dustLevel: number;
   approach: ApproachStyle;
   noteStyle: NoteStyle;
+  noteColor: NoteColor;
   background: Background;
   /** Octave of the computer-keyboard "A" key (C of that octave). */
   keyboardOctave: number;
@@ -83,9 +90,11 @@ export function defaultSettings(): Settings {
     effects: true,
     effectLevel: 0.5,
     effectStyle: "sparks",
-    dustTrail: true,
+    dust: "smoke",
+    dustLevel: 0.5,
     approach: "beam",
     noteStyle: "gem",
+    noteColor: "auto",
     background: "night",
     keyboardOctave: 4,
     keymaps: defaultKeymaps(),
@@ -136,8 +145,10 @@ function sanitize(s: Settings): Settings {
     fallSeconds: num(s.fallSeconds, 1, 8, d.fallSeconds),
     effectLevel: num(s.effectLevel, 0.1, 1, d.effectLevel),
     effectStyle: oneOf(EFFECT_STYLES, s.effectStyle, d.effectStyle),
-    dustTrail: s.dustTrail !== false,
+    dust: oneOf(DUST_STYLES, s.dust, d.dust),
+    dustLevel: num(s.dustLevel, 0.1, 1, d.dustLevel),
     approach: oneOf(APPROACH_STYLES, s.approach, d.approach),
+    noteColor: oneOf(NOTE_COLORS, s.noteColor, d.noteColor),
     noteStyle: oneOf(NOTE_STYLES, s.noteStyle, d.noteStyle),
     background: oneOf(BACKGROUNDS, s.background, d.background),
     keyboardOctave: Math.round(num(s.keyboardOctave, 1, 7, d.keyboardOctave)),

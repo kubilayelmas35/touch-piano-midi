@@ -6,15 +6,19 @@ import { INSTRUMENT_HEIGHT_RANGE, defaultSettings } from "../state/settings";
 import { setPanel, useApp } from "../state/store";
 import { IconPlug } from "../ui/icons";
 import { KeyBindings } from "./KeyBindings";
-import { ApproachSwatch, BackgroundSwatch, ChoiceCards, EffectSwatch, NoteSwatch } from "./AppearancePicker";
+import { ApproachSwatch, BackgroundSwatch, ChoiceCards, ColorSwatch, DustSwatch, EffectSwatch, NoteSwatch } from "./AppearancePicker";
 import {
   APPROACH_STYLES,
   BACKGROUNDS,
+  DUST_STYLES,
   EFFECT_STYLES,
+  NOTE_COLORS,
   NOTE_STYLES,
   type ApproachStyle,
   type Background,
+  type DustStyle,
   type EffectStyle,
+  type NoteColor,
   type NoteStyle,
 } from "../render/appearance";
 import type { DictKey } from "../i18n/en";
@@ -49,12 +53,30 @@ const FX_LABEL: Record<EffectStyle, DictKey> = {
   stars: "fxStars",
   fire: "fxFire",
   glow: "fxGlow",
-  dust: "fxDust",
+  notes: "fxNotes",
   confetti: "fxConfetti",
   bubbles: "fxBubbles",
   lightning: "fxLightning",
   petals: "fxPetals",
   pixels: "fxPixels",
+};
+const COLOR_LABEL: Record<NoteColor, DictKey> = {
+  auto: "ncAuto",
+  violet: "ncViolet",
+  rainbow: "ncRainbow",
+  gradient: "ncGradient",
+  sunset: "ncSunset",
+  ice: "ncIce",
+  pastel: "ncPastel",
+};
+const DUST_LABEL: Record<DustStyle, DictKey> = {
+  off: "duOff",
+  smoke: "duSmoke",
+  sparkle: "duSparkle",
+  nebula: "duNebula",
+  fog: "duFog",
+  embers: "duEmbers",
+  stardust: "duStardust",
 };
 const APPROACH_LABEL: Record<ApproachStyle, DictKey> = {
   off: "apOff",
@@ -205,6 +227,12 @@ export function SettingsDialog() {
                 onChange={(v) => updateSettings({ noteStyle: v })}
                 options={NOTE_STYLES.map((n) => ({ value: n, label: t(NOTE_LABEL[n]), preview: <NoteSwatch style={n} /> }))}
               />
+              <ChoiceCards
+                label={t("noteColor")}
+                value={s.noteColor}
+                onChange={(v) => updateSettings({ noteColor: v })}
+                options={NOTE_COLORS.map((c) => ({ value: c, label: t(COLOR_LABEL[c]), preview: <ColorSwatch color={c} /> }))}
+              />
             </Section>
             <Section>
               <Switch label={t("effects")} checked={s.effects} onChange={(v) => updateSettings({ effects: v })} />
@@ -225,8 +253,26 @@ export function SettingsDialog() {
                     onChange={(v) => updateSettings({ effectStyle: v })}
                     options={EFFECT_STYLES.map((e) => ({ value: e, label: t(FX_LABEL[e]), preview: <EffectSwatch style={e} /> }))}
                   />
-                  <Switch label={t("dustTrail")} checked={s.dustTrail} onChange={(v) => updateSettings({ dustTrail: v })} />
                 </>
+              )}
+            </Section>
+            <Section>
+              <ChoiceCards
+                label={t("dust")}
+                value={s.dust}
+                onChange={(v) => updateSettings({ dust: v })}
+                options={DUST_STYLES.map((d) => ({ value: d, label: t(DUST_LABEL[d]), preview: <DustSwatch style={d} /> }))}
+              />
+              {s.dust !== "off" && (
+                <Slider
+                  label={t("dustLevel")}
+                  value={s.dustLevel}
+                  min={0.1}
+                  max={1}
+                  step={0.05}
+                  onChange={(v) => updateSettings({ dustLevel: v })}
+                  format={pct}
+                />
               )}
             </Section>
             <Section>

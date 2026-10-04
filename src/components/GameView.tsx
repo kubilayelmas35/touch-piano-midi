@@ -145,9 +145,11 @@ export function GameView() {
         effects: s.effects,
         effectLevel: s.effectLevel,
         effectStyle: s.effectStyle,
-        dustTrail: s.dustTrail,
+        dust: s.dust,
+        dustLevel: s.dustLevel,
         approach: s.approach,
         noteStyle: s.noteStyle,
+        noteColor: s.noteColor,
         background: s.background,
         labels,
       });

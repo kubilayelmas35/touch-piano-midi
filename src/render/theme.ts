@@ -74,6 +74,44 @@ export function glowSprite(color: string, size = 64): HTMLCanvasElement {
   return c;
 }
 
+/** Flat-profiled soft blob for smoke and fog (no bright core like glowSprite). */
+export function softSprite(color: string, size = 64): HTMLCanvasElement {
+  const key = `soft:${color}:${size}`;
+  const cached = spriteCache.get(key);
+  if (cached) return cached;
+  const c = document.createElement("canvas");
+  c.width = c.height = size;
+  const g = c.getContext("2d")!;
+  const grad = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  grad.addColorStop(0, withAlpha(color, 0.5));
+  grad.addColorStop(0.45, withAlpha(color, 0.3));
+  grad.addColorStop(0.75, withAlpha(color, 0.1));
+  grad.addColorStop(1, withAlpha(color, 0));
+  g.fillStyle = grad;
+  g.fillRect(0, 0, size, size);
+  spriteCache.set(key, c);
+  return c;
+}
+
+/** Blends two hex colours (k = 0 → a, 1 → b) into a hex colour. */
+export function mixHex(a: string, b: string, k: number): string {
+  const ch = (h: string, i: number) => parseInt(h.slice(i + 1, i + 3), 16);
+  const out = [0, 2, 4].map((i) => Math.round(ch(a, i) + (ch(b, i) - ch(a, i)) * k));
+  return `#${out.map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+}
+
+/** HSL (h in degrees, s/l 0–1) to hex. */
+export function hslHex(h: number, s: number, l: number): string {
+  const f = (n: number) => {
+    const k = (n + h / 30) % 12;
+    const c = l - s * Math.min(l, 1 - l) * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+    return Math.round(c * 255)
+      .toString(16)
+      .padStart(2, "0");
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
+}
+
 export function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
   const rr = Math.max(0, Math.min(r, w / 2, h / 2));
   ctx.beginPath();

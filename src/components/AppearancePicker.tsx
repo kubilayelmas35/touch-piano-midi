@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
-import type { ApproachStyle, Background, EffectStyle, NoteStyle } from "../render/appearance";
+import type { ApproachStyle, Background, DustStyle, EffectStyle, NoteColor, NoteStyle } from "../render/appearance";
+import { hslHex, mixHex } from "../render/theme";
 import { cx } from "../ui/primitives";
 
 export interface ChoiceOption<T extends string> {
@@ -169,11 +170,14 @@ function Bits({ colors, shape }: { colors: string[]; shape: (size: number, color
 
 export function EffectSwatch({ style }: { style: EffectStyle }) {
   const base = "absolute inset-0 bg-[linear-gradient(#070a1a,#121633)]";
-  if (style === "dust") {
+  if (style === "notes") {
     return (
       <div className={base}>
-        <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 50% 60% at 50% 90%, rgba(139,92,246,0.55), transparent 75%)" }} />
-        <Bits colors={["#c4b5fd", "#8b5cf6", "#ffffff"]} shape={(s, c) => ({ width: s / 2.5, height: s / 2.5, background: c, opacity: 0.8 })} />
+        {(["♪", "♫", "♩", "♬", "♪"] as const).map((g, i) => (
+          <span key={i} className="absolute font-bold" style={{ left: `${12 + i * 17}%`, top: `${[40, 12, 52, 20, 5][i]}%`, fontSize: 12 + (i % 3) * 3, color: i % 2 ? "#fff" : "#7dd3fc", textShadow: "0 0 6px #38d6ff" }}>
+            {g}
+          </span>
+        ))}
       </div>
     );
   }
@@ -248,6 +252,75 @@ export function EffectSwatch({ style }: { style: EffectStyle }) {
           ✦
         </span>
       ))}
+    </div>
+  );
+}
+
+/** [left %, top %] of the sample columns; top also drives gradient palettes. */
+const COLUMNS: [number, number][] = [
+  [8, 8],
+  [30, 48],
+  [52, 22],
+  [74, 58],
+];
+
+function columnColor(color: NoteColor, i: number, top: number): string {
+  const hand = i % 2 ? "#c084fc" : "#38d6ff";
+  const k = (top + 15) / 80;
+  switch (color) {
+    case "violet":
+      return "#8b5cf6";
+    case "rainbow":
+      return hslHex(i * 85, 0.85, 0.62);
+    case "gradient":
+      return mixHex("#38d6ff", "#e879f9", k);
+    case "sunset":
+      return mixHex("#facc15", "#f43f5e", k);
+    case "ice":
+      return mixHex(hand, "#e0f2fe", 0.6);
+    case "pastel":
+      return mixHex(hand, "#ffffff", 0.42);
+    default:
+      return hand;
+  }
+}
+
+export function ColorSwatch({ color }: { color: NoteColor }) {
+  return (
+    <div className="absolute inset-0 bg-[linear-gradient(#070a1a,#121633)]">
+      {COLUMNS.map(([left, top], i) => {
+        const c = columnColor(color, i, top);
+        return <div key={i} className="absolute h-[30%] w-[16%] rounded-[4px]" style={{ left: `${left}%`, top: `${top}%`, background: c, boxShadow: `0 0 8px ${c}88` }} />;
+      })}
+    </div>
+  );
+}
+
+const DUST_PREVIEW: Record<DustStyle, string> = {
+  off: "none",
+  smoke:
+    "radial-gradient(1px 1px at 30% 30%, #c4b5fd 50%, transparent), radial-gradient(1px 1px at 66% 22%, #a78bfa 50%, transparent), radial-gradient(1px 1px at 72% 62%, #c4b5fd 50%, transparent), radial-gradient(1px 1px at 26% 70%, #a78bfa 50%, transparent), radial-gradient(ellipse 30% 55% at 42% 60%, rgba(139,92,246,0.4), transparent 75%), radial-gradient(ellipse 28% 50% at 60% 35%, rgba(124,58,237,0.32), transparent 75%)",
+  sparkle:
+    "radial-gradient(1.5px 1.5px at 30% 40%, #fff 50%, transparent), radial-gradient(1.5px 1.5px at 62% 30%, #c4b5fd 50%, transparent), radial-gradient(1.5px 1.5px at 70% 66%, #fff 50%, transparent), radial-gradient(1.5px 1.5px at 22% 70%, #a78bfa 50%, transparent), radial-gradient(1.5px 1.5px at 44% 18%, #c4b5fd 50%, transparent), radial-gradient(ellipse 40% 45% at 50% 85%, rgba(139,92,246,0.35), transparent 75%)",
+  nebula:
+    "radial-gradient(1.5px 1.5px at 70% 25%, #fff 50%, transparent), radial-gradient(circle at 30% 40%, rgba(236,72,153,0.45), transparent 40%), radial-gradient(circle at 68% 60%, rgba(59,130,246,0.45), transparent 42%), radial-gradient(circle at 50% 25%, rgba(168,85,247,0.4), transparent 40%)",
+  fog: "radial-gradient(ellipse 70% 22% at 50% 82%, rgba(199,210,254,0.45), transparent 75%), radial-gradient(ellipse 60% 18% at 35% 68%, rgba(167,139,250,0.3), transparent 75%)",
+  embers:
+    "radial-gradient(2px 2px at 30% 60%, #fde68a 50%, transparent), radial-gradient(2px 2px at 60% 35%, #fb923c 50%, transparent), radial-gradient(2px 2px at 72% 70%, #fde68a 50%, transparent), radial-gradient(2px 2px at 42% 20%, #f97316 50%, transparent), radial-gradient(2px 2px at 20% 30%, #fb923c 50%, transparent), radial-gradient(ellipse 40% 30% at 50% 100%, rgba(251,146,60,0.35), transparent 75%)",
+  stardust: "radial-gradient(ellipse 40% 60% at 50% 70%, rgba(196,181,253,0.18), transparent 75%)",
+};
+
+export function DustSwatch({ style }: { style: DustStyle }) {
+  return (
+    <div className="absolute inset-0 bg-[#05030c]">
+      <div className="absolute inset-0" style={{ background: DUST_PREVIEW[style] }} />
+      {style === "stardust" &&
+        SCATTER.slice(0, 7).map(([left, top, size], i) => (
+          <span key={i} className="absolute text-white" style={{ left: `${left}%`, top: `${top}%`, fontSize: size + 3, textShadow: "0 0 5px #c4b5fd" }}>
+            ✦
+          </span>
+        ))}
+      <div className="absolute bottom-0 left-1/2 h-[70%] w-[14%] -translate-x-1/2 rounded-t-[3px] bg-violet-500/90" />
     </div>
   );
 }
