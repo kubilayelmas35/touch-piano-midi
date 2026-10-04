@@ -16,15 +16,39 @@ protocol.registerSchemesAsPrivileged([
   { scheme: "app", privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true } },
 ]);
 
+// sonatrio:// links bring Google/Apple sign-in back from the system browser.
+const LINK_SCHEME = "sonatrio";
+if (process.defaultApp) app.setAsDefaultProtocolClient(LINK_SCHEME, process.execPath, [path.resolve(process.argv[1])]);
+else app.setAsDefaultProtocolClient(LINK_SCHEME);
+const findLink = (argv) => argv.find((a) => a.startsWith(`${LINK_SCHEME}://`)) ?? null;
+let pendingLink = findLink(process.argv);
+
+function deliverLink(url) {
+  const win = BrowserWindow.getAllWindows()[0];
+  if (!win) {
+    pendingLink = url;
+    return;
+  }
+  if (win.isMinimized()) win.restore();
+  win.focus();
+  win.webContents.send("desktop:link", url);
+}
+
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
-  app.on("second-instance", () => {
+  app.on("second-instance", (_e, argv) => {
+    const link = findLink(argv);
+    if (link) return deliverLink(link);
     const win = BrowserWindow.getAllWindows()[0];
     if (win) {
       if (win.isMinimized()) win.restore();
       win.focus();
     }
+  });
+  app.on("open-url", (e, url) => {
+    e.preventDefault();
+    deliverLink(url);
   });
 }
 
@@ -122,6 +146,11 @@ ipcMain.handle("desktop:fullscreen", (e) => {
 });
 ipcMain.handle("desktop:isFullscreen", (e) => BrowserWindow.fromWebContents(e.sender)?.isFullScreen() ?? false);
 ipcMain.handle("desktop:achievement", (_e, id) => steam.unlock(String(id)));
+ipcMain.handle("desktop:takeLink", () => {
+  const link = pendingLink;
+  pendingLink = null;
+  return link;
+});
 ipcMain.on("desktop:quit", () => app.quit());
 
 app.whenReady().then(() => {

@@ -293,6 +293,7 @@ export const en = {
   signUp: "Sign up",
   continueGoogle: "Continue with Google",
   continueApple: "Continue with Apple",
+  continueInBrowser: "Finish signing in in your browser; you'll come back to the app automatically.",
   orDivider: "or",
   emailOrUsername: "Email or username",
   email: "Email",

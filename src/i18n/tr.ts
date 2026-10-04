@@ -284,6 +284,7 @@ export const tr: Dict = {
   signUp: "Üye ol",
   continueGoogle: "Google ile devam et",
   continueApple: "Apple ile devam et",
+  continueInBrowser: "Tarayıcıda girişi tamamla; bitince uygulamaya otomatik döneceksin.",
   orDivider: "veya",
   emailOrUsername: "E-posta veya kullanıcı adı",
   email: "E-posta",

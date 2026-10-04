@@ -8,6 +8,9 @@ directories:
 files:
   - desktop/**/*
   - package.json
+protocols:
+  - name: Sonatrio
+    schemes: [sonatrio]
 asarUnpack:
   - node_modules/steamworks.js/**/*
 extraResources:

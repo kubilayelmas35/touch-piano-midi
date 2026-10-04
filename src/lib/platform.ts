@@ -9,6 +9,8 @@ export interface DesktopBridge {
   toggleFullscreen(): Promise<boolean>;
   isFullscreen(): Promise<boolean>;
   unlockAchievement(id: string): Promise<boolean>;
+  /** sonatrio:// links opened by the system (sign-in coming back from the browser). */
+  onLink(cb: (url: string) => void): void;
   quit(): void;
 }
 

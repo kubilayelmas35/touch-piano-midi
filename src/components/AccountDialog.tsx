@@ -82,6 +82,10 @@ function SignedOut() {
     else setError(errorText(t, r));
   };
 
+  const providerStarted = (r: AuthResult & { ok: true }) => {
+    if (r.message === "browser") setInfo(t("continueInBrowser"));
+  };
+
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (mode === "signin") {
@@ -128,12 +132,12 @@ function SignedOut() {
             <>
               <div className="space-y-2">
                 {providers.google && (
-                  <ProviderButton onClick={() => void run(() => signInWithProvider("google"))} icon={<IconGoogle />}>
+                  <ProviderButton onClick={() => void run(() => signInWithProvider("google"), providerStarted)} icon={<IconGoogle />}>
                     {t("continueGoogle")}
                   </ProviderButton>
                 )}
                 {providers.apple && (
-                  <ProviderButton onClick={() => void run(() => signInWithProvider("apple"))} icon={<IconApple />} dark>
+                  <ProviderButton onClick={() => void run(() => signInWithProvider("apple"), providerStarted)} icon={<IconApple />} dark>
                     {t("continueApple")}
                   </ProviderButton>
                 )}

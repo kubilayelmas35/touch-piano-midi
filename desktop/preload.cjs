@@ -9,5 +9,9 @@ contextBridge.exposeInMainWorld("sonatrioDesktop", {
   toggleFullscreen: () => ipcRenderer.invoke("desktop:fullscreen"),
   isFullscreen: () => ipcRenderer.invoke("desktop:isFullscreen"),
   unlockAchievement: (id) => ipcRenderer.invoke("desktop:achievement", id),
+  onLink: (cb) => {
+    ipcRenderer.on("desktop:link", (_e, url) => cb(url));
+    void ipcRenderer.invoke("desktop:takeLink").then((url) => url && cb(url));
+  },
   quit: () => ipcRenderer.send("desktop:quit"),
 });

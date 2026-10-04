@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { setPanel, useApp } from "../state/store";
-import { SITE_URL, isApp } from "../lib/platform";
+import { setPanel, toast, useApp } from "../state/store";
+import { SITE_URL, desktop, isApp, isNativeApp } from "../lib/platform";
+import { tNow } from "../i18n";
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
@@ -16,6 +17,9 @@ export const STORE_LINKS = {
 };
 
 export const USERNAME_RE = /^[A-Za-z0-9_.]{3,24}$/;
+
+/** Where Google/Apple return to inside the packaged apps; must be in Supabase's redirect URL allow list. */
+const APP_CALLBACK = isNativeApp ? "com.sonatrio.app://auth" : "sonatrio://auth";
 
 function redirectUrl(): string {
   return isApp ? SITE_URL : window.location.origin + window.location.pathname;
@@ -45,8 +49,6 @@ async function loadProfile(userId: string, email: string | null): Promise<void> 
 }
 
 async function loadProviders(): Promise<void> {
-  // Google/Apple sign-in returns to a web address; the packaged apps use e-mail or username sign-in.
-  if (isApp) return;
   try {
     const res = await fetch(`${url}/auth/v1/settings`, { headers: { apikey: key! } });
     const ext = (await res.json())?.external ?? {};
@@ -60,6 +62,7 @@ export async function initAuth(): Promise<void> {
   if (!supabase) return;
   useApp.setState((s) => ({ account: { ...s.account, status: "loading" } }));
   void loadProviders();
+  if (isApp) void listenForAppSignIn();
   supabase.auth.onAuthStateChange((event, session) => {
     if (event === "PASSWORD_RECOVERY") {
       useApp.setState((s) => ({ account: { ...s.account, recovery: true } }));
@@ -136,8 +139,49 @@ export async function signUp(email: string, password: string, username: string):
 
 export async function signInWithProvider(provider: "google" | "apple"): Promise<AuthResult> {
   if (!supabase) return { ok: false, error: "disabled" };
-  const { error } = await supabase.auth.signInWithOAuth({ provider, options: { redirectTo: redirectUrl() } });
-  return error ? fail(error) : { ok: true };
+  if (!isApp) {
+    const { error } = await supabase.auth.signInWithOAuth({ provider, options: { redirectTo: redirectUrl() } });
+    return error ? fail(error) : { ok: true };
+  }
+  // Google refuses sign-in inside an embedded WebView, so it runs in the system browser and comes back via APP_CALLBACK.
+  const { data, error } = await supabase.auth.signInWithOAuth({ provider, options: { redirectTo: APP_CALLBACK, skipBrowserRedirect: true } });
+  if (error || !data.url) return fail(error ?? "no url");
+  if (isNativeApp) {
+    const { Browser } = await import("@capacitor/browser");
+    await Browser.open({ url: data.url });
+  } else {
+    window.open(data.url, "_blank");
+  }
+  return { ok: true, message: "browser" };
+}
+
+/** Completes Google/Apple sign-in when the browser hands the result back to the app. */
+async function finishAppSignIn(link: string): Promise<void> {
+  if (!supabase || !link.startsWith(APP_CALLBACK)) return;
+  if (isNativeApp) void import("@capacitor/browser").then(({ Browser }) => Browser.close()).catch(() => {});
+  const u = new URL(link);
+  const params = new URLSearchParams(u.search || u.hash.slice(1));
+  const code = params.get("code");
+  const failure = params.get("error_description") ?? params.get("error");
+  if (code) {
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    if (error) toast(error.message, "error");
+    else {
+      toast(tNow("welcomeBack"), "success");
+      setPanel(null);
+    }
+  } else if (failure) {
+    toast(failure, "error");
+  }
+}
+
+async function listenForAppSignIn(): Promise<void> {
+  if (isNativeApp) {
+    const { App } = await import("@capacitor/app");
+    await App.addListener("appUrlOpen", ({ url: link }) => void finishAppSignIn(link));
+  } else {
+    desktop?.onLink((link) => void finishAppSignIn(link));
+  }
 }
 
 export async function sendPasswordReset(email: string): Promise<AuthResult> {
