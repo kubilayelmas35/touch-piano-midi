@@ -1,5 +1,6 @@
 package com.sonatrio.app;
 
+import android.graphics.Color;
 import android.os.Bundle;
 import android.view.WindowManager;
 import android.webkit.WebSettings;
@@ -18,6 +19,8 @@ public class MainActivity extends BridgeActivity {
         // Practising with both hands on the screen: never dim or lock while the app is open.
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+        // The camera cutout band stays outside the WebView; paint it like the app instead of white.
+        getWindow().getDecorView().setBackgroundColor(Color.rgb(0x0a, 0x0d, 0x1f));
         WebView web = getBridge().getWebView();
         WebSettings settings = web.getSettings();
         // Samples start on the first tap; no extra gesture needed for audio.

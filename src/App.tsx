@@ -71,7 +71,7 @@ export function App() {
   }, [language]);
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden">
+    <div className="flex h-full flex-col overflow-hidden">
       <TopBar />
       <main className="flex min-h-0 flex-1 flex-col">
         <GameView />

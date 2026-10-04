@@ -269,9 +269,9 @@ export function Dialog({
         if (e.target === ref.current) onClose();
       }}
       className={cx(
-        side ? "m-0 h-dvh max-h-dvh" : "m-auto w-[calc(100vw-24px)]",
-        side === "left" && "mr-auto",
-        side === "right" && "ml-auto",
+        side ? "m-0 h-dvh max-h-dvh pt-[var(--safe-top)] pb-[var(--safe-bottom)]" : "m-auto w-[calc(100vw-24px)]",
+        side === "left" && "mr-auto pl-[var(--safe-left)]",
+        side === "right" && "ml-auto pr-[var(--safe-right)]",
         side ? "w-[min(420px,100vw)]" : width
       )}
     >
