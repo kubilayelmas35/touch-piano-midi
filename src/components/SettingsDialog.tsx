@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import { useT } from "../i18n";
 import { startMidi } from "../input/midi";
 import { updateSettings } from "../state/actions";
-import { INSTRUMENT_HEIGHT_RANGE, defaultSettings } from "../state/settings";
+import { INSTRUMENT_HEIGHT_RANGE, KEY_ZOOM_MAX, defaultSettings } from "../state/settings";
 import { setPanel, useApp } from "../state/store";
 import { IconPlug } from "../ui/icons";
 import { KeyBindings } from "./KeyBindings";
@@ -358,6 +358,21 @@ export function SettingsDialog() {
               onChange={(v) => updateSettings({ instrumentHeight: v })}
               format={pct}
             />
+          </Section>
+        )}
+        {tab === "gameplay" && (
+          <Section title={t("piano")}>
+            <Slider
+              label={t("keyZoom")}
+              hint={t("keyZoomHint")}
+              value={s.keyZoom}
+              min={1}
+              max={KEY_ZOOM_MAX}
+              step={0.25}
+              onChange={(v) => updateSettings({ keyZoom: v })}
+              format={(v) => `${v.toFixed(2).replace(/\.?0+$/, "")}×`}
+            />
+            <Switch label={t("compactKeys")} hint={t("compactKeysHint")} checked={s.compactKeys} onChange={(v) => updateSettings({ compactKeys: v })} />
           </Section>
         )}
         {tab === "gameplay" && (

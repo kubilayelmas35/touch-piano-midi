@@ -65,10 +65,15 @@ export interface Settings {
   midiInput: string;
   /** Instrument panel height as a fraction of the game area. */
   instrumentHeight: number;
+  /** Piano width as a multiple of the screen (1–3); wider keys, the rest scrolls off screen. */
+  keyZoom: number;
+  /** Piano shows only the keys the song uses. */
+  compactKeys: boolean;
   onboarded: boolean;
 }
 
 export const INSTRUMENT_HEIGHT_RANGE: [number, number] = [0.16, 0.65];
+export const KEY_ZOOM_MAX = 3;
 
 const KEY = "staveflow-settings-v2";
 
@@ -112,6 +117,8 @@ export function defaultSettings(): Settings {
     tapToPlay: false,
     midiInput: "all",
     instrumentHeight: 0.3,
+    keyZoom: 1,
+    compactKeys: false,
     onboarded: false,
   };
 }
@@ -176,6 +183,8 @@ function sanitize(s: Settings): Settings {
     autoFret: s.autoFret === true,
     tapToPlay: s.tapToPlay === true,
     instrumentHeight: num(s.instrumentHeight, ...INSTRUMENT_HEIGHT_RANGE, d.instrumentHeight),
+    keyZoom: num(s.keyZoom, 1, KEY_ZOOM_MAX, d.keyZoom),
+    compactKeys: s.compactKeys === true,
   };
 }
 

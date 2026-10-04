@@ -200,7 +200,7 @@ export class Highway {
       paintBackdrop(g, this.w, this.h, view.background);
       this.backdrop = g.canvas;
     }
-    const key = `${size}|${view.piano ? `p${view.piano.low}-${view.piano.high}` : ""}|${
+    const key = `${size}|${view.piano ? `p${view.piano.sig}` : ""}|${
       view.fret ? `f${view.fret.columns}:${view.fret.pluckW}:${view.fret.spec.tuning.length}:${view.naming}` : ""
     }`;
     if (key === this.lanesKey && this.lanes) return;
@@ -209,13 +209,16 @@ export class Highway {
 
     if (view.piano) {
       const p = view.piano;
-      for (let m = p.low; m <= p.high; m++) {
+      for (const m of p.keys) {
         const lane = p.lane(m)!;
         if (lane.black) {
           g.fillStyle = COLORS.laneBlack;
           g.fillRect(lane.x, 0, lane.w, this.h);
         }
-        if (!isBlack(m) && (m % 12 === 0 || m % 12 === 5)) {
+        if (p.compact) {
+          g.fillStyle = m % 12 === 0 ? COLORS.octaveLine : COLORS.laneLine;
+          g.fillRect(Math.round(lane.x), 0, 1, this.h);
+        } else if (!isBlack(m) && (m % 12 === 0 || m % 12 === 5)) {
           g.fillStyle = m % 12 === 0 ? COLORS.octaveLine : COLORS.laneLine;
           g.fillRect(Math.round(lane.x), 0, 1, this.h);
         }

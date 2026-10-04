@@ -119,10 +119,11 @@ export class KeyboardRenderer extends CanvasSurface {
     ctx.textAlign = "center";
     ctx.textBaseline = "alphabetic";
 
-    // White keys.
-    for (let m = L.low; m <= L.high; m++) {
+    // White keys (in compact mode every key is a full-height column; black ones are drawn below).
+    for (const m of L.keys) {
       if (isBlack(m)) continue;
       const lane = L.lane(m)!;
+      if (lane.x + lane.w < 0 || lane.x > w) continue;
       const pressed = marks.pressed.has(m);
       const sound = marks.sounding.get(m);
       const target = marks.target.get(m);
@@ -157,7 +158,7 @@ export class KeyboardRenderer extends CanvasSurface {
         ctx.fillText(keyLabel.toUpperCase(), x + kw / 2, ly);
         ly -= fs + 4;
       }
-      if ((view.showAllNames || m % 12 === 0) && kw >= 11) {
+      if ((view.showAllNames || L.compact || m % 12 === 0) && kw >= 11) {
         ctx.font = `${m % 12 === 0 ? 700 : 600} ${fs}px system-ui, sans-serif`;
         ctx.fillStyle = sound || pressed ? "rgba(255,255,255,0.9)" : m % 12 === 0 ? "#4b4f86" : "rgba(75,79,134,0.7)";
         const label = noteName(m, view.naming) + (m % 12 === 0 ? octaveOf(m) : "");
@@ -166,13 +167,14 @@ export class KeyboardRenderer extends CanvasSurface {
     }
 
     // Black keys.
-    for (let m = L.low; m <= L.high; m++) {
+    for (const m of L.keys) {
       if (!isBlack(m)) continue;
       const lane = L.lane(m)!;
+      if (lane.x + lane.w < 0 || lane.x > w) continue;
       const pressed = marks.pressed.has(m);
       const sound = marks.sounding.get(m);
       const target = marks.target.get(m);
-      const bh = blackH + (pressed ? 2 : 0);
+      const bh = (L.compact ? h - 1 : blackH) + (pressed ? 2 : 0);
       ctx.fillStyle = "rgba(0,0,0,0.45)";
       roundRect(ctx, lane.x + 1, -4, lane.w, bh + 6, 4);
       ctx.fill();
@@ -199,7 +201,13 @@ export class KeyboardRenderer extends CanvasSurface {
         const fs = Math.max(8, Math.min(11, lane.w * 0.45));
         ctx.font = `700 ${fs}px system-ui, sans-serif`;
         ctx.fillStyle = "rgba(220,224,255,0.8)";
-        ctx.fillText(keyLabel.toUpperCase(), lane.x + lane.w / 2, bh - 6);
+        ctx.fillText(keyLabel.toUpperCase(), lane.x + lane.w / 2, L.compact ? bh - 26 : bh - 6);
+      }
+      if (L.compact && lane.w >= 11) {
+        const fs = Math.max(8, Math.min(12, lane.w * 0.36));
+        ctx.font = `600 ${fs}px system-ui, sans-serif`;
+        ctx.fillStyle = sound || pressed ? "rgba(255,255,255,0.95)" : "rgba(200,205,240,0.75)";
+        ctx.fillText(noteName(m, view.naming), lane.x + lane.w / 2, h - 7);
       }
     }
 

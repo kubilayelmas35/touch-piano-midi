@@ -1,15 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { __test } from "./builtin";
+import { BUILTIN_CATEGORIES, BUILTIN_SONGS, __test } from "./builtin";
 
-const { voice, pitchToMidi, build, SPECS } = __test;
+const { voice, pitchToMidi, build, duration, SPECS } = __test;
 
-function beats(src: string): number {
-  return src
-    .trim()
-    .split(/\s+/)
-    .filter((t) => t !== "|")
-    .reduce((sum, t) => sum + Number(t.split(":")[1]), 0);
-}
+const tokens = (src: string) => src.trim().split(/\s+/).filter((t) => t && t !== "|");
+const beats = (src: string) => tokens(src).reduce((sum, t) => sum + duration(t.split(":")[1]), 0);
+/** Bar lengths; a line break counts as a bar line too. */
+const bars = (src: string) =>
+  src
+    .split(/\||\n/)
+    .map((b) => b.trim())
+    .filter(Boolean)
+    .map(beats);
 
 describe("builtin notation", () => {
   it("parses pitches", () => {
@@ -17,23 +19,34 @@ describe("builtin notation", () => {
     expect(pitchToMidi("A4")).toBe(69);
     expect(pitchToMidi("F#5")).toBe(78);
     expect(pitchToMidi("Bb3")).toBe(58);
+    expect(pitchToMidi("B#3")).toBe(60);
   });
 
-  it("parses chords and rests", () => {
+  it("parses chords, rests and triplets", () => {
     const notes = voice("C3+E3:2 -:1 G3:1", 0, 0.5);
     expect(notes.map((n) => n.midi)).toEqual([48, 52, 55]);
     expect(notes[2].time).toBeCloseTo(1.5);
+    const trip = voice("C4:1/3 D4:1/3 E4:1/3 F4:1", 0, 1);
+    expect(trip[3].time).toBeCloseTo(1);
+  });
+
+  it("has unique ids and known categories", () => {
+    const ids = BUILTIN_SONGS.map((s) => s.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const s of BUILTIN_SONGS) expect(BUILTIN_CATEGORIES).toContain(s.category);
   });
 
   for (const spec of SPECS) {
-    it(`${spec.id}: hands end together and fill whole measures`, () => {
+    it(`${spec.id}: hands end together and every bar is one measure`, () => {
+      const pickup = spec.pickup ?? 0;
       const right = beats(spec.right);
-      const left = spec.left ? beats(spec.left) + (spec.pickup ?? 0) : right;
+      const left = spec.left ? beats(spec.left) + pickup : right;
       expect(left).toBeCloseTo(right, 5);
-      const [perMeasure, unit] = spec.meter;
-      const measureLen = perMeasure * unit;
-      const body = right - (spec.pickup ?? 0);
-      expect(body / measureLen).toBeCloseTo(Math.round(body / measureLen), 5);
+      const measureLen = spec.meter[0] * spec.meter[1];
+      const rightBars = bars(spec.right);
+      if (pickup) expect(rightBars.shift()).toBeCloseTo(pickup, 5);
+      rightBars.forEach((b, i) => expect(b, `right bar ${i + 1}`).toBeCloseTo(measureLen, 5));
+      if (spec.left) bars(spec.left).forEach((b, i) => expect(b, `left bar ${i + 1}`).toBeCloseTo(measureLen, 5));
     });
 
     it(`${spec.id}: builds a playable song`, () => {

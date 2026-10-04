@@ -1,8 +1,9 @@
 import { finalizeSong, parseMidi, type Beat, type Song, type SongNote, type SongTrack } from "./song";
+import { SONGBOOK } from "./songbook";
 
 /**
  * Tiny melody notation used for the bundled public-domain songs.
- * Tokens: `E4:1` (note:beats), `C3+E3+G3:2` (chord), `-:1` (rest). Beats are quarter notes.
+ * Tokens: `E4:1` (note:beats), `C3+E3+G3:2` (chord), `-:1` (rest), `E4:1/3` (triplet). Beats are quarter notes.
  */
 const PITCH = /^([A-G])(#|b)?(-?\d)$/;
 const SEMI: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
@@ -14,13 +15,18 @@ function pitchToMidi(p: string): number {
   return (Number(m[3]) + 1) * 12 + SEMI[m[1]] + acc;
 }
 
+function duration(s: string | undefined): number {
+  const [a, b] = (s ?? "").split("/");
+  return b === undefined ? Number(a) : Number(a) / Number(b);
+}
+
 function voice(src: string, track: number, spb: number, startBeat = 0, velocity = 0.75): SongNote[] {
   const out: SongNote[] = [];
   let beat = startBeat;
   for (const token of src.trim().split(/\s+/)) {
     if (token === "|") continue;
     const [pitches, durStr] = token.split(":");
-    const dur = Number(durStr);
+    const dur = duration(durStr);
     if (!Number.isFinite(dur)) throw new Error(`Bad duration in ${token}`);
     if (pitches !== "-") {
       for (const p of pitches.split("+")) {
@@ -38,13 +44,22 @@ function voice(src: string, track: number, spb: number, startBeat = 0, velocity 
   return out;
 }
 
-interface BuiltinSpec {
+export type BuiltinCategory = "kids" | "classical" | "folk" | "holiday";
+export const BUILTIN_CATEGORIES: BuiltinCategory[] = ["kids", "classical", "folk", "holiday"];
+
+export interface BuiltinSpec {
   id: string;
   title: string;
+  /** Name the song is known by in Turkish, when different. */
+  titleTr?: string;
   composer: string;
   level: 1 | 2 | 3;
+  category: BuiltinCategory;
   bpm: number;
-  /** Beats per measure and the beat length in quarter notes (0.5 for x/8). */
+  /**
+   * Beats per measure and the beat length in quarter notes (0.5 for x/8, 1.5 for compound 6/8).
+   * Every line break or `|` is a bar line; the first right-hand bar holds just the pickup.
+   */
   meter: [number, number];
   pickup?: number;
   right: string;
@@ -90,6 +105,7 @@ const SPECS: BuiltinSpec[] = [
     title: "Twinkle, Twinkle, Little Star",
     composer: "Traditional",
     level: 1,
+    category: "kids",
     bpm: 96,
     meter: [4, 1],
     right: `C4:1 C4:1 G4:1 G4:1 | A4:1 A4:1 G4:2 | F4:1 F4:1 E4:1 E4:1 | D4:1 D4:1 C4:2
@@ -104,6 +120,7 @@ const SPECS: BuiltinSpec[] = [
     title: "Ode to Joy",
     composer: "L. van Beethoven",
     level: 1,
+    category: "classical",
     bpm: 108,
     meter: [4, 1],
     right: `E4:1 E4:1 F4:1 G4:1 | G4:1 F4:1 E4:1 D4:1 | C4:1 C4:1 D4:1 E4:1 | E4:1.5 D4:0.5 D4:2
@@ -120,6 +137,7 @@ const SPECS: BuiltinSpec[] = [
     title: "Jingle Bells",
     composer: "J. L. Pierpont",
     level: 1,
+    category: "holiday",
     bpm: 120,
     meter: [4, 1],
     right: `E4:1 E4:1 E4:2 | E4:1 E4:1 E4:2 | E4:1 G4:1 C4:1.5 D4:0.5 | E4:4
@@ -136,6 +154,7 @@ const SPECS: BuiltinSpec[] = [
     title: "Minuet in G",
     composer: "C. Petzold",
     level: 2,
+    category: "classical",
     bpm: 112,
     meter: [3, 1],
     right: `D5:1 G4:0.5 A4:0.5 B4:0.5 C5:0.5 | D5:1 G4:1 G4:1 | E5:1 C5:0.5 D5:0.5 E5:0.5 F#5:0.5 | G5:1 G4:1 G4:1
@@ -152,6 +171,7 @@ const SPECS: BuiltinSpec[] = [
     title: "Greensleeves",
     composer: "Traditional",
     level: 2,
+    category: "folk",
     bpm: 132,
     meter: [3, 1],
     pickup: 1,
@@ -169,6 +189,7 @@ const SPECS: BuiltinSpec[] = [
     title: "Für Elise (theme)",
     composer: "L. van Beethoven",
     level: 3,
+    category: "classical",
     bpm: 66,
     meter: [3, 0.5],
     pickup: 0.5,
@@ -191,16 +212,20 @@ const SPECS: BuiltinSpec[] = [
   },
 ];
 
+SPECS.push(...SONGBOOK);
+
 export interface BuiltinInfo {
   id: string;
   title: string;
+  titleTr?: string;
   composer: string;
   level: 1 | 2 | 3;
+  category: BuiltinCategory;
 }
 
 export const BUILTIN_SONGS: BuiltinInfo[] = [
-  ...SPECS.map(({ id, title, composer, level }) => ({ id, title, composer, level })),
-  { id: "bach-846", title: "Prelude in C major, BWV 846", composer: "J. S. Bach", level: 3 },
+  ...SPECS.map(({ id, title, titleTr, composer, level, category }) => ({ id, title, titleTr, composer, level, category })),
+  { id: "bach-846", title: "Prelude in C major, BWV 846", composer: "J. S. Bach", level: 3, category: "classical" },
 ];
 
 export function isBuiltin(id: string): boolean {
@@ -226,4 +251,4 @@ export async function loadBuiltin(id: string): Promise<Song> {
   throw new Error(`Unknown builtin ${id}`);
 }
 
-export const __test = { voice, pitchToMidi, build, SPECS };
+export const __test = { voice, pitchToMidi, build, duration, SPECS };

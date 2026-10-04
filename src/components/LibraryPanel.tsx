@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useT } from "../i18n";
 import { formatTime } from "../lib/notes";
-import { BUILTIN_SONGS } from "../midi/builtin";
+import { BUILTIN_CATEGORIES, BUILTIN_SONGS, type BuiltinCategory } from "../midi/builtin";
 import { canImport } from "../auth/account";
 import { syncCloud } from "../auth/cloud";
 import { formatBytes } from "../lib/format";
@@ -55,11 +55,21 @@ export function LibraryPanel() {
   const fileRef = useRef<HTMLInputElement>(null);
   const close = () => setPanel(null);
 
+  const [category, setCategory] = useState<BuiltinCategory | "all">("all");
+  const lang = useApp((s) => s.settings.language);
   const q = normalize(query.trim());
   const builtins = useMemo(
-    () => BUILTIN_SONGS.filter((s) => !q || normalize(`${s.title} ${s.composer}`).includes(q)),
-    [q]
+    () =>
+      BUILTIN_SONGS.filter(
+        (s) =>
+          (category === "all" || s.category === category) &&
+          (!q || normalize(`${s.title} ${s.titleTr ?? ""} ${s.composer}`).includes(q))
+      ),
+    [q, category]
   );
+  const composerLabel = (c: string) => (c === "Traditional" ? t("traditional") : c);
+  const catLabel = (c: BuiltinCategory | "all") =>
+    c === "all" ? t("catAll") : c === "kids" ? t("catKids") : c === "classical" ? t("catClassical") : c === "folk" ? t("catFolk") : t("catHoliday");
   const mine = useMemo(() => userSongs.filter((s) => !q || normalize(s.title).includes(q)), [userSongs, q]);
 
   const choose = async (id: string) => {
@@ -232,8 +242,24 @@ export function LibraryPanel() {
 
       <section aria-labelledby="lib-builtin" className="mt-6">
         <h3 id="lib-builtin" className="mb-2 text-xs font-bold tracking-[0.12em] text-mist-400 uppercase">
-          {t("builtIn")}
+          {t("builtIn")} <span className="font-semibold text-mist-400/70">· {builtins.length}</span>
         </h3>
+        <div className="-mx-1 mb-2 flex gap-1.5 overflow-x-auto px-1 pb-1" role="group" aria-label={t("builtIn")}>
+          {(["all", ...BUILTIN_CATEGORIES] as const).map((c) => (
+            <button
+              key={c}
+              type="button"
+              aria-pressed={category === c}
+              onClick={() => setCategory(c)}
+              className={cx(
+                "shrink-0 rounded-full px-3 py-1 text-xs font-semibold whitespace-nowrap transition-colors",
+                category === c ? "bg-brand-500/25 text-brand-100 ring-1 ring-brand-400/40" : "bg-white/[0.05] text-mist-300 hover:bg-white/[0.09]"
+              )}
+            >
+              {catLabel(c)}
+            </button>
+          ))}
+        </div>
         {builtins.length === 0 ? (
           <p className="px-1 text-sm text-mist-400">{t("noResults")}</p>
         ) : (
@@ -252,9 +278,12 @@ export function LibraryPanel() {
                     )}
                   >
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-semibold">{s.title}</div>
+                      <div className="truncate text-sm font-semibold">{lang === "tr" && s.titleTr ? s.titleTr : s.title}</div>
                       <div className="mt-0.5 flex items-center gap-2 text-xs text-mist-400">
-                        <span className="truncate">{s.composer}</span>
+                        <span className="truncate">
+                          {composerLabel(s.composer)}
+                          {lang === "tr" && s.titleTr ? ` · ${s.title}` : ""}
+                        </span>
                         <Stars n={bestStars(prefs[s.id], instrument)} />
                       </div>
                     </div>
@@ -267,6 +296,7 @@ export function LibraryPanel() {
             })}
           </ul>
         )}
+        <p className="mt-3 px-1 text-[11px] leading-relaxed text-mist-400/70">{t("builtInNote")}</p>
       </section>
     </Dialog>
   );

@@ -174,6 +174,8 @@ export async function openSong(id: string, opts: { quiet?: boolean } = {}): Prom
     let song: Song;
     if (isBuiltin(id)) {
       song = await loadBuiltin(id);
+      const trTitle = BUILTIN_SONGS.find((s) => s.id === id)?.titleTr;
+      if (trTitle && useApp.getState().settings.language === "tr") song.title = trTitle;
     } else {
       const stored = await getSong(id);
       if (!stored) throw new Error("missing");

@@ -12,6 +12,7 @@ import { updateSettings } from "../state/actions";
 import { useT } from "../i18n";
 import { Hud } from "./Hud";
 import { EmptyState } from "./EmptyState";
+import { KEY_STRIP_H, KeyStrip } from "./KeyStrip";
 
 const MIN_WHITE = 15;
 const MAX_WHITE = 46;
@@ -48,6 +49,9 @@ export function GameView() {
   const instrument = useApp((s) => s.settings.instrument);
   const instrumentHeight = useApp((s) => s.settings.instrumentHeight);
   const hasSong = useApp((s) => !!s.song);
+  const keyZoom = useApp((s) => s.settings.keyZoom);
+  const compactKeys = useApp((s) => s.settings.compactKeys);
+  const keyPan = useApp((s) => s.keyPan);
   const wrapRef = useRef<HTMLDivElement>(null);
   const hwRef = useRef<HTMLCanvasElement>(null);
   const instRef = useRef<HTMLCanvasElement>(null);
@@ -77,11 +81,28 @@ export function GameView() {
   }, []);
 
   const fretSpec = instrument === "piano" ? null : engine.fretSpec;
+  // Distinct pitches the player has to play, low → high.
+  const used = useMemo(
+    () => [...new Set(engine.notes.map((n) => n.midi))].sort((a, b) => a - b),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [notesRev]
+  );
+  const range = useMemo(() => (size.w ? pianoRange(size.w) : null), [size.w, notesRev]); // eslint-disable-line react-hooks/exhaustive-deps
+  const only = compactKeys && used.length ? used : null;
+
+  // Zooming in or switching song: centre the song's notes on screen.
+  useEffect(() => {
+    if (instrument !== "piano" || !range || keyZoom <= 1) return;
+    const probe = new PianoLayout(range[0], range[1], size.w, { zoom: keyZoom, only });
+    useApp.setState({ keyPan: used.length ? probe.panFor(used[0], used[used.length - 1]) : 0.5 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [instrument, range, keyZoom, compactKeys, used]);
+
   const layout = useMemo(() => {
     if (!size.w) return null;
     if (instrument === "piano") {
-      const [lo, hi] = pianoRange(size.w);
-      return { piano: new PianoLayout(lo, hi, size.w), fret: null };
+      const [lo, hi] = range!;
+      return { piano: new PianoLayout(lo, hi, size.w, { zoom: keyZoom, pan: keyPan, only }), fret: null };
     }
     const spec = engine.fretSpec!;
     const pw = pluckWidth(size.w);
@@ -89,7 +110,7 @@ export function GameView() {
     for (const n of engine.notes) if (n.fret > highest) highest = n.fret;
     return { piano: null, fret: new FretLayout(spec, size.w, visibleFrets(spec, size.w - pw, highest), pw) };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [size.w, instrument, notesRev, fretSpec]);
+  }, [size.w, instrument, notesRev, fretSpec, range, keyZoom, keyPan, only]);
 
   useEffect(() => {
     fretted.reset();
@@ -101,7 +122,9 @@ export function GameView() {
     const minH = instrument === "piano" ? 96 : (instrument === "guitar" ? 6 : 4) * 22;
     return Math.round(Math.max(minH, Math.min(want, size.h * INSTRUMENT_HEIGHT_RANGE[1])));
   }, [size.h, instrumentHeight, instrument]);
-  const hwH = Math.max(0, size.h - instH);
+  const showStrip = !!layout?.piano && (keyZoom > 1 || compactKeys || size.w < 760);
+  const stripH = showStrip ? KEY_STRIP_H : 0;
+  const hwH = Math.max(0, size.h - instH - stripH);
 
   // Renderers live for the component lifetime; the frame loop reads the latest view through a ref.
   const renderers = useRef<{ hw: Highway; kb: KeyboardRenderer; fb: FretboardRenderer } | null>(null);
@@ -346,6 +369,11 @@ export function GameView() {
       >
         <div className="h-1 w-12 rounded-full bg-white/15 transition-colors group-hover:bg-brand-400/70" />
       </div>
+      {showStrip && layout?.piano && (
+        <div className="absolute inset-x-0" style={{ top: hwH, height: stripH }}>
+          <KeyStrip piano={layout.piano} used={used} />
+        </div>
+      )}
       <div className="absolute inset-x-0 bottom-0" style={{ height: instH }}>
         <canvas
           ref={instRef}

@@ -85,6 +85,8 @@ export interface AppState {
   cloudIds: string[];
   cloudBytes: number;
   cloudBusy: boolean;
+  /** Which part of a zoomed piano is on screen (0 left … 1 right). */
+  keyPan: number;
 }
 
 export const DEFAULT_SESSION: Session = {
@@ -140,6 +142,7 @@ export const useApp = create<AppState>(() => ({
   cloudIds: [],
   cloudBytes: 0,
   cloudBusy: false,
+  keyPan: 0.5,
 }));
 
 let toastId = 1;
