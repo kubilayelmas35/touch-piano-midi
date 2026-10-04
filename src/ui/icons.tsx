@@ -329,6 +329,27 @@ export const IconExpand = (p: IconProps) => (
     <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
   </Svg>
 );
+export const IconRotate = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="3" y="8" width="18" height="10" rx="2" />
+    <path d="M17 13h.01" />
+    <path d="M7 4a6 6 0 0 1 8 0" />
+    <path d="m15 1.5 0 2.5h-2.5" />
+  </Svg>
+);
+export const IconVideo = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="2" y="5" width="15" height="14" rx="2" />
+    <path d="m17 10 5-3v10l-5-3" />
+  </Svg>
+);
+export const IconMessage = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    <path d="M8 9h8" />
+    <path d="M8 13h5" />
+  </Svg>
+);
 export const IconGoogle = ({ size = 18, ...p }: IconProps) => (
   <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false" {...p}>
     <path fill="#4285F4" d="M21.6 12.23c0-.68-.06-1.36-.18-2.02H12v3.83h5.4a4.6 4.6 0 0 1-2 3.02v2.5h3.24c1.9-1.75 2.96-4.33 2.96-7.33Z" />

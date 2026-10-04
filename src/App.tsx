@@ -1,6 +1,7 @@
 import { Suspense, lazy, useEffect } from "react";
 import { initAuth } from "./auth/account";
 import { AccountDialog, ProDialog } from "./components/AccountDialog";
+import { FeedbackDialog } from "./components/FeedbackDialog";
 import { GameView } from "./components/GameView";
 import { LibraryPanel } from "./components/LibraryPanel";
 import { ProgressDialog } from "./components/ProgressDialog";
@@ -11,7 +12,9 @@ import { StudioDialog } from "./components/StudioDialog";
 import { TakeDialog } from "./components/RecordingUI";
 import { NoteEditor } from "./components/NoteEditor";
 import { Toasts } from "./components/Toasts";
+import { RotateHint } from "./components/RotateHint";
 import { TopBar } from "./components/TopBar";
+import { VideoDialog } from "./components/VideoDialog";
 import { WelcomeDialog } from "./components/WelcomeDialog";
 import { useGlobalInput } from "./hooks/useGlobalInput";
 import { useT } from "./i18n";
@@ -90,7 +93,10 @@ export function App() {
       <StudioDialog />
       <TakeDialog />
       <NoteEditor />
+      <FeedbackDialog />
+      <VideoDialog />
       <AdminGate />
+      <RotateHint />
       <Toasts />
       <DropOverlay />
     </div>

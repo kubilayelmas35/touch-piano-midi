@@ -81,6 +81,27 @@ export interface AuditEntry {
   detail: Record<string, unknown>;
 }
 
+export type FeedbackStatus = "new" | "read" | "done";
+
+export interface FeedbackEntry {
+  id: number;
+  created_at: string;
+  user_id: string | null;
+  account_email: string | null;
+  username: string | null;
+  email: string | null;
+  kind: "suggestion" | "complaint" | "bug" | "other";
+  message: string;
+  platform: string | null;
+  app_version: string | null;
+  language: string | null;
+  device: string | null;
+  status: FeedbackStatus;
+  admin_note: string | null;
+}
+
+export type FeedbackCounts = Record<FeedbackStatus | "all", number>;
+
 export type UserFilter = "all" | "pro" | "free" | "cloud" | "admin" | "unconfirmed" | "banned";
 export type UserSort = "new" | "old" | "active" | "storage" | "name";
 
@@ -162,6 +183,24 @@ export async function downloadFile(file: AdminFile): Promise<void> {
 
 export async function auditLog(userId: string | null, limit = 100): Promise<AuditEntry[]> {
   return check(await client().rpc("admin_audit_log", { p_user: userId, p_limit: limit })) as AuditEntry[];
+}
+
+export async function listFeedback(status: FeedbackStatus | "open" | "all", limit = 200): Promise<FeedbackEntry[]> {
+  return check(await client().rpc("admin_feedback_list", { p_status: status, p_limit: limit })) as FeedbackEntry[];
+}
+
+export async function feedbackCounts(): Promise<FeedbackCounts> {
+  return check(await client().rpc("admin_feedback_counts")) as FeedbackCounts;
+}
+
+export async function updateFeedback(id: number, patch: { status?: FeedbackStatus; note?: string }): Promise<void> {
+  check(
+    await client().rpc("admin_feedback_update", { p_id: id, p_status: patch.status ?? null, p_note: patch.note ?? null })
+  );
+}
+
+export async function deleteFeedback(id: number): Promise<void> {
+  check(await client().rpc("admin_feedback_delete", { p_id: id }));
 }
 
 /** Ban / unban / delete go through an edge function because they need the service role. */

@@ -21,6 +21,18 @@
   --animate-fade: fade 0.2s ease-out;
   --animate-slide-left: slideLeft 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
   --animate-slide-up: slideUp 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+  --animate-tilt: tilt 2.4s ease-in-out infinite;
+}
+
+@keyframes tilt {
+  0%,
+  20% {
+    transform: rotate(90deg);
+  }
+  50%,
+  100% {
+    transform: rotate(0deg);
+  }
 }
 
 @utility no-scrollbar {

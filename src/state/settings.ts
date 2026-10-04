@@ -77,6 +77,10 @@ export interface Settings {
   compactKeys: boolean;
   /** Minutes of practice a day that count as the daily goal. */
   dailyGoalMin: number;
+  /** Phones in portrait: suggest turning the device sideways. */
+  rotateHint: boolean;
+  /** App: keep the screen in landscape. */
+  landscapeLock: boolean;
   onboarded: boolean;
 }
 
@@ -131,6 +135,8 @@ export function defaultSettings(): Settings {
     keyZoom: 1,
     compactKeys: false,
     dailyGoalMin: 10,
+    rotateHint: true,
+    landscapeLock: false,
     onboarded: false,
   };
 }
@@ -201,6 +207,8 @@ function sanitize(s: Settings): Settings {
     keyZoom: num(s.keyZoom, 1, KEY_ZOOM_MAX, d.keyZoom),
     compactKeys: s.compactKeys === true,
     dailyGoalMin: Math.round(num(s.dailyGoalMin, 5, 60, d.dailyGoalMin)),
+    rotateHint: s.rotateHint !== false,
+    landscapeLock: s.landscapeLock === true,
   };
 }
 

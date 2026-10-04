@@ -33,7 +33,20 @@ export interface Toast {
   kind: "info" | "success" | "error";
 }
 
-export type Panel = "library" | "settings" | "setup" | "account" | "pro" | "admin" | "progress" | "studio" | "editor" | null;
+export type Panel =
+  | "library"
+  | "settings"
+  | "setup"
+  | "account"
+  | "pro"
+  | "admin"
+  | "progress"
+  | "studio"
+  | "editor"
+  | "feedback"
+  | null;
+
+export type VideoKind = "tutorial" | "promo";
 
 /** A finished recording waiting to be named and saved. */
 export interface Take {
@@ -85,6 +98,8 @@ export interface AppState {
   results: Results | null;
   panel: Panel;
   welcomeOpen: boolean;
+  /** Video player on top of everything; `first` = shown right after the welcome screen. */
+  video: { kind: VideoKind; first: boolean } | null;
   toasts: Toast[];
   midiSupported: boolean;
   /** "idle" until access is requested, then "ready" or "denied". */
@@ -138,6 +153,7 @@ export const useApp = create<AppState>(() => ({
   results: null,
   panel: null,
   welcomeOpen: !initialSettings.onboarded,
+  video: null,
   toasts: [],
   midiSupported: typeof navigator !== "undefined" && "requestMIDIAccess" in navigator,
   midiAccess: "idle",
@@ -176,4 +192,8 @@ export function toast(text: string, kind: Toast["kind"] = "info", ms = 3200): vo
 
 export function setPanel(panel: Panel): void {
   useApp.setState({ panel });
+}
+
+export function openVideo(kind: VideoKind, first = false): void {
+  useApp.setState({ video: { kind, first }, panel: null });
 }

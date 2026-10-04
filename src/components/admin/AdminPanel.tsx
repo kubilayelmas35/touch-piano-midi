@@ -2,13 +2,17 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { supabase } from "../../auth/account";
 import {
   auditLog,
+  deleteFeedback,
   deleteFile,
   downloadFile,
+  feedbackCounts,
   fetchStats,
   getUser,
+  listFeedback,
   listFiles,
   listUsers,
   storageByUser,
+  updateFeedback,
   updateUser,
   userAction,
   usersCsv,
@@ -16,6 +20,8 @@ import {
   type AdminUser,
   type AuditEntry,
   type DayCount,
+  type FeedbackEntry,
+  type FeedbackStatus,
   type UserFilter,
   type UserPatch,
   type UserSort,
@@ -28,6 +34,7 @@ import {
   IconApple,
   IconBan,
   IconChart,
+  IconCheck,
   IconClose,
   IconCloud,
   IconCopy,
@@ -35,6 +42,7 @@ import {
   IconDownload,
   IconGoogle,
   IconList,
+  IconMessage,
   IconSearch,
   IconShield,
   IconSync,
@@ -44,7 +52,7 @@ import {
 } from "../../ui/icons";
 import { Button, IconButton, Segmented, Switch, cx } from "../../ui/primitives";
 
-type Tab = "overview" | "members" | "cloud" | "audit";
+type Tab = "overview" | "members" | "cloud" | "feedback" | "audit";
 const PAGE = 25;
 
 // ------------------------------------------------------------------ helpers
@@ -141,6 +149,8 @@ function describe(t: TFn, e: AuditEntry): string {
       return t("admActProPurchase", { store: sourceLabel(t, String(d.store ?? "")) });
     case "delete_file":
       return t("admActDeleteFile", { title: String(d.title ?? "") });
+    case "delete_feedback":
+      return t("admActDeleteFeedback");
     default:
       return e.action;
   }
@@ -944,6 +954,163 @@ function AuditTab({ rev, onOpen, t, lang }: { rev: number; onOpen: (id: string) 
   );
 }
 
+// ---------------------------------------------------------------- feedback
+
+const FEEDBACK_TONE: Record<FeedbackEntry["kind"], "amber" | "sky" | "violet" | "rose" | "slate"> = {
+  suggestion: "sky",
+  complaint: "amber",
+  bug: "rose",
+  other: "slate",
+};
+
+function FeedbackItem({ f, t, lang, onOpen, onChanged }: { f: FeedbackEntry; t: TFn; lang: string; onOpen: (id: string) => void; onChanged: () => void }) {
+  const [note, setNote] = useState(f.admin_note ?? "");
+  const [busy, setBusy] = useState(false);
+  const run = (job: () => Promise<void>, ok = t("admFbSaved")) => {
+    setBusy(true);
+    void job().then(
+      () => {
+        setBusy(false);
+        toast(ok, "success");
+        onChanged();
+      },
+      (err) => {
+        setBusy(false);
+        toast(t("admError", { msg: String(err?.message ?? err) }), "error");
+      }
+    );
+  };
+  const replyTo = f.email ?? f.account_email;
+  return (
+    <li className={cx("rounded-2xl border p-4", f.status === "new" ? "border-brand-400/30 bg-brand-500/[0.06]" : "border-white/[0.06] bg-white/[0.02]")}>
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <Badge tone={FEEDBACK_TONE[f.kind]}>{t(`feedbackKind_${f.kind}`).toUpperCase()}</Badge>
+        {f.status === "new" && <Badge tone="violet">{t("admFbNew").toUpperCase()}</Badge>}
+        {f.status === "done" && <Badge tone="slate">{t("admFbDone").toUpperCase()}</Badge>}
+        <span className="text-mist-400" title={formatDate(f.created_at, lang, true)}>
+          {timeAgo(f.created_at, lang)}
+        </span>
+        <span className="ml-auto flex items-center gap-2 text-mist-400">
+          {f.user_id ? (
+            <button type="button" className="flex items-center gap-1.5 font-semibold text-brand-300 hover:text-brand-200" onClick={() => onOpen(f.user_id!)}>
+              <Avatar name={displayName({ username: f.username, email: f.account_email })} size={18} />
+              {displayName({ username: f.username, email: f.account_email })}
+            </button>
+          ) : (
+            <span>{t("admFbGuest")}</span>
+          )}
+        </span>
+      </div>
+      <p className="mt-3 text-sm leading-relaxed whitespace-pre-wrap break-words text-mist-100">{f.message}</p>
+      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-mist-500">
+        {f.platform && <span>{f.platform}</span>}
+        {f.app_version && <span>v{f.app_version}</span>}
+        {f.language && <span>{f.language.toUpperCase()}</span>}
+        {f.email && <span>{f.email}</span>}
+        {f.device && (
+          <span className="max-w-full truncate" title={f.device}>
+            {f.device}
+          </span>
+        )}
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <input
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder={t("admFbNote")}
+          maxLength={2000}
+          className="h-8 min-w-0 flex-1 rounded-lg border border-white/10 bg-black/30 px-2.5 text-xs outline-none focus:border-brand-400"
+        />
+        {note !== (f.admin_note ?? "") && (
+          <Button size="sm" disabled={busy} onClick={() => run(() => updateFeedback(f.id, { note }))}>
+            {t("admFbNoteSave")}
+          </Button>
+        )}
+        {f.status === "new" && (
+          <Button size="sm" disabled={busy} onClick={() => run(() => updateFeedback(f.id, { status: "read" }))}>
+            <IconCheck size={14} /> {t("admFbMarkRead")}
+          </Button>
+        )}
+        {f.status !== "done" ? (
+          <Button size="sm" disabled={busy} onClick={() => run(() => updateFeedback(f.id, { status: "done" }))}>
+            <IconCheck size={14} /> {t("admFbMarkDone")}
+          </Button>
+        ) : (
+          <Button size="sm" disabled={busy} onClick={() => run(() => updateFeedback(f.id, { status: "read" }))}>
+            {t("admFbReopen")}
+          </Button>
+        )}
+        {replyTo && (
+          <a
+            className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-white/[0.06] bg-white/[0.06] px-3 text-[13px] font-semibold text-mist-100 hover:bg-white/[0.11]"
+            href={`mailto:${replyTo}?subject=${encodeURIComponent(t("admFbReplySubject"))}`}
+          >
+            <IconMessage size={14} /> {t("admFbReply")}
+          </a>
+        )}
+        <IconButton
+          size="sm"
+          label={t("admFbDelete")}
+          className="hover:!text-rose-300"
+          disabled={busy}
+          onClick={() => {
+            if (window.confirm(t("admFbDeleteConfirm"))) run(() => deleteFeedback(f.id), t("admDone"));
+          }}
+        >
+          <IconTrash size={15} />
+        </IconButton>
+      </div>
+    </li>
+  );
+}
+
+function FeedbackTab({ rev, onOpen, onChanged, t, lang }: { rev: number; onOpen: (id: string) => void; onChanged: () => void; t: TFn; lang: string }) {
+  const [filter, setFilter] = useState<FeedbackStatus | "open" | "all">("open");
+  const counts = useLoad(feedbackCounts, [rev]);
+  const list = useLoad(() => listFeedback(filter, 300), [rev, filter]);
+  const c = counts.data;
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-3 gap-3">
+        <Kpi icon={<IconMessage size={15} />} tone="from-brand-400 to-fuchsia-600" label={t("admFbNew")} value={c ? c.new : "…"} />
+        <Kpi icon={<IconList size={15} />} tone="from-sky-400 to-blue-600" label={t("admFbRead")} value={c ? c.read : "…"} />
+        <Kpi icon={<IconCheck size={15} />} tone="from-emerald-400 to-teal-600" label={t("admFbDone")} value={c ? c.done : "…"} />
+      </div>
+      <Card
+        title={t("admTabFeedback")}
+        action={
+          <Segmented
+            size="sm"
+            label={t("admTabFeedback")}
+            value={filter}
+            onChange={setFilter}
+            options={[
+              { value: "open", label: t("admFbOpen") },
+              { value: "new", label: t("admFbNew") },
+              { value: "done", label: t("admFbDone") },
+              { value: "all", label: t("admFbAll") },
+            ]}
+          />
+        }
+      >
+        {list.error ? (
+          <ErrorBox msg={list.error} t={t} />
+        ) : !list.data ? (
+          <Loading t={t} />
+        ) : list.data.length === 0 ? (
+          <p className="py-6 text-center text-sm text-mist-400">{t("admFbEmpty")}</p>
+        ) : (
+          <ul className="space-y-3">
+            {list.data.map((f) => (
+              <FeedbackItem key={`${f.id}-${f.status}-${f.admin_note ?? ""}`} f={f} t={t} lang={lang} onOpen={onOpen} onChanged={onChanged} />
+            ))}
+          </ul>
+        )}
+      </Card>
+    </div>
+  );
+}
+
 // ------------------------------------------------------------------- shell
 
 export default function AdminPanel() {
@@ -972,6 +1139,7 @@ export default function AdminPanel() {
         ["overview", t("admTabOverview"), <IconChart key="o" size={16} />],
         ["members", t("admTabMembers"), <IconUsers key="m" size={16} />],
         ["cloud", t("admTabCloud"), <IconCloud key="c" size={16} />],
+        ["feedback", t("admTabFeedback"), <IconMessage key="f" size={16} />],
         ["audit", t("admTabAudit"), <IconList key="a" size={16} />],
       ] as [Tab, string, ReactNode][],
     [t]
@@ -1020,6 +1188,7 @@ export default function AdminPanel() {
           {tab === "overview" && <Overview rev={rev} t={t} lang={lang} />}
           {tab === "members" && <Members rev={rev} t={t} lang={lang} onOpen={setSelected} />}
           {tab === "cloud" && <CloudTab rev={rev} t={t} lang={lang} onOpen={setSelected} onChanged={bump} />}
+          {tab === "feedback" && <FeedbackTab rev={rev} t={t} lang={lang} onOpen={setSelected} onChanged={bump} />}
           {tab === "audit" && <AuditTab rev={rev} t={t} lang={lang} onOpen={setSelected} />}
         </div>
       </div>

@@ -4,8 +4,9 @@ import { startMidi } from "../input/midi";
 import { useFullscreen } from "../lib/fullscreen";
 import { updateSettings } from "../state/actions";
 import { INSTRUMENT_HEIGHT_RANGE, KEY_ZOOM_MAX, defaultSettings } from "../state/settings";
-import { setPanel, useApp } from "../state/store";
-import { IconPlug } from "../ui/icons";
+import { openVideo, setPanel, useApp } from "../state/store";
+import { isNativeApp } from "../lib/platform";
+import { IconMessage, IconPlug, IconSparkles, IconVideo } from "../ui/icons";
 import { KeyBindings } from "./KeyBindings";
 import { LegalLinks } from "./LegalLinks";
 import { ApproachSwatch, BackgroundSwatch, ChoiceCards, ColorPicker, ColorSwatch, DustSwatch, EffectSwatch, NoteSwatch } from "./AppearancePicker";
@@ -121,6 +122,24 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
+const touchScreen = typeof matchMedia !== "undefined" && matchMedia("(pointer: coarse)").matches;
+
+function HelpButton({ icon, label, hint, onClick }: { icon: ReactNode; label: string; hint: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-start gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.04] p-3 text-left transition-colors hover:bg-white/[0.08] sm:flex-col sm:gap-2"
+    >
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-500/20 text-brand-300">{icon}</span>
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold text-mist-100">{label}</span>
+        <span className="mt-0.5 block text-xs text-mist-400">{hint}</span>
+      </span>
+    </button>
+  );
+}
+
 export function SettingsDialog() {
   const t = useT();
   const open = useApp((s) => s.panel === "settings");
@@ -208,6 +227,24 @@ export function SettingsDialog() {
               </Row>
               <Switch label={t("showNoteNames")} checked={s.showNoteNames} onChange={(v) => updateSettings({ showNoteNames: v })} />
               {fs.supported && <Switch label={t("fullscreen")} hint="F11" checked={fs.full} onChange={fs.toggle} />}
+              {isNativeApp && (
+                <Switch
+                  label={t("landscapeLock")}
+                  hint={t("landscapeLockHint")}
+                  checked={s.landscapeLock}
+                  onChange={(v) => updateSettings({ landscapeLock: v })}
+                />
+              )}
+              {touchScreen && (
+                <Switch label={t("rotateHintSetting")} hint={t("rotateHintSettingHint")} checked={s.rotateHint} onChange={(v) => updateSettings({ rotateHint: v })} />
+              )}
+            </Section>
+            <Section title={t("helpSection")}>
+              <div className="grid gap-2 py-2 sm:grid-cols-3">
+                <HelpButton icon={<IconVideo size={18} />} label={t("tutorialWatch")} hint={t("tutorialWatchHint")} onClick={() => openVideo("tutorial")} />
+                <HelpButton icon={<IconSparkles size={18} />} label={t("promoWatch")} hint={t("promoWatchHint")} onClick={() => openVideo("promo")} />
+                <HelpButton icon={<IconMessage size={18} />} label={t("feedback")} hint={t("feedbackHint")} onClick={() => setPanel("feedback")} />
+              </div>
             </Section>
             <Section title={t("about")}>
               <div className="space-y-1.5 py-2 text-xs leading-relaxed text-mist-400">

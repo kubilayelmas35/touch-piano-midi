@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { InstrumentKind } from "../engine/types";
 import { useT } from "../i18n";
 import { updateSettings } from "../state/actions";
-import { useApp } from "../state/store";
+import { openVideo, useApp } from "../state/store";
 import { unlockAudio } from "../audio/context";
 import { IconGuitar, IconPiano, IconViolin } from "../ui/icons";
 import { Button, Dialog, Segmented, cx } from "../ui/primitives";
@@ -17,6 +17,7 @@ export function WelcomeDialog() {
     void unlockAudio();
     updateSettings({ instrument: pick, onboarded: true });
     useApp.setState({ welcomeOpen: false });
+    openVideo("tutorial", true);
   };
 
   const cards: { id: InstrumentKind; icon: typeof IconPiano; desc: string; tint: string }[] = [
