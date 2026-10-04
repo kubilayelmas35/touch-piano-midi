@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GUITAR, VIOLIN, assignFingerings, foldIntoRange, midiAt } from "./fretting";
-import { judge, starsFor, accuracyOf, emptyStats } from "./types";
+import { judge, starsFor, accuracyOf, emptyStats, holdWeight } from "./types";
 
 describe("fretting", () => {
   it("places every note on a string that produces the right pitch", () => {
@@ -39,7 +39,17 @@ describe("scoring", () => {
     expect(judge(10, 150)).toBe("perfect");
     expect(judge(-80, 150)).toBe("great");
     expect(judge(140, 150)).toBe("good");
-    expect(judge(160, 150)).toBeNull();
+    expect(judge(250, 150)).toBe("good");
+    expect(judge(280, 150)).toBeNull();
+    expect(judge(-190, 150)).toBeNull();
+  });
+
+  it("counts sustain toward accuracy for long notes", () => {
+    expect(holdWeight(0.3)).toBe(0);
+    expect(holdWeight(2)).toBeGreaterThan(holdWeight(1));
+    const tapped = { ...emptyStats(1), perfect: 1, holdPossible: 1 };
+    expect(accuracyOf(tapped)).toBeCloseTo(0.5);
+    expect(accuracyOf({ ...tapped, holdEarned: 1 })).toBeCloseTo(1);
   });
 
   it("computes accuracy and stars", () => {

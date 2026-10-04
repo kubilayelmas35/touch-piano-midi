@@ -204,6 +204,70 @@ export const IconCrown = (p: IconProps) => (
     <path d="M3 7l4.5 4L12 4l4.5 7L21 7l-2 12H5Z" />
   </Svg>
 );
+export const IconCloud = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M7 18a5 5 0 0 1-.9-9.92A6 6 0 0 1 17.7 9.1 4.5 4.5 0 0 1 17.5 18Z" />
+  </Svg>
+);
+export const IconSync = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M20 12a8 8 0 0 1-14.3 4.9" />
+    <path d="M4 12a8 8 0 0 1 14.3-4.9" />
+    <path d="M18.5 3v4.5H14" />
+    <path d="M5.5 21v-4.5H10" />
+  </Svg>
+);
+export const IconShield = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6Z" />
+    <path d="M9 12l2 2 4-4" />
+  </Svg>
+);
+export const IconUsers = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="9" cy="8" r="3.5" />
+    <path d="M2.5 20a6.5 6.5 0 0 1 13 0" />
+    <path d="M16 4.6a3.5 3.5 0 0 1 0 6.8" />
+    <path d="M18 14.2a6.5 6.5 0 0 1 3.5 5.8" />
+  </Svg>
+);
+export const IconChart = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M4 20V10" />
+    <path d="M10 20V4" />
+    <path d="M16 20v-7" />
+    <path d="M22 20H2" />
+  </Svg>
+);
+export const IconList = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M9 6h11" />
+    <path d="M9 12h11" />
+    <path d="M9 18h11" />
+    <circle cx="4.5" cy="6" r="1" fill="currentColor" />
+    <circle cx="4.5" cy="12" r="1" fill="currentColor" />
+    <circle cx="4.5" cy="18" r="1" fill="currentColor" />
+  </Svg>
+);
+export const IconDownload = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 4v11" />
+    <path d="M7 10l5 5 5-5" />
+    <path d="M5 20h14" />
+  </Svg>
+);
+export const IconBan = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M5.6 5.6l12.8 12.8" />
+  </Svg>
+);
+export const IconCopy = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="9" y="9" width="11" height="11" rx="2" />
+    <path d="M5 15V6a2 2 0 0 1 2-2h9" />
+  </Svg>
+);
 export const IconGoogle = ({ size = 18, ...p }: IconProps) => (
   <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false" {...p}>
     <path fill="#4285F4" d="M21.6 12.23c0-.68-.06-1.36-.18-2.02H12v3.83h5.4a4.6 4.6 0 0 1-2 3.02v2.5h3.24c1.9-1.75 2.96-4.33 2.96-7.33Z" />

@@ -9,7 +9,8 @@ const strKey = (s: number) => `str:${s}`;
 /**
  * Guitar / violin playing model: the left hand frets (touching the neck or holding fret keys sets the pitch
  * of a string without sounding it), the right hand strikes strings in the pluck zone (several at once,
- * strumming by sliding across). Guitar strings ring on after release; violin sounds only while bowing.
+ * strumming by sliding across). Guitar strings ring on after release and fade unless kept vibrating
+ * (scrubbing the string or vibrato); violin sounds only while bowing and gets louder with bow speed.
  */
 class FrettedController {
   /** Fingers on the neck. */
@@ -22,6 +23,11 @@ class FrettedController {
   private sounding: number[] = [];
   /** performance.now() of the last strike per string, for the vibration animation. */
   readonly struckAt: number[] = [];
+  /** 0–1 vibration per string; drives loudness. Guitar strings decay unless kept vibrating; violin needs bow motion. */
+  private energy: number[] = [];
+  /** Excitation gathered since the last tick (bow speed, vibrato, scrubbing the string). */
+  private feed: number[] = [];
+  private lastTick = 0;
   autoFret = false;
   tapToPlay = false;
 
@@ -80,7 +86,71 @@ class FrettedController {
     const fret = this.fretOf(string);
     this.sounding[string] = fret;
     this.struckAt[string] = performance.now();
+    this.energy[string] = this.violin ? 0.85 : 1;
     engine.press(strKey(string), midiAt(spec, string, fret), velocity, { string, fret });
+  }
+
+  energyOf(string: number): number {
+    return this.energy[string] ?? 0;
+  }
+
+  /** Bow / scrub motion over the strings a source is touching in the strike zone (speed in px/ms). */
+  stroke(source: Source, speed: number): void {
+    const set = this.striking.get(source);
+    if (!set) return;
+    const amount = Math.min(1, speed * 0.9);
+    for (const s of set) this.feed[s] = Math.max(this.feed[s] ?? 0, amount);
+  }
+
+  /** Vibrato on a neck finger keeps its string alive (speed in px/ms). */
+  vibrate(source: Source, speed: number): void {
+    const p = this.neck.get(source);
+    if (p) this.feed[p.string] = Math.max(this.feed[p.string] ?? 0, Math.min(1, speed * 1.4));
+  }
+
+  /** Per-frame string physics: decay, bow pressure and the loudness that follows. */
+  tick(now: number): void {
+    const spec = this.spec;
+    const dt = this.lastTick ? Math.min(0.1, (now - this.lastTick) / 1000) : 0;
+    this.lastTick = now;
+    if (!spec || !dt) return;
+    const violin = this.violin;
+    for (let s = 0; s < spec.tuning.length; s++) {
+      const key = strKey(s);
+      const held = engine.isHeld(key);
+      if (!held && !engine.isRinging(key)) {
+        this.energy[s] = 0;
+        this.feed[s] = 0;
+        continue;
+      }
+      let e = this.energy[s] ?? 0;
+      let feed = this.feed[s] ?? 0;
+      // Computer keys and tap-to-play can't move, so they bow steadily.
+      if (violin && held && this.steadyBow(s)) feed = Math.max(feed, 0.8);
+      if (violin) {
+        if (feed > 0.02) e += (Math.min(1, 0.45 + feed) - e) * (1 - Math.exp(-dt / 0.06));
+        else e *= Math.exp(-dt / 0.45);
+      } else {
+        e *= Math.exp(-dt / 2.2);
+        if (feed > 0.02) e = Math.min(1, e + feed * dt * 2.5);
+      }
+      this.feed[s] = 0;
+      this.energy[s] = e;
+      if (!violin && e < 0.04) {
+        engine.mute(key);
+        this.energy[s] = 0;
+        this.struckAt[s] = -Infinity;
+        continue;
+      }
+      engine.setLevel(key, violin ? e / 0.85 : e);
+    }
+  }
+
+  private steadyBow(string: number): boolean {
+    for (const [src, set] of this.striking) {
+      if (typeof src === "string" && (src.startsWith("kb:") || src.startsWith("tap:")) && set.has(string)) return true;
+    }
+    return false;
   }
 
   private letGo(string: number): void {
@@ -118,12 +188,14 @@ class FrettedController {
       if (engine.isHeld(key)) {
         this.sounding[s] = fret;
         engine.press(key, midiAt(spec, s, fret), this.violin ? 0.75 : 0.5, { string: s, fret });
+        engine.setLevel(key, this.violin ? (this.energy[s] ?? 0.85) / 0.85 : this.energy[s] ?? 1);
       } else if (engine.isRinging(key)) {
         if (fret > before) {
           // Hammer-on: the ringing string jumps to the new fret.
           this.sounding[s] = fret;
           engine.press(key, midiAt(spec, s, fret), 0.45, { string: s, fret });
           engine.release(key, true);
+          engine.setLevel(key, this.energy[s] ?? 0.6);
         } else {
           // Lifting the finger damps the string.
           engine.mute(key);
@@ -201,6 +273,8 @@ class FrettedController {
     const spec = this.spec;
     if (spec) for (let s = 0; s < 6; s++) engine.mute(strKey(s));
     this.sounding = [];
+    this.energy = [];
+    this.feed = [];
     this.struckAt.fill(-Infinity);
   }
 }

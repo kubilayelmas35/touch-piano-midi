@@ -5,10 +5,14 @@ import { isLoaded, loadInstrument, playNote, type Voice } from "../audio/sampler
 import { selectAccompanimentNotes, selectPlayerNotes, type Song, type SongNote } from "../midi/song";
 import { GUITAR, VIOLIN, assignFingerings, foldIntoRange, type FrettedSpec } from "./fretting";
 import {
+  EARLY_FACTOR,
+  HOLD_POINTS_PER_SEC,
   JUDGEMENT_POINTS,
+  LATE_FACTOR,
   NoteState,
   comboMultiplier,
   emptyStats,
+  holdWeight,
   judge,
   type EngineConfig,
   type Fx,
@@ -116,6 +120,15 @@ export class Engine {
   private ringing = new Map<string, Voice>();
   private sustain = false;
   private sustained: Voice[] = [];
+  /** Voices kept alive by the sustain pedal, by the key that played them. */
+  private pedaled = new Map<string, Voice>();
+  /** Loudness set through setLevel (string energy / bow pressure). */
+  private levels = new Map<string, number>();
+  /** Long notes that were hit and are still running. */
+  private holds: PlayNote[] = [];
+  private holdScore = 0;
+  private lastFrameT = 0;
+  private lastHoldEmit = 0;
   private beats: GridBeat[] = [];
   private firstNoteTime = 0;
   private countInActive = false;
@@ -247,6 +260,10 @@ export class Engine {
           state: NoteState.Pending,
           judgement: null,
           resolvedAt: 0,
+          holdSrc: null,
+          holdStart: 0,
+          held: 0,
+          holding: false,
         });
       });
     });
@@ -350,16 +367,26 @@ export class Engine {
     this.emit();
   }
 
+  private resetHold(n: PlayNote): void {
+    n.holdSrc = null;
+    n.holdStart = 0;
+    n.held = 0;
+    n.holding = false;
+  }
+
   private seekInternal(t: number): void {
     this.killScheduled();
     for (const n of this.notes) {
       if (n.time >= t - 0.0005) {
         n.state = NoteState.Pending;
         n.judgement = null;
+        this.resetHold(n);
       } else if (n.state === NoteState.Pending) {
         n.state = NoteState.Skipped;
       }
     }
+    for (const n of this.holds) n.holding = false;
+    this.holds = [];
     this.pendingIdx = 0;
     this.advancePending();
     this.waiting = false;
@@ -372,7 +399,10 @@ export class Engine {
       n.state = NoteState.Pending;
       n.judgement = null;
       n.resolvedAt = 0;
+      this.resetHold(n);
     }
+    this.holds = [];
+    this.holdScore = 0;
     this.stats = emptyStats(this.notes.length);
     this.runDirty = false;
     this.fx = [];
@@ -501,8 +531,13 @@ export class Engine {
       this.emit();
     }
 
+    const dt = t - this.lastFrameT;
+    this.lastFrameT = t;
     if (cfg.autoPlay) this.markAutoHits(t);
-    else if (!cfg.waitMode) this.scanMisses(t);
+    else {
+      if (!cfg.waitMode) this.scanMisses(t);
+      this.trackHolds(t, dt > 0 && dt < 0.25 ? dt : 0);
+    }
 
     this.schedule(t);
 
@@ -529,8 +564,47 @@ export class Engine {
     if (changed) this.advancePending();
   }
 
+  /** Credits long notes for as long as their key/string keeps sounding. */
+  private trackHolds(t: number, dt: number): void {
+    if (!this.holds.length) return;
+    const s = this.stats;
+    let finished = false;
+    const keep: PlayNote[] = [];
+    for (const n of this.holds) {
+      const end = n.time + n.duration;
+      const on = !!n.holdSrc && this.isSounding(n.holdSrc, n.midi);
+      if (on && dt > 0) {
+        const gained = Math.max(0, Math.min(t, end) - Math.max(t - dt, n.holdStart));
+        n.held += gained;
+        this.holdScore += (gained / this.config.speed) * HOLD_POINTS_PER_SEC * comboMultiplier(s.combo);
+      }
+      n.holding = on && t < end;
+      if (t < end) {
+        keep.push(n);
+        continue;
+      }
+      const span = Math.max(0.05, end - n.holdStart);
+      const w = holdWeight(n.duration);
+      s.holdEarned += w * Math.min(1, n.held / (span * 0.92));
+      s.holdPossible += w;
+      finished = true;
+    }
+    this.holds = keep;
+    const whole = Math.floor(this.holdScore);
+    if (whole > 0) {
+      s.score += whole;
+      this.holdScore -= whole;
+    }
+    const now = performance.now();
+    if (finished || (whole > 0 && now - this.lastHoldEmit > 120)) {
+      this.lastHoldEmit = now;
+      this.stats = { ...s };
+      this.emit();
+    }
+  }
+
   private scanMisses(t: number): void {
-    const win = (this.config.timingWindowMs / 1000) * this.config.speed;
+    const win = (this.config.timingWindowMs / 1000) * this.config.speed * LATE_FACTOR;
     let changed = false;
     for (let i = this.pendingIdx; i < this.notes.length && this.notes[i].time < t - win; i++) {
       const n = this.notes[i];
@@ -539,6 +613,7 @@ export class Engine {
       n.judgement = "miss";
       n.resolvedAt = performance.now();
       this.stats.miss++;
+      this.stats.holdPossible += holdWeight(n.duration);
       this.stats.combo = 0;
       this.pushFx(n, "miss");
       changed = true;
@@ -625,6 +700,8 @@ export class Engine {
     const prev = this.voices.get(sourceKey);
     if (prev) prev.stop();
     this.mute(sourceKey, 0.04);
+    this.pedaled.delete(sourceKey);
+    this.levels.delete(sourceKey);
     const voice = playNote(this.instrumentId, midi, velocity, { volume: this.config.playerVolume });
     if (voice) this.voices.set(sourceKey, voice);
     const spec = this.fretSpec;
@@ -634,7 +711,7 @@ export class Engine {
       if (s >= 0 && midi - spec.tuning[s] <= spec.maxFret) place = { string: s, fret: midi - spec.tuning[s] };
     }
     this.held.set(sourceKey, { midi, string: place?.string ?? -1, fret: place?.fret ?? -1 });
-    this.judgePress(midi, place);
+    this.judgePress(sourceKey, midi, place);
   }
 
   /** Lets go of a note; with `ring` the voice decays naturally (a plucked string) instead of stopping. */
@@ -646,8 +723,14 @@ export class Engine {
     if (ring) {
       this.mute(sourceKey, 0.04);
       this.ringing.set(sourceKey, v);
-    } else if (this.sustain) this.sustained.push(v);
-    else v.stop();
+    } else if (this.sustain) {
+      this.sustained.push(v);
+      this.pedaled.set(sourceKey, v);
+      this.levels.delete(sourceKey);
+    } else {
+      v.stop();
+      this.levels.delete(sourceKey);
+    }
   }
 
   /** Damps a ringing string. */
@@ -655,7 +738,22 @@ export class Engine {
     const v = this.ringing.get(sourceKey);
     if (!v) return;
     this.ringing.delete(sourceKey);
+    this.levels.delete(sourceKey);
     v.stop(release);
+  }
+
+  /** Loudness of a held or ringing note (0–1), e.g. bow pressure or string energy. */
+  setLevel(sourceKey: string, level: number): void {
+    const v = this.voices.get(sourceKey) ?? this.ringing.get(sourceKey);
+    if (!v) return;
+    this.levels.set(sourceKey, level);
+    v.setLevel?.(level);
+  }
+
+  /** Whether the note a source played is still audibly going (held, ringing or pedaled). */
+  isSounding(sourceKey: string, midi: number): boolean {
+    const v = this.voices.get(sourceKey) ?? this.ringing.get(sourceKey) ?? this.pedaled.get(sourceKey);
+    return !!v && !v.done && v.midi === midi && (this.levels.get(sourceKey) ?? 1) > 0.15;
   }
 
   isHeld(sourceKey: string): boolean {
@@ -677,6 +775,7 @@ export class Engine {
     if (!on) {
       for (const v of this.sustained) v.stop(0.35);
       this.sustained = [];
+      this.pedaled.clear();
     }
   }
 
@@ -686,25 +785,34 @@ export class Engine {
     this.held.clear();
   }
 
-  private judgePress(midi: number, pos?: PressPos): void {
+  private judgePress(sourceKey: string, midi: number, pos?: PressPos): void {
     if (this.status !== "playing" || this.config.autoPlay) return;
     const cfg = this.config;
     const t = this.time;
     const win = (cfg.timingWindowMs / 1000) * cfg.speed;
+    const early = win * EARLY_FACTOR;
+    const late = win * LATE_FACTOR;
     let best: PlayNote | null = null;
     let bestDelta = Infinity;
     const waitGroup = this.waiting && this.pendingIdx < this.notes.length ? this.notes[this.pendingIdx].group : -1;
     for (let i = this.pendingIdx; i < this.notes.length; i++) {
       const n = this.notes[i];
-      if (n.time > t + win) break;
+      if (n.time > t + early) break;
       if (n.state !== NoteState.Pending || n.midi !== midi) continue;
       const delta = Math.abs(n.time - t);
-      if ((delta <= win || n.group === waitGroup) && delta < bestDelta) {
+      const inWindow = n.time - t <= early && t - n.time <= late;
+      if ((inWindow || n.group === waitGroup) && delta < bestDelta) {
         best = n;
         bestDelta = delta;
       }
     }
     if (!best) {
+      // A press just after a note slipped past is a late attempt, not a stray key; the miss already counted.
+      const [m0, m1] = this.visibleRange(t - late - 0.35, t);
+      for (let i = m0; i < m1; i++) {
+        const n = this.notes[i];
+        if (n.state === NoteState.Missed && n.midi === midi && t - n.time <= late + 0.35) return;
+      }
       this.stats = { ...this.stats, wrong: this.stats.wrong + 1 };
       this.pushFx({ midi, string: pos?.string ?? -1, fret: pos?.fret ?? -1 }, "wrong");
       this.emit();
@@ -716,6 +824,13 @@ export class Engine {
     best.state = NoteState.Hit;
     best.judgement = j;
     best.resolvedAt = performance.now();
+    if (holdWeight(best.duration) > 0) {
+      best.holdSrc = sourceKey;
+      best.holdStart = Math.max(best.time, Math.min(t, best.time + best.duration));
+      best.held = 0;
+      best.holding = true;
+      this.holds.push(best);
+    }
     const s = { ...this.stats };
     s[j]++;
     s.combo++;

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import { initAuth } from "./auth/account";
 import { AccountDialog, ProDialog } from "./components/AccountDialog";
 import { GameView } from "./components/GameView";
@@ -16,6 +16,18 @@ import { startMidi } from "./input/midi";
 import { initApp } from "./state/actions";
 import { useApp } from "./state/store";
 import { IconUpload } from "./ui/icons";
+
+const AdminPanel = lazy(() => import("./components/admin/AdminPanel"));
+
+function AdminGate() {
+  const show = useApp((s) => s.panel === "admin" && s.account.status === "signedIn" && s.account.isAdmin);
+  if (!show) return null;
+  return (
+    <Suspense fallback={null}>
+      <AdminPanel />
+    </Suspense>
+  );
+}
 
 async function startMidiIfGranted(): Promise<void> {
   try {
@@ -68,6 +80,7 @@ export function App() {
       <WelcomeDialog />
       <AccountDialog />
       <ProDialog />
+      <AdminGate />
       <Toasts />
       <DropOverlay />
     </div>

@@ -23,6 +23,12 @@ export interface PlayNote extends SongNote {
   judgement: Judgement | null;
   /** performance.now() when hit/missed (for effects). */
   resolvedAt: number;
+  /** Long notes: input source that started the note, song time it was hit, seconds held so far. */
+  holdSrc: string | null;
+  holdStart: number;
+  held: number;
+  /** Still being held/sounding right now (drawn lit). */
+  holding: boolean;
 }
 
 export type Status = "empty" | "loading" | "ready" | "playing" | "paused" | "complete";
@@ -37,18 +43,35 @@ export interface Stats {
   miss: number;
   wrong: number;
   total: number;
+  /** Long-note sustain credit earned / available (see holdWeight). */
+  holdEarned: number;
+  holdPossible: number;
 }
 
 export function emptyStats(total = 0): Stats {
-  return { score: 0, combo: 0, maxCombo: 0, perfect: 0, great: 0, good: 0, miss: 0, wrong: 0, total };
+  return { score: 0, combo: 0, maxCombo: 0, perfect: 0, great: 0, good: 0, miss: 0, wrong: 0, total, holdEarned: 0, holdPossible: 0 };
+}
+
+/** Notes at least this long (song seconds) must be held, not just tapped. */
+export const HOLD_MIN_SEC = 0.45;
+/** Score per second of sustain, before the combo multiplier. */
+export const HOLD_POINTS_PER_SEC = 120;
+
+/** How much a long note's sustain counts toward accuracy, relative to a perfectly timed attack (1). */
+export function holdWeight(duration: number): number {
+  return duration < HOLD_MIN_SEC ? 0 : Math.min(2, (duration - 0.3) * 0.6);
 }
 
 /** Wrong presses weigh half a miss, so mashing keys (especially in wait mode) doesn't pay off. */
 export function accuracyOf(s: Stats): number {
   const judged = s.perfect + s.great + s.good + s.miss;
   if (!judged) return 0;
-  return (s.perfect + s.great * 0.7 + s.good * 0.4) / (judged + s.wrong * 0.5);
+  return (s.perfect + s.great * 0.7 + s.good * 0.4 + s.holdEarned) / (judged + s.holdPossible + s.wrong * 0.5);
 }
+
+/** Hits may land a bit early and noticeably late (people react to the note reaching the line). */
+export const EARLY_FACTOR = 1.2;
+export const LATE_FACTOR = 1.8;
 
 export function starsFor(accuracy: number): number {
   if (accuracy >= 0.95) return 5;
@@ -66,11 +89,12 @@ export function comboMultiplier(combo: number): number {
   return 1;
 }
 
+/** deltaMs > 0 is late. */
 export function judge(deltaMs: number, windowMs: number): Judgement | null {
+  if (deltaMs < -windowMs * EARLY_FACTOR || deltaMs > windowMs * LATE_FACTOR) return null;
   const d = Math.abs(deltaMs);
-  if (d > windowMs) return null;
-  if (d <= Math.min(50, windowMs * 0.34)) return "perfect";
-  if (d <= Math.min(100, windowMs * 0.67)) return "great";
+  if (d <= Math.min(60, windowMs * 0.4)) return "perfect";
+  if (d <= Math.min(125, windowMs * 0.85)) return "great";
   return "good";
 }
 

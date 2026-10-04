@@ -160,6 +160,7 @@ export function GameView() {
       } else if (v.layout.fret) {
         fretted.autoFret = s.autoFret;
         fretted.tapToPlay = s.tapToPlay;
+        fretted.tick(now);
         const km = s.instrument === "violin" ? s.keymaps.violin : s.keymaps.guitar;
         if (!fretLabels || fretLabels.src !== km || fretLabels.rev !== rev) {
           fretLabels = { src: km, rev, strings: km.strings.map(keyLabel), frets: km.frets.map(keyLabel) };
@@ -173,6 +174,7 @@ export function GameView() {
           fingers: fretted.heldFrets(),
           struckAt: fretted.struckAt,
           isStruck: (str) => fretted.isStruck(str),
+          energyOf: (str) => fretted.energyOf(str),
           keyLabels: s.showKeyLabels && s.fretKeyMode === "strings" ? fretLabels : null,
         });
       }
@@ -261,6 +263,8 @@ export function GameView() {
         p.lastY = y;
         p.lastT = e.timeStamp;
         fretted.strikeSync(e.pointerId, stringsAt(y, e, count), Math.max(0.45, Math.min(1, 0.5 + speed * 0.35)));
+        // Moving on a string bows it (violin) or keeps it vibrating (guitar).
+        fretted.stroke(e.pointerId, speed);
       } else {
         const fret = Math.min(L.fretAt(x), L.lastFret);
         if (fret !== p.fret) {
@@ -273,7 +277,12 @@ export function GameView() {
           const dy = Math.abs(y - p.y0);
           const cents = instrument === "violin" ? Math.max(-45, Math.min(45, (p.y0 - y) * 2.2)) : Math.min(200, (dy / rowH) * 200);
           fretted.neckBend(e.pointerId, cents);
+          const dt = Math.max(1, e.timeStamp - p.lastT);
+          fretted.vibrate(e.pointerId, Math.hypot(x - p.lastX, y - p.lastY) / dt);
         }
+        p.lastX = x;
+        p.lastY = y;
+        p.lastT = e.timeStamp;
       }
     }
   };

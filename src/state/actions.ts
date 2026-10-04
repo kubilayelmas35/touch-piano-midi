@@ -21,6 +21,7 @@ import { migrateLegacyLibrary } from "../storage/migrate";
 import { saveSettings, type Settings } from "./settings";
 import { DEFAULT_SESSION, setPanel, toast, useApp, type Session } from "./store";
 import { canImport } from "../auth/account";
+import { cloudAfterDelete, cloudAfterImport, cloudAfterRename } from "../auth/cloud";
 
 const LAST_SONG = "staveflow-last-song";
 
@@ -195,6 +196,7 @@ export async function importFiles(files: File[]): Promise<boolean> {
   }
   const midiFiles = files.filter((f) => /\.(mid|midi|kar)$/i.test(f.name) || f.type.includes("midi"));
   let firstId: string | null = null;
+  const added: string[] = [];
   let count = 0;
   let t = Date.now();
   for (const file of midiFiles) {
@@ -214,6 +216,7 @@ export async function importFiles(files: File[]): Promise<boolean> {
         noteCount: song.notes.length,
       });
       firstId ??= id;
+      added.push(id);
       count++;
     } catch {
       toast(tNow("importFailed", { name: file.name }), "error", 4500);
@@ -222,6 +225,7 @@ export async function importFiles(files: File[]): Promise<boolean> {
   if (count) {
     await refreshLibrary();
     toast(tNow("imported", { n: count }), "success");
+    void cloudAfterImport(added);
     if (firstId) await openSong(firstId);
   }
   return true;
@@ -229,6 +233,7 @@ export async function importFiles(files: File[]): Promise<boolean> {
 
 export async function removeSong(id: string): Promise<void> {
   await deleteSong(id);
+  void cloudAfterDelete(id);
   await refreshLibrary();
   if (useApp.getState().currentId === id) await openSong(BUILTIN_SONGS[0].id, { quiet: true });
 }
@@ -237,6 +242,7 @@ export async function renameUserSong(id: string, title: string): Promise<void> {
   const clean = title.trim().slice(0, 120);
   if (!clean) return;
   await renameSong(id, clean);
+  void cloudAfterRename(id, clean);
   await refreshLibrary();
   const st = useApp.getState();
   if (st.currentId === id && st.song) useApp.setState({ song: { ...st.song, title: clean } });

@@ -12,7 +12,7 @@ vi.mock("../audio/sampler", () => ({
   loadInstrument: async () => {},
   playNote: (_id: string, midi: number, _vel: number, opts: { when?: number } = {}) => {
     audio.played.push({ midi, when: opts.when });
-    return { done: false, stop: () => {}, bend: () => {}, kill: () => {} };
+    return { midi, done: false, stop: () => {}, bend: () => {}, kill: () => {}, setLevel: () => {} };
   },
 }));
 
@@ -86,6 +86,37 @@ describe("engine", () => {
     expect(engine.notes[1].state).toBe(NoteState.Missed);
     expect(engine.stats.miss).toBe(1);
     expect(engine.stats.combo).toBe(0);
+  });
+
+  it("credits holding a long note, not just tapping it", async () => {
+    const tapped = await startEngine();
+    advance(-tapped.startTime, tapped);
+    tapped.press("k", 60);
+    tapped.release("k");
+    advance(1, tapped);
+    expect(tapped.stats.holdPossible).toBeGreaterThan(0);
+    expect(tapped.stats.holdEarned).toBe(0);
+
+    const held = await startEngine();
+    advance(-held.startTime, held);
+    held.press("k", 60);
+    advance(1, held);
+    held.release("k");
+    expect(held.stats.holdEarned).toBeCloseTo(held.stats.holdPossible, 2);
+    expect(held.stats.score).toBeGreaterThan(tapped.stats.score);
+  });
+
+  it("accepts a slightly late press and doesn't count a late retry as wrong", async () => {
+    const engine = await startEngine();
+    advance(-engine.startTime + 0.2, engine);
+    engine.press("k", 60);
+    expect(engine.notes[0].state).toBe(NoteState.Hit);
+    advance(0.5, engine);
+    expect(engine.notes[1].state).toBe(NoteState.Pending);
+    advance(0.6, engine);
+    expect(engine.notes[1].state).toBe(NoteState.Missed);
+    engine.press("j", 62);
+    expect(engine.stats.wrong).toBe(0);
   });
 
   it("counts a wrong key without consuming a note", async () => {

@@ -178,11 +178,203 @@ export class Highway {
     return isBlack(n.midi) ? pair[1] : pair[0];
   }
 
-  private laneOf(n: PlayNote, view: HighwayView): { x: number; w: number } | null {
+  /**
+   * Notes on the same fret but different strings that overlap in time share the column side by side,
+   * ordered low string → high string like the strike-zone lanes. Returns note id → [slot, slots].
+   */
+  private fretSlots(i0: number, i1: number, minDur: number): Map<number, [number, number]> {
+    const notes = this.engine.notes;
+    const byFret = new Map<number, PlayNote[]>();
+    for (let i = i0; i < i1; i++) {
+      const n = notes[i];
+      if (n.fret < 0) continue;
+      const list = byFret.get(n.fret);
+      if (list) list.push(n);
+      else byFret.set(n.fret, [n]);
+    }
+    const out = new Map<number, [number, number]>();
+    for (const list of byFret.values()) {
+      if (list.length < 2) continue;
+      for (const n of list) {
+        const end = n.time + Math.max(minDur, n.duration);
+        const strings = new Set<number>([n.string]);
+        for (const m of list) {
+          if (m !== n && m.time < end - 0.005 && n.time < m.time + Math.max(minDur, m.duration) - 0.005) strings.add(m.string);
+        }
+        if (strings.size < 2) continue;
+        const sorted = [...strings].sort((a, b) => a - b);
+        out.set(n.id, [sorted.indexOf(n.string), sorted.length]);
+      }
+    }
+    return out;
+  }
+
+  private headHeight(laneW: number, height: number, long: boolean): number {
+    if (!long) return height;
+    return Math.min(height, Math.max(18, Math.min(34, laneW * 0.85)));
+  }
+
+  /** Gem-like head where the note starts, with a glowing tail for its length. */
+  private drawNote(
+    ctx: CanvasRenderingContext2D,
+    o: {
+      lane: { x: number; w: number };
+      yTop: number;
+      yBottom: number;
+      color: string;
+      alpha: number;
+      long: boolean;
+      live: boolean;
+      holding: boolean;
+      missed: boolean;
+      target: boolean;
+      pulse: number;
+      now: number;
+      effects: boolean;
+    }
+  ): void {
+    const { lane, yTop, yBottom, color, alpha } = o;
+    const height = yBottom - yTop;
+    const headH = this.headHeight(lane.w, height, o.long);
+    const headTop = yBottom - headH;
+    const cx = lane.x + lane.w / 2;
+    const r = Math.min(10, lane.w * 0.4, headH / 2);
+
+    // Halo.
+    if (o.effects && o.live) {
+      ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = alpha * (o.holding ? 0.95 : 0.38);
+      const spread = o.holding ? 0.6 : 0.36;
+      ctx.drawImage(glowSprite(color, 64), lane.x - lane.w * spread, headTop - 10, lane.w * (1 + spread * 2), headH + 20);
+      if (o.long) {
+        ctx.globalAlpha = alpha * (o.holding ? 0.45 : 0.16);
+        ctx.drawImage(glowSprite(color, 64), lane.x - lane.w * 0.2, yTop - 6, lane.w * 1.4, height - headH + 12);
+      }
+      ctx.globalCompositeOperation = "source-over";
+    }
+
+    // Tail.
+    if (o.long && height > headH + 2) {
+      const tw = Math.max(6, lane.w * (o.holding ? 0.88 : 0.78));
+      const tx = cx - tw / 2;
+      const tailBottom = headTop + headH * 0.5;
+      const tailH = tailBottom - yTop;
+      ctx.globalAlpha = alpha;
+      // Cylinder shading across, fading out toward the end of the note.
+      const across = ctx.createLinearGradient(tx, 0, tx + tw, 0);
+      across.addColorStop(0, shade(color, -0.35, 0.9));
+      across.addColorStop(0.5, shade(color, o.holding ? 0.45 : 0.2));
+      across.addColorStop(1, shade(color, -0.35, 0.9));
+      ctx.fillStyle = across;
+      roundRect(ctx, tx, yTop, tw, tailH, Math.min(tw / 2, 8));
+      ctx.fill();
+      const fade = ctx.createLinearGradient(0, yTop, 0, tailBottom);
+      fade.addColorStop(0, "rgba(9,11,28,0.62)");
+      fade.addColorStop(0.45, "rgba(9,11,28,0.18)");
+      fade.addColorStop(1, "rgba(9,11,28,0)");
+      ctx.fillStyle = fade;
+      ctx.fill();
+      // Bright core line.
+      const core = ctx.createLinearGradient(0, yTop, 0, tailBottom);
+      core.addColorStop(0, "rgba(255,255,255,0)");
+      core.addColorStop(1, `rgba(255,255,255,${o.holding ? 0.8 : 0.42})`);
+      ctx.fillStyle = core;
+      ctx.fillRect(cx - Math.max(1, tw * 0.09), yTop + 4, Math.max(2, tw * 0.18), tailH - 4);
+      // Energy flowing down into the hit line while held.
+      if (o.holding && o.effects) {
+        ctx.globalCompositeOperation = "lighter";
+        const gap = 22;
+        const off = (o.now * 0.14) % gap;
+        for (let y = tailBottom - off; y > yTop + 4; y -= gap) {
+          const k = (y - yTop) / Math.max(1, tailH);
+          ctx.fillStyle = `rgba(255,255,255,${0.32 * k})`;
+          ctx.beginPath();
+          ctx.moveTo(tx + 1, y - 7);
+          ctx.lineTo(cx, y);
+          ctx.lineTo(tx + tw - 1, y - 7);
+          ctx.lineTo(tx + tw - 1, y - 4);
+          ctx.lineTo(cx, y + 3);
+          ctx.lineTo(tx + 1, y - 4);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.globalCompositeOperation = "source-over";
+      }
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = withAlpha("#ffffff", o.holding ? 0.4 : 0.16);
+      roundRect(ctx, tx, yTop, tw, tailH, Math.min(tw / 2, 8));
+      ctx.stroke();
+    }
+
+    // Head.
+    ctx.globalAlpha = alpha;
+    const body = ctx.createLinearGradient(0, headTop, 0, yBottom);
+    if (o.missed) {
+      body.addColorStop(0, "rgba(140,144,170,0.85)");
+      body.addColorStop(1, "rgba(70,74,98,0.9)");
+    } else {
+      body.addColorStop(0, shade(color, o.holding ? 0.75 : 0.55));
+      body.addColorStop(0.45, shade(color, o.holding ? 0.3 : 0.05));
+      body.addColorStop(1, shade(color, o.holding ? 0 : -0.32));
+    }
+    ctx.fillStyle = body;
+    roundRect(ctx, lane.x, headTop, lane.w, headH, r);
+    ctx.fill();
+
+    if (!o.missed && lane.w >= 8) {
+      // Side bevels give the head some depth.
+      const bevel = ctx.createLinearGradient(lane.x, 0, lane.x + lane.w, 0);
+      bevel.addColorStop(0, "rgba(255,255,255,0.18)");
+      bevel.addColorStop(0.18, "rgba(255,255,255,0)");
+      bevel.addColorStop(0.82, "rgba(0,0,0,0)");
+      bevel.addColorStop(1, "rgba(0,0,0,0.22)");
+      ctx.fillStyle = bevel;
+      ctx.fill();
+      // Glossy dome on the upper half.
+      const shine = ctx.createLinearGradient(0, headTop, 0, headTop + headH * 0.55);
+      shine.addColorStop(0, "rgba(255,255,255,0.55)");
+      shine.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.fillStyle = shine;
+      roundRect(ctx, lane.x + lane.w * 0.12, headTop + 1.5, lane.w * 0.76, Math.max(3, headH * 0.45), Math.max(2, r * 0.7));
+      ctx.fill();
+      // Hot spot where it meets the keys.
+      if (o.effects && headH >= 12) {
+        const cap = ctx.createRadialGradient(cx, yBottom, 0, cx, yBottom, lane.w * 0.7);
+        cap.addColorStop(0, "rgba(255,255,255,0.75)");
+        cap.addColorStop(0.4, withAlpha(color, 0.7));
+        cap.addColorStop(1, withAlpha(color, 0));
+        ctx.fillStyle = cap;
+        ctx.beginPath();
+        ctx.ellipse(cx, yBottom - 1, lane.w * 0.5, Math.min(6, headH * 0.22), 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    roundRect(ctx, lane.x, headTop, lane.w, headH, r);
+    if (o.target) {
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = `rgba(255,255,255,${0.55 + 0.45 * o.pulse})`;
+    } else if (o.missed) {
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = "rgba(251,113,133,0.8)";
+    } else {
+      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = shade(color, 0.6, o.holding ? 0.95 : 0.55);
+    }
+    ctx.stroke();
+  }
+
+  private laneOf(n: PlayNote, view: HighwayView, slot?: [number, number]): { x: number; w: number } | null {
     if (view.fret) {
       if (n.fret < 0) return null;
       const col = view.fret.column(n.fret);
       const pad = Math.min(6, col.w * 0.12);
+      if (slot && slot[1] > 1) {
+        const inner = col.w - pad * 2;
+        const gap = Math.min(3, inner * 0.06);
+        const w = (inner - gap * (slot[1] - 1)) / slot[1];
+        return { x: col.x + pad + slot[0] * (w + gap), w };
+      }
       return { x: col.x + pad, w: col.w - pad * 2 };
     }
     if (view.piano) {
@@ -258,122 +450,81 @@ export class Highway {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
 
+    const slots = view.fret ? this.fretSlots(i0, i1, 10 / pps) : null;
     for (let i = i0; i < i1; i++) {
       const n = notes[i];
-      const lane = this.laneOf(n, view);
+      const lane = this.laneOf(n, view, slots?.get(n.id));
       if (!lane) continue;
-      const yBottom = yOf(n.time);
-      const height = Math.max(10, n.duration * pps - 2);
-      const yTop = yBottom - height;
-      if (yTop > hitY || yBottom < -4) continue;
-      const color = this.noteColor(n);
       const sounding = n.time <= t && t < n.time + n.duration;
+      const isLong = n.holdSrc !== null || n.duration * pps > Math.max(36, lane.w * 1.4);
+      // A hit long note sticks to the hit line and its tail drains into it.
+      const sticky = n.state === NoteState.Hit && sounding && isLong;
+      const brokenHold = sticky && n.holdSrc !== null && !n.holding;
+      const holdingNow = sticky && !brokenHold;
+      let yBottom = yOf(n.time);
+      if (sticky) yBottom = Math.min(yBottom, hitY);
+      const yTop = yOf(n.time) - Math.max(10, n.duration * pps - 2);
+      const height = yBottom - yTop;
+      if (height <= 0 || yTop > hitY || yBottom < -4) continue;
+
+      const color = this.noteColor(n);
       let alpha = 1;
       let fill = color;
       if (n.state === NoteState.Missed) {
         fill = "#5b5f7a";
-        alpha = 0.75;
+        alpha = 0.7;
       } else if (n.state === NoteState.Skipped) {
         alpha = 0.25;
-      } else if (n.state === NoteState.Hit && !sounding) {
-        alpha = Math.max(0.15, 1 - (now - n.resolvedAt) / 500);
+      } else if (n.state === NoteState.Hit && !sticky) {
+        alpha = Math.max(0, 1 - (now - n.resolvedAt) / 450);
+        if (alpha <= 0) continue;
       }
-      const r = Math.min(10, lane.w * 0.42);
-      ctx.globalAlpha = alpha;
-      const live = n.state === NoteState.Pending || (n.state === NoteState.Hit && sounding);
-      const glowing = n.state === NoteState.Hit && sounding;
+      const live = n.state === NoteState.Pending || holdingNow;
+      const isTarget = n.state === NoteState.Pending && (n.group === waitGroup || Math.abs(n.time - t) <= win);
 
-      // Neon halo.
-      if (view.effects && live) {
-        ctx.globalCompositeOperation = "lighter";
-        ctx.globalAlpha = alpha * (glowing ? 0.9 : 0.32);
-        const spread = glowing ? 0.5 : 0.32;
-        ctx.drawImage(glowSprite(color, 64), lane.x - lane.w * spread, yTop - 8, lane.w * (1 + spread * 2), height + 16);
-        ctx.globalCompositeOperation = "source-over";
-        ctx.globalAlpha = alpha;
-      }
-
-      // Body: bright top fading into a deep base.
-      const grad = ctx.createLinearGradient(0, yTop, 0, yBottom);
-      if (n.state === NoteState.Missed) {
-        grad.addColorStop(0, "rgba(120,124,150,0.7)");
-        grad.addColorStop(1, fill);
-      } else {
-        grad.addColorStop(0, shade(fill, glowing ? 0.7 : 0.5, 0.95));
-        grad.addColorStop(0.35, shade(fill, glowing ? 0.35 : 0.12));
-        grad.addColorStop(0.75, glowing ? shade(fill, 0.15) : fill);
-        grad.addColorStop(1, shade(fill, glowing ? 0 : -0.28));
-      }
-      ctx.fillStyle = grad;
-      roundRect(ctx, lane.x, yTop, lane.w, height, r);
-      ctx.fill();
-
-      if (live && lane.w >= 8) {
-        // Glossy highlight on the upper left.
-        const shineH = Math.min(height * 0.3, 20);
-        const shine = ctx.createLinearGradient(lane.x, yTop, lane.x + lane.w * 0.4, yTop + shineH);
-        shine.addColorStop(0, "rgba(255,255,255,0.42)");
-        shine.addColorStop(1, "rgba(255,255,255,0)");
-        ctx.fillStyle = shine;
-        roundRect(ctx, lane.x + lane.w * 0.1, yTop + 1.5, lane.w * 0.32, shineH, r * 0.5);
-        ctx.fill();
-        // Hot cap where the note meets the keys.
-        if (view.effects && height >= 12) {
-          const cx = lane.x + lane.w / 2;
-          const cap = ctx.createRadialGradient(cx, yBottom, 0, cx, yBottom, lane.w * 0.7);
-          cap.addColorStop(0, "rgba(255,255,255,0.7)");
-          cap.addColorStop(0.4, withAlpha(color, 0.75));
-          cap.addColorStop(1, withAlpha(color, 0));
-          ctx.fillStyle = cap;
-          ctx.beginPath();
-          ctx.ellipse(cx, yBottom - 1, lane.w * 0.5, Math.min(7, height * 0.12), 0, 0, Math.PI * 2);
-          ctx.fill();
-        }
-        roundRect(ctx, lane.x, yTop, lane.w, height, r);
-      }
+      this.drawNote(ctx, {
+        lane,
+        yTop,
+        yBottom,
+        color: brokenHold ? "#6b7092" : fill,
+        alpha,
+        long: isLong,
+        live,
+        holding: holdingNow,
+        missed: n.state === NoteState.Missed,
+        target: isTarget,
+        pulse,
+        now,
+        effects: view.effects,
+      });
 
       // Matching marker in the string lane above the strike zone.
       const sl = this.stringLaneOf(n, view);
       if (sl) {
+        ctx.globalAlpha = alpha * (brokenHold ? 0.5 : 1);
         const sg = ctx.createLinearGradient(0, yTop, 0, yBottom);
-        sg.addColorStop(0, shade(fill, 0.4, 0.85));
-        sg.addColorStop(1, fill);
+        sg.addColorStop(0, withAlpha(fill, 0.25));
+        sg.addColorStop(0.7, shade(fill, 0.25, 0.9));
+        sg.addColorStop(1, shade(fill, 0.55));
         ctx.fillStyle = sg;
         roundRect(ctx, sl.x, yTop, sl.w, height, Math.min(6, sl.w * 0.45));
         ctx.fill();
-        roundRect(ctx, lane.x, yTop, lane.w, height, r);
       }
 
-      const isTarget =
-        n.state === NoteState.Pending && (n.group === waitGroup || Math.abs(n.time - t) <= win);
-      if (isTarget) {
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = `rgba(255,255,255,${0.55 + 0.45 * pulse})`;
-        ctx.stroke();
-      } else if (n.state === NoteState.Missed) {
-        ctx.lineWidth = 1.5;
-        ctx.strokeStyle = "rgba(251,113,133,0.8)";
-        ctx.stroke();
-      } else {
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = "rgba(255,255,255,0.28)";
-        ctx.stroke();
-      }
-
-      // Label.
+      // Label on the head.
+      ctx.globalAlpha = alpha;
+      const headH = this.headHeight(lane.w, height, isLong);
+      const headMid = yBottom - headH / 2;
       if (view.fret && lane.w >= 14) {
-        const label = String(n.fret);
         const fs = Math.min(15, Math.max(10, lane.w * 0.42));
         ctx.font = `800 ${fs}px system-ui, sans-serif`;
-        ctx.fillStyle = "rgba(10,12,30,0.88)";
-        const ly = Math.min(yBottom - fs * 0.75, Math.max(yTop + fs * 0.75, yBottom - fs * 0.75));
-        ctx.fillText(label, lane.x + lane.w / 2, ly);
-      } else if (view.showNames && lane.w >= 13 && height >= 14) {
+        ctx.fillStyle = "rgba(10,12,30,0.9)";
+        ctx.fillText(String(n.fret), lane.x + lane.w / 2, headMid + 0.5);
+      } else if (view.showNames && lane.w >= 13 && headH >= 14) {
         const fs = Math.min(12, Math.max(8, lane.w * 0.5));
         ctx.font = `700 ${fs}px system-ui, sans-serif`;
         ctx.fillStyle = "rgba(10,12,30,0.85)";
-        const label = noteName(n.midi, view.naming).replace("#", "♯");
-        ctx.fillText(label, lane.x + lane.w / 2, yBottom - Math.min(height / 2, fs * 0.9));
+        ctx.fillText(noteName(n.midi, view.naming).replace("#", "♯"), lane.x + lane.w / 2, headMid + 0.5);
       }
     }
     ctx.globalAlpha = 1;
@@ -404,7 +555,9 @@ export class Highway {
     const t = view.t;
     for (let i = i0; i < i1; i++) {
       const n = engine.notes[i];
-      if (n.state === NoteState.Hit && n.time <= t && t < n.time + n.duration) add(this.laneOf(n, view), this.noteColor(n));
+      if (n.state === NoteState.Hit && n.time <= t && t < n.time + n.duration && (n.holdSrc === null || n.holding)) {
+        add(this.laneOf(n, view), this.noteColor(n));
+      }
     }
     for (const h of engine.held.values()) {
       const fake = { midi: h.midi, string: h.string, fret: h.fret } as PlayNote;

@@ -222,11 +222,11 @@ export interface FretboardView {
   /** performance.now() of the last strike per string. */
   struckAt: number[];
   isStruck: (string: number) => boolean;
+  /** 0–1 vibration per string (from the playing model). */
+  energyOf: (string: number) => number;
   /** Computer-keyboard labels per string and per fret (from fret 1), when string mode is on. */
   keyLabels: { strings: string[]; frets: string[] } | null;
 }
-
-const GUITAR_RING_S = 1.8;
 
 export class FretboardRenderer extends CanvasSurface {
   /** Row index (0 = top) for a string (0 = lowest pitch). Highest string is drawn on top. */
@@ -240,11 +240,10 @@ export class FretboardRenderer extends CanvasSurface {
   }
 
   /** 0..1 vibration of a string, for drawing. */
-  private energy(view: FretboardView, s: number, now: number): number {
-    const age = (now - (view.struckAt[s] ?? -1e9)) / 1000;
-    if (view.violin) return view.isStruck(s) ? 0.55 : Math.max(0, 0.5 - age * 3);
-    const decay = Math.max(0, 1 - age / GUITAR_RING_S);
-    return view.isStruck(s) ? Math.max(0.35, decay) : decay * decay;
+  private energy(view: FretboardView, s: number): number {
+    const e = view.energyOf(s);
+    if (view.violin) return view.isStruck(s) ? Math.max(0.1, e * 0.7) : 0;
+    return e * e;
   }
 
   draw(view: FretboardView): void {
@@ -378,7 +377,7 @@ export class FretboardRenderer extends CanvasSurface {
       for (const [pos, c] of marks.targetPos) targetStrings.set(Number(pos.split(":")[0]), c);
       for (let s = 0; s < count; s++) {
         const top = this.rowOf(s, count) * rowH;
-        const e = this.energy(view, s, now);
+        const e = this.energy(view, s);
         const target = targetStrings.get(s);
         if (target) {
           ctx.fillStyle = withAlpha(target, 0.14 + 0.2 * pulse);
@@ -400,7 +399,7 @@ export class FretboardRenderer extends CanvasSurface {
     for (let s = 0; s < count; s++) {
       const y = this.rowOf(s, count) * rowH + rowH / 2;
       const thick = view.violin ? 1.2 + (count - 1 - s) * 0.45 : 1 + (count - 1 - s) * 0.5;
-      const e = this.energy(view, s, now);
+      const e = this.energy(view, s);
       const finger = view.fingers.get(s) ?? 0;
       const xv = finger > 0 ? Math.min(neckW, (finger + 1) * L.colW) : L.colW;
       const color = e > 0.03 ? colors[s] : "rgba(225,225,235,0.75)";

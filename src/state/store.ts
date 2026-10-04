@@ -29,7 +29,7 @@ export interface Toast {
   kind: "info" | "success" | "error";
 }
 
-export type Panel = "library" | "settings" | "setup" | "account" | "pro" | null;
+export type Panel = "library" | "settings" | "setup" | "account" | "pro" | "admin" | null;
 
 export interface Account {
   /** "disabled" when no Supabase project is configured. */
@@ -37,6 +37,10 @@ export interface Account {
   email: string | null;
   username: string | null;
   pro: boolean;
+  /** Cloud MIDI storage, switched on per member by an admin. */
+  cloud: boolean;
+  cloudQuotaMb: number;
+  isAdmin: boolean;
   /** Arrived from a password-reset e-mail; asks for a new password. */
   recovery: boolean;
   /** OAuth providers switched on in the Supabase dashboard. */
@@ -77,6 +81,10 @@ export interface AppState {
   dragOver: boolean;
   audioLocked: boolean;
   account: Account;
+  /** Ids of library songs that also live in the member's cloud. */
+  cloudIds: string[];
+  cloudBytes: number;
+  cloudBusy: boolean;
 }
 
 export const DEFAULT_SESSION: Session = {
@@ -118,7 +126,20 @@ export const useApp = create<AppState>(() => ({
   midiDevices: [],
   dragOver: false,
   audioLocked: false,
-  account: { status: "disabled", email: null, username: null, pro: false, recovery: false, providers: { google: false, apple: false } },
+  account: {
+    status: "disabled",
+    email: null,
+    username: null,
+    pro: false,
+    cloud: false,
+    cloudQuotaMb: 0,
+    isAdmin: false,
+    recovery: false,
+    providers: { google: false, apple: false },
+  },
+  cloudIds: [],
+  cloudBytes: 0,
+  cloudBusy: false,
 }));
 
 let toastId = 1;

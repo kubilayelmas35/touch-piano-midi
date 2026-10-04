@@ -22,7 +22,12 @@ function redirectUrl(): string {
 
 async function loadProfile(userId: string, email: string | null): Promise<void> {
   if (!supabase) return;
-  const { data } = await supabase.from("profiles").select("username, pro").eq("id", userId).maybeSingle();
+  const { data } = await supabase
+    .from("profiles")
+    .select("username, pro, cloud, cloud_quota_mb, is_admin")
+    .eq("id", userId)
+    .maybeSingle();
+  const hadCloud = useApp.getState().account.cloud;
   useApp.setState((s) => ({
     account: {
       ...s.account,
@@ -30,8 +35,12 @@ async function loadProfile(userId: string, email: string | null): Promise<void> 
       email,
       username: (data?.username as string | null) ?? null,
       pro: data?.pro === true,
+      cloud: data?.cloud === true,
+      cloudQuotaMb: Number(data?.cloud_quota_mb ?? 0),
+      isAdmin: data?.is_admin === true,
     },
   }));
+  if (data?.cloud === true && !hadCloud) void import("./cloud").then((m) => m.syncCloud({ quiet: true }));
 }
 
 async function loadProviders(): Promise<void> {
@@ -58,7 +67,12 @@ export async function initAuth(): Promise<void> {
       // Defer: Supabase forbids awaiting other calls inside this callback.
       window.setTimeout(() => void loadProfile(user.id, user.email ?? null), 0);
     } else {
-      useApp.setState((s) => ({ account: { ...s.account, status: "signedOut", email: null, username: null, pro: false, recovery: false } }));
+      useApp.setState((s) => ({
+        account: { ...s.account, status: "signedOut", email: null, username: null, pro: false, cloud: false, cloudQuotaMb: 0, isAdmin: false, recovery: false },
+        cloudIds: [],
+        cloudBytes: 0,
+        panel: s.panel === "admin" ? null : s.panel,
+      }));
     }
   });
   const { data } = await supabase.auth.getSession();
@@ -68,7 +82,8 @@ export async function initAuth(): Promise<void> {
 /** Whether importing MIDI files is allowed (always, when accounts aren't configured). */
 export function canImport(): boolean {
   if (!supabase) return true;
-  return useApp.getState().account.pro;
+  const a = useApp.getState().account;
+  return a.pro || a.cloud;
 }
 
 export async function refreshAccount(): Promise<void> {

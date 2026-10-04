@@ -19,6 +19,8 @@ export interface Voice {
   stop(release?: number, when?: number): void;
   /** Pitch bend in cents relative to the note (vibrato / slides). */
   bend(cents: number): void;
+  /** Scales the note's loudness (0–1 of its attack level): bow pressure, string energy. */
+  setLevel(level: number, smoothing?: number): void;
   readonly done: boolean;
 }
 
@@ -126,6 +128,7 @@ class VoiceImpl implements Voice {
   private released = false;
   private readonly baseDetune: number;
   private readonly startedAt: number;
+  private readonly level: GainNode;
 
   constructor(
     readonly midi: number,
@@ -135,11 +138,19 @@ class VoiceImpl implements Voice {
     private readonly nodes: AudioNode[],
     private readonly def: InstrumentDef,
     baseDetune: number,
-    when: number
+    when: number,
+    level: GainNode
   ) {
     this.baseDetune = baseDetune;
     this.startedAt = when;
+    this.level = level;
     source.onended = () => this.cleanup();
+  }
+
+  setLevel(level: number, smoothing = 0.05): void {
+    if (this.done) return;
+    const ctx = this.env.context as AudioContext;
+    this.level.gain.setTargetAtTime(Math.max(0, Math.min(1.2, level)), ctx.currentTime, smoothing);
   }
 
   stop(release?: number, when?: number): void {
@@ -228,9 +239,11 @@ export function playNote(id: InstrumentId, midi: number, velocity: number, opts:
   env.gain.setValueAtTime(0, when);
   env.gain.linearRampToValueAtTime(peak, when + def.attack);
 
-  const nodes: AudioNode[] = [source, env];
-  let tail: AudioNode = env;
+  const level = ctx.createGain();
+  const nodes: AudioNode[] = [source, env, level];
+  let tail: AudioNode = level;
   source.connect(env);
+  env.connect(level);
 
   if (def.velocityTone) {
     const filter = ctx.createBiquadFilter();
@@ -249,7 +262,7 @@ export function playNote(id: InstrumentId, midi: number, velocity: number, opts:
   nodes.push(pan);
 
   source.start(when);
-  const voice = new VoiceImpl(midi, id, source, env, nodes, def, detune, when);
+  const voice = new VoiceImpl(midi, id, source, env, nodes, def, detune, when, level);
   active.add(voice);
   if (opts.duration != null) {
     voice.stop(opts.release ?? def.minRelease, when + Math.max(0.03, opts.duration));

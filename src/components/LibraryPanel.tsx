@@ -3,10 +3,12 @@ import { useT } from "../i18n";
 import { formatTime } from "../lib/notes";
 import { BUILTIN_SONGS } from "../midi/builtin";
 import { canImport } from "../auth/account";
+import { syncCloud } from "../auth/cloud";
+import { formatBytes } from "../lib/format";
 import { importFiles, openSong, removeSong, renameUserSong } from "../state/actions";
 import { setPanel, useApp } from "../state/store";
 import { bestKey, type SongPrefs } from "../storage/db";
-import { IconCheck, IconEdit, IconSearch, IconStar, IconTrash, IconUpload } from "../ui/icons";
+import { IconCheck, IconCloud, IconEdit, IconSearch, IconStar, IconSync, IconTrash, IconUpload } from "../ui/icons";
 import { Button, Dialog, IconButton, cx } from "../ui/primitives";
 
 function Stars({ n, size = 12 }: { n: number; size?: number }) {
@@ -41,6 +43,11 @@ export function LibraryPanel() {
   const currentId = useApp((s) => s.currentId);
   const instrument = useApp((s) => s.settings.instrument);
   const pro = useApp((s) => s.account.pro);
+  const cloud = useApp((s) => s.account.status === "signedIn" && s.account.cloud);
+  const quotaMb = useApp((s) => s.account.cloudQuotaMb);
+  const cloudIds = useApp((s) => s.cloudIds);
+  const cloudBytes = useApp((s) => s.cloudBytes);
+  const cloudBusy = useApp((s) => s.cloudBusy);
   const accountOn = useApp((s) => s.account.status !== "disabled");
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
@@ -83,7 +90,7 @@ export function LibraryPanel() {
           <Button variant="primary" onClick={() => (canImport() ? fileRef.current?.click() : setPanel("pro"))}>
             <IconUpload size={16} />
             <span className="max-[380px]:hidden">{t("importMidi")}</span>
-            {!pro && accountOn && (
+            {!pro && !cloud && accountOn && (
               <span className="rounded-md bg-amber-300 px-1.5 text-[10px] leading-4 font-extrabold text-ink-950">PRO</span>
             )}
           </Button>
@@ -101,6 +108,28 @@ export function LibraryPanel() {
           />
         </div>
         <p className="mt-2 hidden text-xs text-mist-400 sm:block">{t("dropHint")}</p>
+        {cloud && (
+          <div className="mt-3 flex items-center gap-3 rounded-2xl border border-sky-300/15 bg-sky-400/[0.07] px-3 py-2">
+            <IconCloud size={18} className="shrink-0 text-sky-300" />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-baseline justify-between gap-2 text-xs">
+                <span className="font-semibold text-sky-100">{t("cloudOn")}</span>
+                <span className="tabular-nums text-mist-300">
+                  {formatBytes(cloudBytes)} / {quotaMb} MB · {t("cloudSongs", { n: cloudIds.length })}
+                </span>
+              </div>
+              <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-sky-400 to-brand-400"
+                  style={{ width: `${Math.min(100, quotaMb ? (cloudBytes / (quotaMb * 1048576)) * 100 : 0)}%` }}
+                />
+              </div>
+            </div>
+            <IconButton size="sm" label={t("cloudSync")} disabled={cloudBusy} onClick={() => void syncCloud()}>
+              <IconSync size={16} className={cloudBusy ? "animate-spin" : ""} />
+            </IconButton>
+          </div>
+        )}
       </div>
 
       <section aria-labelledby="lib-mine">
@@ -152,7 +181,15 @@ export function LibraryPanel() {
                       </form>
                     ) : (
                       <button type="button" onClick={() => void choose(s.id)} className="min-w-0 flex-1 text-left">
-                        <div className="truncate text-sm font-semibold">{s.title}</div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="truncate text-sm font-semibold">{s.title}</span>
+                          {cloud && cloudIds.includes(s.id) && (
+                            <span title={t("inCloud")} className="shrink-0 text-sky-300">
+                              <IconCloud size={13} />
+                              <span className="sr-only">{t("inCloud")}</span>
+                            </span>
+                          )}
+                        </div>
                         <div className="mt-0.5 flex items-center gap-2 text-xs text-mist-400">
                           {s.duration ? <span>{formatTime(s.duration)}</span> : null}
                           {s.noteCount ? <span>{t("notesCount", { n: s.noteCount })}</span> : null}
