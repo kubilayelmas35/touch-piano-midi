@@ -78,7 +78,16 @@ export function LibraryPanel() {
   );
   const composerLabel = (c: string) => (c === "Traditional" ? t("traditional") : c);
   const catLabel = (c: BuiltinCategory | "all") =>
-    c === "all" ? t("catAll") : c === "kids" ? t("catKids") : c === "classical" ? t("catClassical") : c === "folk" ? t("catFolk") : t("catHoliday");
+    ({
+      all: t("catAll"),
+      kids: t("catKids"),
+      classical: t("catClassical"),
+      folk: t("catFolk"),
+      holiday: t("catHoliday"),
+      study: t("catStudy"),
+      ragtime: t("catRagtime"),
+      guitar: t("catGuitar"),
+    })[c];
   const mine = useMemo(() => userSongs.filter((s) => !q || normalize(s.title).includes(q)), [userSongs, q]);
   const daily = songOfTheDay();
 

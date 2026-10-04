@@ -216,6 +216,7 @@ export function SettingsDialog() {
                   <li>{t("creditPiano")}</li>
                   <li>{t("creditStrings")}</li>
                   <li>{t("creditBach")}</li>
+                  <li>{t("creditMutopia")}</li>
                   <li>{t("creditSongs")}</li>
                 </ul>
                 <LegalLinks className="pt-1" />

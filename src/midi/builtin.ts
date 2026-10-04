@@ -1,4 +1,5 @@
 import { finalizeSong, parseMidi, type Beat, type Song, type SongNote, type SongTrack } from "./song";
+import MUTOPIA_LIST from "./mutopia.json";
 import { SONGBOOK } from "./songbook";
 
 /**
@@ -20,7 +21,30 @@ function duration(s: string | undefined): number {
   return b === undefined ? Number(a) : Number(a) / Number(b);
 }
 
-function voice(src: string, track: number, spb: number, startBeat = 0, velocity = 0.75): SongNote[] {
+/** Total length of a voice in quarter notes. */
+function length(src: string): number {
+  return src
+    .trim()
+    .split(/\s+/)
+    .filter((t) => t && t !== "|")
+    .reduce((sum, t) => sum + duration(t.split(":")[1]), 0);
+}
+
+/**
+ * Spreads a held chord into a repeating figure (low–high, or Alberti low–high–mid–high for triads),
+ * used to vary the accompaniment on repeated verses.
+ */
+function broken(midis: number[], dur: number, step: number): { midi: number; at: number; dur: number }[] {
+  const sorted = [...midis].sort((a, b) => a - b);
+  const figure = sorted.length >= 3 ? [sorted[0], sorted[sorted.length - 1], sorted[1], sorted[sorted.length - 1]] : sorted;
+  const out: { midi: number; at: number; dur: number }[] = [];
+  for (let at = 0, i = 0; at < dur - 1e-6; at += step, i++) {
+    out.push({ midi: figure[i % figure.length], at, dur: Math.min(step, dur - at) });
+  }
+  return out;
+}
+
+function voice(src: string, track: number, spb: number, startBeat = 0, velocity = 0.75, brokenStep = 0): SongNote[] {
   const out: SongNote[] = [];
   let beat = startBeat;
   for (const token of src.trim().split(/\s+/)) {
@@ -29,11 +53,16 @@ function voice(src: string, track: number, spb: number, startBeat = 0, velocity 
     const dur = duration(durStr);
     if (!Number.isFinite(dur)) throw new Error(`Bad duration in ${token}`);
     if (pitches !== "-") {
-      for (const p of pitches.split("+")) {
+      const midis = pitches.split("+").map(pitchToMidi);
+      const parts =
+        brokenStep && midis.length >= 2 && dur >= brokenStep * 2
+          ? broken(midis, dur, brokenStep)
+          : midis.map((midi) => ({ midi, at: 0, dur }));
+      for (const p of parts) {
         out.push({
-          midi: pitchToMidi(p),
-          time: beat * spb,
-          duration: dur * spb * 0.94,
+          midi: p.midi,
+          time: (beat + p.at) * spb,
+          duration: p.dur * spb * 0.94,
           velocity,
           track,
         });
@@ -44,8 +73,8 @@ function voice(src: string, track: number, spb: number, startBeat = 0, velocity 
   return out;
 }
 
-export type BuiltinCategory = "kids" | "classical" | "folk" | "holiday";
-export const BUILTIN_CATEGORIES: BuiltinCategory[] = ["kids", "classical", "folk", "holiday"];
+export type BuiltinCategory = "kids" | "classical" | "folk" | "holiday" | "study" | "ragtime" | "guitar";
+export const BUILTIN_CATEGORIES: BuiltinCategory[] = ["kids", "folk", "holiday", "classical", "study", "ragtime", "guitar"];
 
 export interface BuiltinSpec {
   id: string;
@@ -64,6 +93,17 @@ export interface BuiltinSpec {
   pickup?: number;
   right: string;
   left?: string;
+  /** How many times the tune is played; by default enough verses (up to 3) to last about a minute. */
+  verses?: number;
+}
+
+const TARGET_SECONDS = 60;
+const MAX_VERSES = 3;
+
+function verseCount(spec: BuiltinSpec): number {
+  if (spec.verses) return spec.verses;
+  const seconds = (length(spec.right) * 60) / spec.bpm;
+  return Math.max(1, Math.min(MAX_VERSES, Math.ceil(TARGET_SECONDS / seconds - 0.15)));
 }
 
 function makeBeats(totalQuarters: number, spb: number, meter: [number, number], pickup: number): Beat[] {
@@ -81,8 +121,18 @@ function makeBeats(totalQuarters: number, spb: number, meter: [number, number], 
 
 function build(spec: BuiltinSpec): Song {
   const spb = 60 / spec.bpm;
-  const right = voice(spec.right, 0, spb, 0, 0.78);
-  const left = spec.left ? voice(spec.left, 1, spb, spec.pickup ?? 0, 0.6) : [];
+  const pickup = spec.pickup ?? 0;
+  const measure = spec.meter[0] * spec.meter[1];
+  // Each verse starts on a bar line so the pickup of the next verse falls in the rest after the last note.
+  const verseLen = Math.ceil(length(spec.right) / measure - 1e-6) * measure;
+  const brokenStep = spec.bpm >= 100 ? 1 : 0.5;
+  const right: SongNote[] = [];
+  const left: SongNote[] = [];
+  for (let v = 0, n = verseCount(spec); v < n; v++) {
+    const start = v * verseLen;
+    right.push(...voice(spec.right, 0, spb, start, 0.78));
+    if (spec.left) left.push(...voice(spec.left, 1, spb, start + pickup, 0.6, v % 2 ? brokenStep : 0));
+  }
   const notes = [...right, ...left];
   const range = (arr: SongNote[]) => ({
     low: Math.min(...arr.map((n) => n.midi)),
@@ -95,7 +145,7 @@ function build(spec: BuiltinSpec): Song {
     tracks.push({ index: 1, name: "Left hand", instrument: "piano", isDrum: false, noteCount: left.length, ...range(left) });
   }
   const totalQuarters = notes.reduce((m, n) => Math.max(m, (n.time + n.duration) / spb), 0);
-  const beats = makeBeats(totalQuarters, spb, spec.meter, spec.pickup ?? 0);
+  const beats = makeBeats(totalQuarters, spb, spec.meter, pickup);
   return finalizeSong(spec.title, notes, tracks, beats, spec.bpm, spec.meter[0]);
 }
 
@@ -223,18 +273,45 @@ export interface BuiltinInfo {
   category: BuiltinCategory;
 }
 
+/** Complete pieces shipped as unmodified Mutopia Project MIDI files (see tools/mutopia.mjs for the credits). */
+const MUTOPIA = MUTOPIA_LIST as (BuiltinInfo & { m: number })[];
+
 export const BUILTIN_SONGS: BuiltinInfo[] = [
   ...SPECS.map(({ id, title, titleTr, composer, level, category }) => ({ id, title, titleTr, composer, level, category })),
   { id: "bach-846", title: "Prelude in C major, BWV 846", composer: "J. S. Bach", level: 3, category: "classical" },
+  ...MUTOPIA.map(({ id, title, titleTr, composer, level, category }) => ({ id, title, titleTr, composer, level, category })),
 ];
 
 export function isBuiltin(id: string): boolean {
   return BUILTIN_SONGS.some((s) => s.id === id);
 }
 
+/** Names a file's tracks "Right hand" / "Left hand" by average pitch so the usual defaults apply. */
+function nameHands(song: Song, title: string, guitar: boolean): Song {
+  const pitched = song.tracks.filter((t) => !t.isDrum && t.noteCount > 0);
+  const avg = new Map<number, number>();
+  for (const t of pitched) {
+    const own = song.notes.filter((n) => n.track === t.index);
+    avg.set(t.index, own.reduce((s, n) => s + n.midi, 0) / Math.max(1, own.length));
+  }
+  const byPitch = [...pitched].sort((a, b) => avg.get(b.index)! - avg.get(a.index)!);
+  const tracks = song.tracks.map((t) => {
+    if (pitched.length === 1 && t === pitched[0]) return { ...t, name: guitar ? "Guitar" : "Melody" };
+    if (pitched.length === 2) return { ...t, name: t === byPitch[0] ? "Right hand" : "Left hand" };
+    return t;
+  });
+  return { ...song, title, tracks };
+}
+
 export async function loadBuiltin(id: string): Promise<Song> {
   const spec = SPECS.find((s) => s.id === id);
   if (spec) return build(spec);
+  const piece = MUTOPIA.find((s) => s.id === id);
+  if (piece) {
+    const res = await fetch(`${import.meta.env.BASE_URL}songs/mutopia/${id}.mid`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return nameHands(parseMidi(await res.arrayBuffer(), piece.title), piece.title, piece.category === "guitar");
+  }
   if (id === "bach-846") {
     const res = await fetch(`${import.meta.env.BASE_URL}songs/bach_846.mid`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -251,4 +328,4 @@ export async function loadBuiltin(id: string): Promise<Song> {
   throw new Error(`Unknown builtin ${id}`);
 }
 
-export const __test = { voice, pitchToMidi, build, duration, SPECS };
+export const __test = { voice, pitchToMidi, build, duration, verseCount, nameHands, SPECS, MUTOPIA };

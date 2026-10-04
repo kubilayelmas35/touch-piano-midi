@@ -26,7 +26,15 @@ export function SongSetupDialog() {
   if (!song) return null;
 
   const trackName = (name: string) =>
-    name === "Right hand" ? t("trackRightHand") : name === "Left hand" ? t("trackLeftHand") : name;
+    name === "Right hand"
+      ? t("trackRightHand")
+      : name === "Left hand"
+        ? t("trackLeftHand")
+        : name === "Guitar"
+          ? t("trackGuitar")
+          : name === "Melody"
+            ? t("trackMelody")
+            : name;
 
   const roleOf = (i: number): Role =>
     session.playTracks.includes(i) ? "play" : session.mutedTracks.includes(i) ? "mute" : "accomp";
