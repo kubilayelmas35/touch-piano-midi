@@ -30,6 +30,8 @@ interface Sample {
   buffer: AudioBuffer;
   /** Seconds where the loop restarts (it runs to the end of the buffer); null plays once. */
   loopStart: number | null;
+  /** Variant for notes held by the player (no fixed duration). */
+  held?: Sample;
 }
 
 interface LoadedInstrument {
@@ -66,11 +68,8 @@ function makeLoopBuffer(ctx: BaseAudioContext, src: AudioBuffer, def: Instrument
   return out;
 }
 
-/**
- * Turns a decaying pluck into one that can sustain: the slice right after the attack (until it has dropped to
- * about a third) is levelled to a constant loudness and crossfade-looped.
- */
-function makePluckLoop(ctx: BaseAudioContext, src: AudioBuffer): Sample {
+/** Loudness of a sample in 20 ms windows. */
+function envelope(src: AudioBuffer) {
   const rate = src.sampleRate;
   const win = Math.max(1, Math.floor(rate * 0.02));
   const nWin = Math.floor(src.length / win);
@@ -88,12 +87,48 @@ function makePluckLoop(ctx: BaseAudioContext, src: AudioBuffer): Sample {
   };
   let peak = 0;
   for (let w = 1; w < Math.min(nWin, 8); w++) if (env[w] > env[peak]) peak = w;
+  return { win, nWin, smooth, peak };
+}
+
+/**
+ * Turns a decaying pluck into one that can sustain: the slice right after the attack (until it has dropped to
+ * about a third) is levelled to a constant loudness and crossfade-looped.
+ */
+function makePluckLoop(ctx: BaseAudioContext, src: AudioBuffer): Sample {
+  const { win, nWin, smooth, peak } = envelope(src);
   const startW = Math.min(nWin - 20, Math.max(peak + 3, 5));
   const startLevel = smooth(startW);
   let endW = startW + 12;
   while (endW < nWin - 2 && endW - startW < 60 && smooth(endW) > startLevel * 0.32) endW++;
   if (startW < 2 || endW >= nWin) return { buffer: src, loopStart: null };
+  return levelledLoop(ctx, src, win, nWin, smooth, startW, endW);
+}
 
+/**
+ * A held piano key: the note decays naturally until it is `dropDb` quieter than its attack (or 2.5 s in),
+ * then a slice of its body is levelled and looped so it keeps sounding for as long as the key is down.
+ */
+function makeHoldLoop(ctx: BaseAudioContext, src: AudioBuffer, dropDb: number): Sample {
+  const { win, nWin, smooth, peak } = envelope(src);
+  const rate = src.sampleRate;
+  const target = smooth(peak) * Math.pow(10, -dropDb / 20);
+  let startW = peak + 12;
+  while (startW < nWin - 50 && (startW * win) / rate < 2.5 && smooth(startW) > target) startW++;
+  const endW = Math.min(nWin - 2, startW + 40);
+  if (endW - startW < 15) return { buffer: src, loopStart: null };
+  return levelledLoop(ctx, src, win, nWin, smooth, startW, endW);
+}
+
+function levelledLoop(
+  ctx: BaseAudioContext,
+  src: AudioBuffer,
+  win: number,
+  nWin: number,
+  smooth: (w: number) => number,
+  startW: number,
+  endW: number
+): Sample {
+  const rate = src.sampleRate;
   const start = startW * win;
   const end = endW * win;
   const xf = Math.min(Math.floor(rate * 0.08), Math.floor((end - start) / 3));
@@ -122,6 +157,7 @@ function makePluckLoop(ctx: BaseAudioContext, src: AudioBuffer): Sample {
 function prepare(ctx: BaseAudioContext, decoded: AudioBuffer, def: InstrumentDef): Sample {
   if (def.sustained && def.loop) return { buffer: makeLoopBuffer(ctx, decoded, def), loopStart: Math.max(0, def.loop.start) };
   if (def.pluckSustain) return makePluckLoop(ctx, decoded);
+  if (def.holdSustain) return { buffer: decoded, loopStart: null, held: makeHoldLoop(ctx, decoded, def.holdSustain.dropDb) };
   return { buffer: decoded, loopStart: null };
 }
 
@@ -282,7 +318,8 @@ export function playNote(id: InstrumentId, midi: number, velocity: number, opts:
   const { ctx, input } = getBus();
   const def = inst.def;
   const when = Math.max(ctx.currentTime, opts.when ?? ctx.currentTime);
-  const [sampleMidi, sample] = nearestSample(inst, midi);
+  const [sampleMidi, base] = nearestSample(inst, midi);
+  const sample = opts.duration == null && base.held ? base.held : base;
   const buffer = sample.buffer;
 
   if (active.size >= MAX_VOICES) {
@@ -312,6 +349,9 @@ export function playNote(id: InstrumentId, midi: number, velocity: number, opts:
   // Scheduled plucks have nobody keeping the string alive, so they fade like a real string.
   if (def.pluckSustain && sample.loopStart !== null && opts.duration != null) {
     env.gain.setTargetAtTime(0, when + def.attack + sample.loopStart, def.pluckSustain.decay);
+  }
+  if (def.holdSustain && sample.loopStart !== null) {
+    env.gain.setTargetAtTime(peak * def.holdSustain.floor, Math.max(when + 0.05, when + sample.loopStart - offset), def.holdSustain.fade);
   }
 
   const level = ctx.createGain();

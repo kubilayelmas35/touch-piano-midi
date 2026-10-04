@@ -21,11 +21,28 @@ export interface PathState {
   tries: number;
   /** Best stars per finished step, keyed by step index. */
   stars: Record<number, number>;
+  /** How much of the song this step plays so far: index into the part ladder (see `partSeconds`). */
+  part: number;
 }
 
 export const SPEEDS = [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1];
 export const PASS = 0.8;
 export const FAIL = 0.5;
+
+/** A step starts with the first half minute of the song and grows each time it is played well. */
+const PART_SECONDS = [30, 45, 60, 90, 120, 180, 240];
+/** A part this close to the whole song just becomes the whole song. */
+const PART_NEARLY_ALL = 0.8;
+
+/** How many parts a song of this length goes through; the last one is always the whole song. */
+export function partCount(songSeconds: number): number {
+  return PART_SECONDS.filter((s) => s < songSeconds * PART_NEARLY_ALL).length + 1;
+}
+
+/** Seconds of the song played in this part; null = the whole song. */
+export function partSeconds(songSeconds: number, part: number): number | null {
+  return part < partCount(songSeconds) - 1 ? PART_SECONDS[part] : null;
+}
 
 export function startSpeed(skill: Skill): number {
   return skill === "new" ? 0.5 : skill === "some" ? 0.7 : 0.9;
@@ -56,7 +73,7 @@ export function pathSteps(instrument: InstrumentKind, skill: Skill): PathStep[] 
 }
 
 export function freshState(skill: Skill): PathState {
-  return { step: 0, speed: startSpeed(skill), wait: false, tries: 0, stars: {} };
+  return { step: 0, speed: startSpeed(skill), wait: false, tries: 0, stars: {}, part: 0 };
 }
 
 function stepSpeed(speed: number, by: number): number {
@@ -76,6 +93,8 @@ export type Verdict =
   | "faster"
   /** Good while the song waited: next run plays in time again. */
   | "waitOff"
+  /** Good at the goal speed: the next run plays more of the song. */
+  | "longer"
   /** Step done; on to the next one. */
   | "passed"
   /** Last step done. */
@@ -92,11 +111,13 @@ export interface RunResult {
 export function judgeRun(
   state: PathState,
   run: RunResult,
-  ctx: { skill: Skill; steps: PathStep[] }
+  ctx: { skill: Skill; steps: PathStep[]; parts?: number }
 ): { verdict: Verdict; next: PathState } {
   const step = ctx.steps[state.step];
   const goal = goalSpeed(ctx.skill, step?.lesson ?? 0);
-  const base = { ...state, speed: run.speed, wait: run.wait, stars: { ...state.stars } };
+  const parts = Math.max(1, ctx.parts ?? 1);
+  const part = Math.min(state.part ?? 0, parts - 1);
+  const base = { ...state, part, speed: run.speed, wait: run.wait, stars: { ...state.stars } };
 
   if (run.wait) {
     if (run.accuracy >= PASS) return { verdict: "waitOff", next: { ...base, wait: false, tries: 0 } };
@@ -104,17 +125,16 @@ export function judgeRun(
   }
 
   if (run.accuracy >= PASS) {
+    // A short part is brought up to speed first, then grows; the step is done once the whole song is.
     if (run.speed + 1e-6 < goal) {
       const up = stepSpeed(run.speed, run.accuracy >= 0.95 ? 2 : 1);
       return { verdict: "faster", next: { ...base, speed: Math.min(goal, up), tries: 0 } };
     }
+    if (part < parts - 1) return { verdict: "longer", next: { ...base, part: part + 1, tries: 0 } };
     base.stars[state.step] = Math.max(base.stars[state.step] ?? 0, run.stars);
     const last = state.step >= ctx.steps.length - 1;
     if (last) return { verdict: "finished", next: { ...base, tries: 0 } };
-    const nextGoal = goalSpeed(ctx.skill, ctx.steps[state.step + 1].lesson);
-    // A new hand or song starts a notch slower than the speed just mastered.
-    const speed = Math.min(nextGoal, Math.max(SPEEDS[0], stepSpeed(run.speed, -1)));
-    return { verdict: "passed", next: { ...base, step: state.step + 1, speed, tries: 0 } };
+    return { verdict: "passed", next: stepTo(base, state.step + 1, run.speed, ctx) };
   }
 
   const slower = () => {
@@ -124,6 +144,30 @@ export function judgeRun(
   if (run.accuracy < FAIL) return slower();
   if (state.tries >= 1) return slower();
   return { verdict: "retry", next: { ...base, tries: state.tries + 1 } };
+}
+
+/**
+ * The state for starting another step: from its first part, a notch slower than `speed` (a new hand or song
+ * takes getting used to) and never above that step's goal.
+ */
+export function stepTo(state: PathState, index: number, speed: number, ctx: { skill: Skill; steps: PathStep[] }): PathState {
+  const i = Math.max(0, Math.min(ctx.steps.length - 1, index));
+  const goal = goalSpeed(ctx.skill, ctx.steps[i].lesson);
+  return {
+    ...state,
+    step: i,
+    part: 0,
+    wait: false,
+    tries: 0,
+    speed: Math.min(goal, Math.max(SPEEDS[0], stepSpeed(speed, -1))),
+  };
+}
+
+/** Jumps to another step by choice ("too easy" / "back"): from its first part, at the current speed or that step's goal. */
+export function jumpTo(state: PathState, index: number, ctx: { skill: Skill; steps: PathStep[] }): PathState {
+  const i = Math.max(0, Math.min(ctx.steps.length - 1, index));
+  const goal = goalSpeed(ctx.skill, ctx.steps[i].lesson);
+  return { ...state, step: i, part: 0, wait: false, tries: 0, speed: Math.min(goal, state.speed) };
 }
 
 /** Saved path per "instrument:skill"; lives in the progress copy so it syncs with the account. */
@@ -141,6 +185,7 @@ export function readPath(all: PathStore | undefined, instrument: InstrumentKind,
     wait: s.wait === true,
     tries: typeof s.tries === "number" ? s.tries : 0,
     stars: s.stars && typeof s.stars === "object" ? s.stars : {},
+    part: typeof s.part === "number" && s.part >= 0 ? Math.round(s.part) : 0,
   };
 }
 
@@ -159,6 +204,7 @@ export function sanitizePaths(raw: unknown): PathStore {
       wait: s.wait === true,
       tries: typeof s.tries === "number" ? s.tries : 0,
       stars,
+      part: typeof s.part === "number" && Number.isFinite(s.part) ? Math.max(0, Math.min(PART_SECONDS.length, Math.round(s.part))) : 0,
       at: typeof s.at === "number" ? s.at : 0,
     };
   }

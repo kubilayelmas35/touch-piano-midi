@@ -58,6 +58,7 @@ export const DEFAULT_CONFIG: EngineConfig = {
   playerVolume: 1,
   pianoPedal: false,
   loop: { a: -1, b: -1, enabled: false },
+  segmentEnd: 0,
 };
 
 /** Fade of a key let go with the piano pedal mode on (seconds to silence). */
@@ -250,8 +251,13 @@ export class Engine {
     if (!song) return;
     const cfg = this.config;
     const spec = this.fretSpec;
-    const raw = selectPlayerNotes(song, cfg.playTracks, cfg.hand);
+    const cut = cfg.segmentEnd > 0 ? (n: SongNote) => n.time < cfg.segmentEnd : null;
+    let raw = selectPlayerNotes(song, cfg.playTracks, cfg.hand);
     this.accomp = selectAccompanimentNotes(song, cfg.playTracks, cfg.hand, cfg.mutedTracks);
+    if (cut) {
+      raw = raw.filter(cut);
+      this.accomp = this.accomp.filter(cut);
+    }
 
     // Group simultaneous notes, fold into instrument range, drop duplicates.
     const groups: SongNote[][] = [];
@@ -464,6 +470,7 @@ export class Engine {
       next.guitarTone !== prev.guitarTone ||
       next.hand !== prev.hand ||
       next.countIn !== prev.countIn ||
+      next.segmentEnd !== prev.segmentEnd ||
       next.playTracks.join() !== prev.playTracks.join() ||
       next.mutedTracks.join() !== prev.mutedTracks.join();
     const timingChanged = next.speed !== prev.speed || next.autoPlay !== prev.autoPlay;

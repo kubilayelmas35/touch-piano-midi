@@ -14,6 +14,8 @@ export interface Session {
   waitMode: boolean;
   autoPlay: boolean;
   loop: LoopRange;
+  /** Learning path: the run stops here (song seconds); 0 = the whole song. */
+  segmentEnd: number;
 }
 
 export interface Results {
@@ -43,6 +45,8 @@ export interface CoachOutcome {
   wait: boolean;
   total: number;
   stepIndex: number;
+  /** Seconds of the song the next attempt plays; null = the whole song. */
+  partSec: number | null;
 }
 
 export interface Toast {
@@ -148,6 +152,7 @@ export const DEFAULT_SESSION: Session = {
   waitMode: false,
   autoPlay: false,
   loop: { a: -1, b: -1, enabled: false },
+  segmentEnd: 0,
 };
 
 const initialSettings = loadSettings();

@@ -37,9 +37,48 @@ export const PIANO_PRESETS: Record<PianoPreset, Record<string, number>> = {
 
 const FRET_KEYS = ["Digit1", "Digit2", "Digit3", "Digit4", "Digit5", "Digit6", "Digit7", "Digit8", "Digit9", "Digit0", "Minus", "Equal"];
 
+export function isPianoPreset(piano: Record<string, number>, preset: PianoPreset): boolean {
+  const p = PIANO_PRESETS[preset];
+  const codes = Object.keys(p);
+  return codes.length === Object.keys(piano).length && codes.every((c) => piano[c] === p[c]);
+}
+
+/** Lowest and highest offset of the piano keymap. */
+export function keymapSpan(piano: Record<string, number>): [number, number] {
+  const offs = Object.values(piano);
+  return offs.length ? [Math.min(...offs), Math.max(...offs)] : [0, 0];
+}
+
+/**
+ * C (MIDI) the keymap's offset 0 should sit on so as many of the song's notes as possible land on keys;
+ * ties go to the octave closest to the middle of the song.
+ */
+export function fitKeyboardBase(midis: number[], span: [number, number]): number {
+  const [a, b] = span;
+  if (!midis.length) return 60;
+  let lo = 127;
+  let hi = 0;
+  for (const m of midis) {
+    if (m < lo) lo = m;
+    if (m > hi) hi = m;
+  }
+  const mid = (lo + hi) / 2 - (a + b) / 2;
+  let best = 60;
+  let bestScore = -1;
+  for (let base = 24; base <= 96; base += 12) {
+    let score = 0;
+    for (const m of midis) if (m >= base + a && m <= base + b) score++;
+    if (score > bestScore || (score === bestScore && Math.abs(base - mid) < Math.abs(best - mid))) {
+      best = base;
+      bestScore = score;
+    }
+  }
+  return best;
+}
+
 export function defaultKeymaps(): Keymaps {
   return {
-    piano: { ...PIANO_PRESETS.classic },
+    piano: { ...PIANO_PRESETS.twoRow },
     guitar: { strings: ["KeyH", "KeyJ", "KeyK", "KeyL", "Semicolon", "Quote"], frets: [...FRET_KEYS] },
     violin: { strings: ["KeyJ", "KeyK", "KeyL", "Semicolon"], frets: [...FRET_KEYS] },
   };

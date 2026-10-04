@@ -4,6 +4,7 @@ import { FretLayout, PianoLayout, pluckWidth, visibleFrets } from "../engine/lay
 import { fretted } from "../input/fretted";
 import { glider } from "../input/glide";
 import { keyLabel, keyLabelMap, keyLabelRevision } from "../input/keyboard";
+import { keyboardBase } from "../input/keyboardBase";
 import { INSTRUMENT_HEIGHT_RANGE } from "../state/settings";
 import { niceKeyboardRange } from "../lib/notes";
 import { Highway } from "../render/highway";
@@ -193,7 +194,7 @@ export function GameView() {
       });
       const rev = keyLabelRevision();
       if (v.layout.piano) {
-        const base = (s.keyboardOctave + 1) * 12;
+        const base = keyboardBase(s);
         if (!pianoLabels || pianoLabels.src !== s.keymaps.piano || pianoLabels.base !== base || pianoLabels.rev !== rev) {
           pianoLabels = { src: s.keymaps.piano, base, rev, map: keyLabelMap(s.keymaps.piano, base) };
         }

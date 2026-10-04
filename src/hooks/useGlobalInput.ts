@@ -4,6 +4,7 @@ import { engine } from "../engine/engine";
 import { tNow } from "../i18n";
 import { fretted } from "../input/fretted";
 import { isEditableTarget } from "../input/keyboard";
+import { keyboardBase, keyboardOctaveNow } from "../input/keyboardBase";
 import { cycleLoop, importFiles, updateSession, updateSettings } from "../state/actions";
 import { setPanel, toast, useApp } from "../state/store";
 import { chooseAudio } from "../studio/studioStore";
@@ -51,7 +52,7 @@ export function useGlobalInput(): void {
         if (e.repeat || down.has(e.code)) return;
         down.set(e.code, action.kind);
         void unlockAudio();
-        if (action.kind === "note") engine.press(`key:${e.code}`, (st.settings.keyboardOctave + 1) * 12 + action.offset, 0.8);
+        if (action.kind === "note") engine.press(`key:${e.code}`, keyboardBase(st.settings) + action.offset, 0.8);
         else if (action.kind === "string") fretted.stringKeyDown(e.code, action.index);
         else fretted.fretKeyDown(e.code, action.index);
         return;
@@ -88,22 +89,33 @@ export function useGlobalInput(): void {
           engine.stop();
           break;
         case "KeyB":
+        case "F2":
+          e.preventDefault();
           cycleLoop();
           break;
         case "KeyN":
+        case "F4":
+          e.preventDefault();
           updateSession({ waitMode: !st.session.waitMode });
           toast(`${tNow("waitMode")}: ${tNow(!st.session.waitMode ? "on" : "off")}`, "info", 1400);
           break;
         case "KeyM":
+        case "F8":
+          e.preventDefault();
           updateSettings({ metronome: !st.settings.metronome });
           toast(`${tNow("metronome")}: ${tNow(!st.settings.metronome ? "on" : "off")}`, "info", 1400);
           break;
         case "KeyZ":
-          updateSettings({ keyboardOctave: Math.max(1, st.settings.keyboardOctave - 1) });
-          break;
+        case "PageDown":
         case "KeyX":
-          updateSettings({ keyboardOctave: Math.min(7, st.settings.keyboardOctave + 1) });
+        case "PageUp": {
+          e.preventDefault();
+          const up = e.code === "KeyX" || e.code === "PageUp";
+          const oct = Math.max(1, Math.min(7, keyboardOctaveNow(st.settings) + (up ? 1 : -1)));
+          updateSettings({ keyboardOctave: oct, autoOctave: false });
+          toast(tNow("keyboardOctaveNow", { o: `C${oct}` }), "info", 1400);
           break;
+        }
         case "Slash":
           e.preventDefault();
           setPanel("library");

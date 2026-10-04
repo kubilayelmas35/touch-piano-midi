@@ -19,6 +19,11 @@ export interface InstrumentDef {
    * the decaying sample is levelled out and looped. Scheduled (autoplay) notes still decay with this time constant.
    */
   pluckSustain?: { decay: number };
+  /**
+   * Struck strings that keep ringing while the key is held: after decaying by `dropDb` the body loops, then fades
+   * slowly (time constant `fade` s) towards `floor` × the attack level instead of dying out.
+   */
+  holdSustain?: { dropDb: number; floor: number; fade: number };
   /** Natural decay is inside the sample; cap ring time after release. */
   maxRing: number;
   /** Whether velocity also darkens the tone (lowpass). */
@@ -39,6 +44,7 @@ export const INSTRUMENTS: Record<InstrumentId, InstrumentDef> = {
     attack: 0.003,
     minRelease: 0.5,
     sustained: false,
+    holdSustain: { dropDb: 12, floor: 0.6, fade: 6 },
     maxRing: 10,
     velocityTone: true,
   },

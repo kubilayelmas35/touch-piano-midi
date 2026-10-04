@@ -49,6 +49,7 @@ export function engineConfig(): Partial<EngineConfig> {
     waitMode: session.waitMode,
     autoPlay: session.autoPlay,
     loop: session.loop,
+    segmentEnd: session.segmentEnd,
   };
 }
 
@@ -85,6 +86,10 @@ export async function initApp(): Promise<void> {
   engine.configure(engineConfig());
   engine.subscribe(syncFromEngine);
   engine.onComplete = handleComplete;
+  // Leaving the path mid-song: the song plays to its end again.
+  useApp.subscribe((s, prev) => {
+    if (!s.coach && prev.coach && s.session.segmentEnd) updateSession({ segmentEnd: 0 });
+  });
   window.addEventListener(OVERLAY_EVENT, () => engine.pause());
   initSettingsSync(applyRemoteSettings);
   initProgress();
@@ -361,7 +366,9 @@ function handleComplete(r: { stats: import("../engine/types").Stats; dirty: bool
   const practice = r.dirty || r.config.autoPlay || r.config.loop.enabled;
   const key = bestKey(r.config.instrument, r.config.waitMode);
   const prev = currentId ? prefs[currentId]?.best?.[key] : undefined;
-  const newBest = !practice && r.stats.score > 0 && (!prev || r.stats.score > prev.score);
+  // A path segment is only part of the song: it neither sets a best score nor masters the song.
+  const partial = r.config.segmentEnd > 0;
+  const newBest = !practice && !partial && r.stats.score > 0 && (!prev || r.stats.score > prev.score);
   const achievements = recordRun({
     songId: currentId,
     instrument: r.config.instrument,
@@ -372,7 +379,7 @@ function handleComplete(r: { stats: import("../engine/types").Stats; dirty: bool
     misses: r.stats.miss,
     waitMode: r.config.waitMode,
     speed: r.config.speed,
-    practice,
+    practice: practice || partial,
   });
   // Skipping around or looping doesn't say how the whole step went.
   const coach = r.dirty || r.config.loop.enabled ? undefined : coachAfterRun({ accuracy, stars, speed: r.config.speed, wait: r.config.waitMode });

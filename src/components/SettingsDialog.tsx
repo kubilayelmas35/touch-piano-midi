@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { useT } from "../i18n";
+import { keyboardOctaveNow } from "../input/keyboardBase";
 import { startMidi } from "../input/midi";
 import { useFullscreen } from "../lib/fullscreen";
 import { updateSettings } from "../state/actions";
@@ -173,18 +174,24 @@ export function SettingsDialog() {
     { id: "input", label: t("input") },
   ];
 
-  const shortcuts: [string[], string][] = [
-    [["Space"], t("scSpace")],
-    [["←", "→"], t("scArrows")],
-    [["↓", "↑"], t("scSpeed")],
-    [["Home"], t("scHome")],
-    [["B"], t("scLoop")],
-    [["N"], t("scWait")],
-    [["M"], t("scMetro")],
-    [["Shift"], t("scPedal")],
-    [["/"], t("scLibrary")],
-    [["Esc"], t("scEsc")],
-  ];
+  const asNote = (code: string) => code in s.keymaps.piano;
+  /** A letter shortcut, or its stand-in when that key plays a note. */
+  const sc = (code: string, label: string, alt?: string) => (!asNote(code) ? [label] : alt ? [alt] : null);
+  const shortcuts = (
+    [
+      [["Space"], t("scSpace")],
+      [["←", "→"], t("scArrows")],
+      [["↓", "↑"], t("scSpeed")],
+      [["Home"], t("scHome")],
+      [sc("KeyB", "B", "F2"), t("scLoop")],
+      [sc("KeyN", "N", "F4"), t("scWait")],
+      [sc("KeyM", "M", "F8"), t("scMetro")],
+      [asNote("KeyZ") ? ["PgDn", "PgUp"] : ["Z", "X"], t("scOctave")],
+      [["Shift"], t("scPedal")],
+      [sc("Slash", "/"), t("scLibrary")],
+      [["Esc"], t("scEsc")],
+    ] as [string[] | null, string][]
+  ).filter((x): x is [string[], string] => !!x[0]);
 
   return (
     <Dialog
@@ -544,13 +551,14 @@ export function SettingsDialog() {
             </Section>
             <Section title={t("computerKeyboard")}>
               <Switch label={t("showKeyLabels")} checked={s.showKeyLabels} onChange={(v) => updateSettings({ showKeyLabels: v })} />
+              <Switch label={t("autoOctave")} hint={t("autoOctaveHint")} checked={s.autoOctave} onChange={(v) => updateSettings({ autoOctave: v })} />
               <Slider
                 label={t("keyboardOctave")}
-                value={s.keyboardOctave}
+                value={s.autoOctave ? keyboardOctaveNow(s) : s.keyboardOctave}
                 min={1}
                 max={7}
                 step={1}
-                onChange={(v) => updateSettings({ keyboardOctave: v })}
+                onChange={(v) => updateSettings({ keyboardOctave: v, autoOctave: false })}
                 format={(v) => `C${v}`}
               />
               <p className="pb-2 text-xs leading-relaxed text-mist-400">{t("keyboardHint")}</p>

@@ -221,6 +221,21 @@ describe("engine", () => {
     expect(t).toBeGreaterThan(0.4);
   });
 
+  it("a segment end leaves out later notes and finishes the run there", async () => {
+    const engine = await startEngine({ segmentEnd: 2.5 });
+    expect(engine.notes.map((n) => n.midi)).toEqual([60, 62, 64]);
+    expect(engine.stats.total).toBe(3);
+    let done = false;
+    engine.onComplete = () => (done = true);
+    advance(3, engine);
+    expect(done).toBe(false);
+    advance(3, engine);
+    expect(done).toBe(true);
+    expect(engine.time).toBeLessThan(6);
+    engine.configure({ segmentEnd: 0 });
+    expect(engine.notes).toHaveLength(5);
+  });
+
   it("A–B loop jumps back with a pre-roll and marks the run dirty", async () => {
     const engine = await startEngine({ loop: { a: 1, b: 3, enabled: true } });
     let maxT = -Infinity;

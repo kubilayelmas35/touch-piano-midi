@@ -126,7 +126,7 @@ describe("mergeProgress", () => {
 });
 
 describe("learning path in the progress copy", () => {
-  const state = (step: number, at: number) => ({ step, speed: 0.6, wait: false, tries: 0, stars: { 0: 4 }, at });
+  const state = (step: number, at: number) => ({ step, speed: 0.6, wait: false, tries: 0, stars: { 0: 4 }, part: 0, at });
 
   it("keeps the most recently saved path, so a restart elsewhere sticks", () => {
     const a = { ...emptyProgress(), path: { "piano:new": state(12, 100), "guitar:new": state(3, 50) } };

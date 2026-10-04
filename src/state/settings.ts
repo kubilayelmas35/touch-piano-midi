@@ -2,7 +2,7 @@ import type { NoteNaming } from "../lib/notes";
 import type { GuitarTone, InstrumentKind } from "../engine/types";
 import { readLegacySettings } from "../storage/migrate";
 import type { Goal, Skill } from "../coach/path";
-import { defaultKeymaps, sanitizeKeymaps, type FretKeyMode, type Keymaps } from "../input/keyboard";
+import { defaultKeymaps, isPianoPreset, PIANO_PRESETS, sanitizeKeymaps, type FretKeyMode, type Keymaps } from "../input/keyboard";
 import {
   APPROACH_STYLES,
   BACKGROUNDS,
@@ -56,7 +56,11 @@ export interface Settings {
   background: Background;
   /** Octave of the computer-keyboard "A" key (C of that octave). */
   keyboardOctave: number;
+  /** Piano: the computer-keyboard octave follows the open song so its notes land on the keys. */
+  autoOctave: boolean;
   keymaps: Keymaps;
+  /** Version of the default keymap the stored keymaps have been migrated to. */
+  keymapRev: number;
   /** Guitar/violin on the computer keyboard: string + fret keys, or piano-style chromatic keys. */
   fretKeyMode: FretKeyMode;
   /** Guitar/violin: frets the next song note automatically, so only the strings need to be struck. */
@@ -136,8 +140,10 @@ export function defaultSettings(): Settings {
     gradFrom: "#22d3ee",
     gradTo: "#f43f5e",
     background: "night",
-    keyboardOctave: 4,
+    keyboardOctave: 3,
+    autoOctave: true,
     keymaps: defaultKeymaps(),
+    keymapRev: KEYMAP_REV,
     fretKeyMode: "strings",
     autoFret: false,
     tapToPlay: false,
@@ -167,7 +173,7 @@ export function loadSettings(): Settings {
   const base = defaultSettings();
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return sanitize({ ...base, ...JSON.parse(raw) });
+    if (raw) return sanitize({ ...base, ...migrate(JSON.parse(raw)) });
     const legacy = readLegacySettings();
     if (legacy) {
       if (legacy.locale === "tr" || legacy.locale === "en") base.language = legacy.locale;
@@ -185,8 +191,22 @@ export function loadSettings(): Settings {
 
 /** Settings from an untrusted source (e.g. the account copy), filled up with defaults. */
 export function sanitizeSettings(raw: unknown): Settings {
-  const obj = raw && typeof raw === "object" ? (raw as Partial<Settings>) : {};
+  const obj = raw && typeof raw === "object" ? migrate(raw as Partial<Settings>) : {};
   return sanitize({ ...defaultSettings(), ...obj });
+}
+
+const KEYMAP_REV = 1;
+
+/** The old default piano keymap left most keys unbound; anyone still on it moves to the full one. */
+function migrate(s: Partial<Settings>): Partial<Settings> {
+  if (!s || typeof s !== "object" || (s.keymapRev ?? 0) >= KEYMAP_REV) return s;
+  const piano = s.keymaps?.piano;
+  const old = !!piano && typeof piano === "object" && isPianoPreset(piano, "classic");
+  return {
+    ...s,
+    keymapRev: KEYMAP_REV,
+    ...(old && s.keymaps ? { keymaps: { ...s.keymaps, piano: { ...PIANO_PRESETS.twoRow } } } : {}),
+  };
 }
 
 function sanitize(s: Settings): Settings {
@@ -218,7 +238,9 @@ function sanitize(s: Settings): Settings {
     noteStyle: oneOf(NOTE_STYLES, s.noteStyle, d.noteStyle),
     background: oneOf(BACKGROUNDS, s.background, d.background),
     keyboardOctave: Math.round(num(s.keyboardOctave, 1, 7, d.keyboardOctave)),
+    autoOctave: s.autoOctave !== false,
     keymaps: sanitizeKeymaps(s.keymaps),
+    keymapRev: KEYMAP_REV,
     fretKeyMode: s.fretKeyMode === "chromatic" ? "chromatic" : "strings",
     autoFret: s.autoFret === true,
     tapToPlay: s.tapToPlay === true,

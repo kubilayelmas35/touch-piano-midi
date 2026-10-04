@@ -12,12 +12,14 @@ import {
   type Keymaps,
   type PianoPreset,
 } from "../input/keyboard";
+import { keyboardBase } from "../input/keyboardBase";
 import { isBlack, noteName } from "../lib/notes";
 import { updateSettings } from "../state/actions";
 import { toast, useApp } from "../state/store";
 import { Button, Segmented, cx } from "../ui/primitives";
 
 const PIANO_SLOTS = 32;
+const CLASSIC_SLOTS = 18;
 
 /** Slot ids: "p:<semitone>" piano note, "s:<string>" string key, "f:<fret>" fret key (from 1). */
 type Slot = string;
@@ -123,7 +125,8 @@ export function KeyBindings() {
     return null;
   };
 
-  const base = (s.keyboardOctave + 1) * 12;
+  const base = keyboardBase(s);
+  const slots = presetOf() === "classic" ? CLASSIC_SLOTS : PIANO_SLOTS;
   const spec = inst === "violin" ? VIOLIN : GUITAR;
   const fkm = inst === "piano" ? null : s.keymaps[inst];
 
@@ -147,7 +150,7 @@ export function KeyBindings() {
       {inst === "piano" ? (
         <>
           <div className="mb-3 flex flex-wrap gap-2">
-            {(["classic", "twoRow"] as PianoPreset[]).map((p) => (
+            {(["twoRow", "classic"] as PianoPreset[]).map((p) => (
               <Button
                 key={p}
                 size="sm"
@@ -159,7 +162,7 @@ export function KeyBindings() {
             ))}
           </div>
           <div className="grid grid-cols-6 gap-1.5 sm:grid-cols-8">
-            {Array.from({ length: PIANO_SLOTS }, (_, off) => {
+            {Array.from({ length: slots }, (_, off) => {
               const midi = base + off;
               return (
                 <KeyChip

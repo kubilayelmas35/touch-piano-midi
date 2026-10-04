@@ -1,5 +1,5 @@
 import { useMemo, type ReactNode } from "react";
-import { resetCoach, skipStep, startCoach } from "../coach/coach";
+import { moveStep, resetCoach, skipStep, startCoach, stepPartSeconds } from "../coach/coach";
 import { goalSpeed, PASS, pathSteps, readPath, type PathStep, type Stage } from "../coach/path";
 import type { DictKey } from "../i18n";
 import { useT } from "../i18n";
@@ -30,6 +30,7 @@ export function useStageText() {
   const piano = useApp((s) => s.settings.instrument === "piano");
   const lang = useApp((s) => s.settings.language);
   return {
+    part: (sec: number | null) => (sec === null ? t("partWhole") : t("partFirst", { s: sec })),
     stage: (s: Stage) =>
       piano ? (s === "right" ? t("coachRightHand") : s === "left" ? t("coachLeftHand") : t("coachBothHands")) : s === "right" ? t("coachStrike") : t("coachFull"),
     tip: (s: Stage) =>
@@ -57,10 +58,11 @@ export function CoachCard() {
   const coach = useApp((s) => s.coach);
   const speed = useApp((s) => s.session.speed);
   const wait = useApp((s) => s.session.waitMode);
-  const { steps, skill } = usePath();
+  const { steps, skill, state } = usePath();
   const text = useStageText();
   const step = coach ? steps[coach.step] : undefined;
   if (!step) return null;
+  const partSec = stepPartSeconds(step.song, state.part);
   return (
     <div className="absolute inset-0 flex items-center justify-center p-4">
       <div className="glass w-full max-w-sm rounded-3xl px-5 py-4 text-center shadow-2xl animate-pop">
@@ -70,6 +72,7 @@ export function CoachCard() {
         <div className="mt-1 truncate text-lg font-extrabold">{text.title(step.song)}</div>
         <div className="mt-2 flex flex-wrap justify-center gap-1.5">
           <Pill tone="brand">{text.stage(step.stage)}</Pill>
+          <Pill>{text.part(partSec)}</Pill>
           <Pill tone={speed < 1 ? "amber" : "plain"}>
             {t("speed")} {pct(speed)}
           </Pill>
@@ -79,7 +82,10 @@ export function CoachCard() {
             </Pill>
           )}
         </div>
-        <p className="mt-3 text-sm leading-relaxed text-mist-200">{wait ? t("coachTipWait") : text.tip(step.stage)}</p>
+        <p className="mt-3 text-sm leading-relaxed text-mist-200">
+          {wait ? t("coachTipWait") : text.tip(step.stage)}
+          {partSec !== null && ` ${t("coachTipPart", { s: partSec })}`}
+        </p>
         <p className="mt-1.5 text-xs text-mist-400">
           {t("coachGoal", { acc: Math.round(PASS * 100), speed: Math.round(goalSpeed(skill, step.lesson) * 100) })}
         </p>
@@ -101,14 +107,16 @@ export function CoachChip() {
   const t = useT();
   const coach = useApp((s) => s.coach);
   const speed = useApp((s) => s.session.speed);
-  const { steps } = usePath();
+  const { steps, state } = usePath();
   const text = useStageText();
   const step = coach ? steps[coach.step] : undefined;
   if (!step) return null;
+  const partSec = stepPartSeconds(step.song, state.part);
   return (
     <div className="pointer-events-none absolute top-3 left-3 flex items-center gap-1.5 rounded-full border border-brand-300/25 bg-ink-900/70 px-3 py-1 text-xs font-bold text-brand-100 backdrop-blur">
       <IconRoute size={13} />
       {t("coachLesson", { n: step.lesson + 1 })} · {text.stage(step.stage)} · {pct(speed)}
+      {partSec !== null && ` · ${text.part(partSec)}`}
     </div>
   );
 }
@@ -119,6 +127,7 @@ const VERDICT_TONE: Record<CoachOutcome["verdict"], string> = {
   retry: "from-sky-400/20 to-brand-500/10 ring-sky-300/25",
   faster: "from-emerald-400/20 to-sky-500/10 ring-emerald-300/25",
   waitOff: "from-emerald-400/20 to-sky-500/10 ring-emerald-300/25",
+  longer: "from-emerald-400/20 to-sky-500/10 ring-emerald-300/25",
   passed: "from-emerald-400/25 to-brand-500/15 ring-emerald-300/35",
   finished: "from-amber-300/25 to-brand-500/15 ring-amber-300/40",
 };
@@ -132,7 +141,15 @@ export function CoachResult({ outcome }: { outcome: CoachOutcome }) {
   const v = outcome.verdict;
   const next = outcome.next;
   const key = songMastered(outcome) ? "coachV_song" : `coachV_${v}`;
-  const vars = { speed: Math.round(outcome.speed * 100), acc: Math.round(PASS * 100), song: text.title(next.song) };
+  const partSec = outcome.partSec ?? null;
+  const vars = { speed: Math.round(outcome.speed * 100), acc: Math.round(PASS * 100), song: text.title(next.song), part: text.part(partSec) };
+  const canEasier = outcome.stepIndex > 0;
+  const canEasy = v !== "passed" && v !== "finished" && outcome.stepIndex < outcome.total - 1;
+  const go = (by: number) => {
+    closeResults();
+    moveStep(by);
+    void startCoach();
+  };
   return (
     <div className={cx("mb-4 rounded-2xl bg-gradient-to-br px-4 py-3 text-left ring-1 animate-pop", VERDICT_TONE[v])}>
       <div className="text-base font-extrabold">{t(key as DictKey)}</div>
@@ -142,6 +159,7 @@ export function CoachResult({ outcome }: { outcome: CoachOutcome }) {
           <span className="font-semibold text-mist-400">{t("coachNext")}:</span>
           <Pill>{text.title(next.song)}</Pill>
           <Pill tone="brand">{text.stage(next.stage)}</Pill>
+          <Pill>{text.part(partSec)}</Pill>
           <Pill tone={outcome.speed < 1 ? "amber" : "plain"}>{pct(outcome.speed)}</Pill>
           {outcome.wait && <Pill tone="amber">{t("waitMode")}</Pill>}
         </div>
@@ -152,6 +170,22 @@ export function CoachResult({ outcome }: { outcome: CoachOutcome }) {
           style={{ width: `${((outcome.stepIndex + (v === "finished" ? 1 : 0)) / outcome.total) * 100}%` }}
         />
       </div>
+      {(canEasier || canEasy) && (
+        <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 text-xs font-semibold">
+          {canEasier ? (
+            <button type="button" onClick={() => go(-1)} className="text-mist-300 underline-offset-4 hover:text-white hover:underline">
+              ← {t("coachPrevStep")}
+            </button>
+          ) : (
+            <span />
+          )}
+          {canEasy && (
+            <button type="button" onClick={() => go(1)} className="text-emerald-200 underline-offset-4 hover:text-white hover:underline">
+              {t("coachTooEasy")} →
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -215,7 +249,8 @@ export function PathCard({ onStart }: { onStart: () => void }) {
           {t("coachLesson", { n: step.lesson + 1 })}: {text.title(step.song)}
         </div>
         <div className="mt-0.5 truncate text-xs text-mist-300">
-          {text.stage(step.stage)} · {pct(state.speed)} · {t("stepOf", { n: state.step + 1, total: steps.length })}
+          {text.stage(step.stage)} · {text.part(stepPartSeconds(step.song, state.part))} · {pct(state.speed)} ·{" "}
+          {t("stepOf", { n: state.step + 1, total: steps.length })}
         </div>
         <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/10">
           <div className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-brand-400" style={{ width: `${(state.step / steps.length) * 100}%` }} />
@@ -343,7 +378,7 @@ export function PathDialog() {
               {current && (
                 <div className="mt-2.5 flex items-center justify-end gap-2">
                   <span className="mr-auto text-xs text-mist-300">
-                    {text.stage(steps[state.step].stage)} · {pct(state.speed)}
+                    {text.stage(steps[state.step].stage)} · {text.part(stepPartSeconds(steps[state.step].song, state.part))} · {pct(state.speed)}
                     {state.wait ? ` · ${t("waitMode")}` : ""}
                   </span>
                   {state.step < steps.length - 1 && (
