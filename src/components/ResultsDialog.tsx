@@ -1,12 +1,53 @@
 import { engine } from "../engine/engine";
 import type { DictKey } from "../i18n";
 import { useT } from "../i18n";
-import { closeResults } from "../state/actions";
+import { closeResults, openSong, updateSession } from "../state/actions";
 import { setPanel, useApp } from "../state/store";
-import { IconStar, IconTrophy } from "../ui/icons";
+import { IconPlay, IconStar, IconTrophy } from "../ui/icons";
 import { Button, Dialog } from "../ui/primitives";
 import { CoachResult, CoachResultActions } from "./CoachUI";
 import { startCoach } from "../coach/coach";
+import { SPEEDS } from "../coach/path";
+import { BUILTIN_BY_DIFFICULTY, builtinTitle } from "../midi/builtin";
+
+/** A well played run outside the path: below full speed suggest the next notch, at full speed the next harder song. */
+function NextUp() {
+  const t = useT();
+  const speed = useApp((s) => s.session.speed);
+  const wait = useApp((s) => s.session.waitMode);
+  const currentId = useApp((s) => s.currentId);
+  const lang = useApp((s) => s.settings.language);
+  if (wait) return null;
+  const faster = SPEEDS.find((v) => v > speed + 0.001);
+  const idx = BUILTIN_BY_DIFFICULTY.findIndex((s) => s.id === currentId);
+  const next = !faster && idx >= 0 ? BUILTIN_BY_DIFFICULTY[idx + 1] : undefined;
+  if (!faster && !next) return null;
+  const pct = Math.round((faster ?? 1) * 100);
+  return (
+    <div className="mb-4 rounded-2xl bg-gradient-to-br from-emerald-400/25 to-brand-500/15 px-4 py-3 text-left ring-1 ring-emerald-300/35 animate-pop">
+      <div className="text-base font-extrabold">{faster ? t("nextUpFaster") : t("coachV_song")}</div>
+      <p className="mt-0.5 text-sm text-mist-200">
+        {faster ? t("nextUpFaster_d", { speed: pct }) : t("nextUpSong_d", { song: next ? builtinTitle(next.id, lang) : "" })}
+      </p>
+      <Button
+        variant="primary"
+        size="sm"
+        className="mt-2.5"
+        onClick={() => {
+          closeResults();
+          if (faster) {
+            updateSession({ speed: faster });
+            engine.stop();
+            void engine.play();
+          } else if (next) void openSong(next.id);
+        }}
+      >
+        <IconPlay size={14} />
+        {faster ? t("nextUpPlayAt", { speed: pct }) : t("coachNextSong")}
+      </Button>
+    </div>
+  );
+}
 
 export function ResultsDialog() {
   const t = useT();
@@ -63,7 +104,7 @@ export function ResultsDialog() {
         )
       }
     >
-      {results.coach && <CoachResult outcome={results.coach} />}
+      {results.coach ? <CoachResult outcome={results.coach} /> : !dirty && stars >= 4 && <NextUp />}
       <div className="text-center">
         <p className="truncate text-sm text-mist-400">{title}</p>
         <div className="mt-3 flex justify-center gap-1.5" role="img" aria-label={t("starsOf", { n: stars })}>

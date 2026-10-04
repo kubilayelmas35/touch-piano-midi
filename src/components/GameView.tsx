@@ -8,7 +8,7 @@ import { INSTRUMENT_HEIGHT_RANGE } from "../state/settings";
 import { niceKeyboardRange } from "../lib/notes";
 import { Highway } from "../render/highway";
 import { BLACK_KEY_RATIO, FretboardRenderer, KeyboardRenderer } from "../render/instrument";
-import { useApp } from "../state/store";
+import { toast, useApp } from "../state/store";
 import { updateSettings } from "../state/actions";
 import { useT } from "../i18n";
 import { Hud } from "./Hud";
@@ -16,6 +16,7 @@ import { RecordingBar } from "./RecordingUI";
 import { EmptyState } from "./EmptyState";
 import { KEY_STRIP_H, KeyStrip } from "./KeyStrip";
 
+const COMPACT_TIP_KEY = "sonatrio-compact-tip";
 const MIN_WHITE = 15;
 const MAX_WHITE = 46;
 
@@ -92,6 +93,13 @@ export function GameView() {
   );
   const range = useMemo(() => (size.w ? pianoRange(size.w) : null), [size.w, notesRev]); // eslint-disable-line react-hooks/exhaustive-deps
   const only = compactKeys && used.length ? used : null;
+
+  const calm = useApp((s) => s.settings.onboarded && !s.welcomeOpen && !s.video && !s.panel);
+  useEffect(() => {
+    if (instrument !== "piano" || !only || !calm || localStorage.getItem(COMPACT_TIP_KEY)) return;
+    localStorage.setItem(COMPACT_TIP_KEY, "1");
+    toast(t("compactKeysTip"), "info", 9000);
+  }, [instrument, only, calm, t]);
 
   // Zooming in or switching song: centre the song's notes on screen.
   useEffect(() => {

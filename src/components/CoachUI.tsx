@@ -122,17 +122,20 @@ const VERDICT_TONE: Record<CoachOutcome["verdict"], string> = {
   finished: "from-amber-300/25 to-brand-500/15 ring-amber-300/40",
 };
 
+const songMastered = (o: CoachOutcome) => o.verdict === "passed" && o.next.song !== o.played.song;
+
 /** Results of a path step: what changes for the next attempt. */
 export function CoachResult({ outcome }: { outcome: CoachOutcome }) {
   const t = useT();
   const text = useStageText();
   const v = outcome.verdict;
   const next = outcome.next;
-  const vars = { speed: Math.round(outcome.speed * 100), acc: Math.round(PASS * 100) };
+  const key = songMastered(outcome) ? "coachV_song" : `coachV_${v}`;
+  const vars = { speed: Math.round(outcome.speed * 100), acc: Math.round(PASS * 100), song: text.title(next.song) };
   return (
     <div className={cx("mb-4 rounded-2xl bg-gradient-to-br px-4 py-3 text-left ring-1 animate-pop", VERDICT_TONE[v])}>
-      <div className="text-base font-extrabold">{t(`coachV_${v}` as DictKey)}</div>
-      <p className="mt-0.5 text-sm text-mist-200">{t(`coachV_${v}_d` as DictKey, vars)}</p>
+      <div className="text-base font-extrabold">{t(key as DictKey)}</div>
+      <p className="mt-0.5 text-sm text-mist-200">{t(`${key}_d` as DictKey, vars)}</p>
       {v !== "finished" && (
         <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-xs">
           <span className="font-semibold text-mist-400">{t("coachNext")}:</span>
@@ -188,7 +191,7 @@ export function CoachResultActions({ outcome }: { outcome: CoachOutcome }) {
           }}
         >
           <IconPlay size={16} />
-          {t("coachContinue")}
+          {songMastered(outcome) ? t("coachNextSong") : t("coachContinue")}
         </Button>
       )}
     </>
