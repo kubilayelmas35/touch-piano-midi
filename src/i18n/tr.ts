@@ -254,7 +254,7 @@ export const tr: Dict = {
   privacyPolicy: "Gizlilik politikası",
   termsOfUse: "Kullanım koşulları",
   licenses: "Lisanslar",
-  agreeNotice: "Devam ederek Kullanım Koşulları'nı ve Gizlilik Politikası'nı kabul etmiş olursun.",
+  agreeNotice: "Devam ederek Kullanım Koşulları'nı kabul etmiş olursun. Kişisel verilerin, Gizlilik Politikası ve KVKK Aydınlatma Metni'nde anlatıldığı şekilde işlenir.",
   deleteAccount: "Hesabı sil",
   deleteAccountBody: "Hesabın, kullanıcı adın, buluttaki MIDI dosyaların, eşitlenen ayarların ve ilerleme kayıtların kalıcı olarak silinir. Bu işlem geri alınamaz. Bu cihazdaki şarkılar ve ayarlar silinmez.",
   deleteConfirmWord: "SİL",

@@ -259,7 +259,7 @@ export const en = {
   privacyPolicy: "Privacy policy",
   termsOfUse: "Terms of use",
   licenses: "Licenses",
-  agreeNotice: "By continuing you agree to the Terms of Use and the Privacy Policy.",
+  agreeNotice: "By continuing you agree to the Terms of Use. Your personal data is processed as described in the Privacy Policy.",
   deleteAccount: "Delete account",
   deleteAccountBody: "Your account, username, cloud MIDI files, synced settings and progress are deleted permanently. This can't be undone. Songs and settings on this device are kept.",
   deleteConfirmWord: "DELETE",
