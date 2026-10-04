@@ -9,8 +9,8 @@ function toBase64(data: ArrayBuffer): string {
   return btoa(bin);
 }
 
-function download(data: ArrayBuffer, fileName: string): void {
-  const url = URL.createObjectURL(new Blob([data], { type: "audio/midi" }));
+function download(data: ArrayBuffer, fileName: string, mime: string): void {
+  const url = URL.createObjectURL(new Blob([data], { type: mime }));
   const a = document.createElement("a");
   a.href = url;
   a.download = fileName;
@@ -23,29 +23,33 @@ function download(data: ArrayBuffer, fileName: string): void {
 const coarse = () => typeof matchMedia !== "undefined" && matchMedia("(pointer: coarse)").matches;
 
 /**
- * Sends a MIDI file out of the app: the Android/iOS share sheet in the apps, the system share sheet on
+ * Sends a file out of the app: the Android/iOS share sheet in the apps, the system share sheet on
  * phones' browsers, otherwise a normal download (the desktop app asks where to save it).
  */
-export async function shareMidi(data: ArrayBuffer, fileName: string, title: string): Promise<ShareResult> {
+export async function shareFile(data: ArrayBuffer, fileName: string, mime: string, title: string, text?: string): Promise<ShareResult> {
   if (isNativeApp) {
     const [{ Filesystem, Directory }, { Share }] = await Promise.all([import("@capacitor/filesystem"), import("@capacitor/share")]);
     const { uri } = await Filesystem.writeFile({ path: fileName, data: toBase64(data), directory: Directory.Cache });
     try {
-      await Share.share({ title, files: [uri], dialogTitle: title });
+      await Share.share({ title, text, files: [uri], dialogTitle: title });
       return "shared";
     } catch {
       return "cancelled";
     }
   }
-  const file = new File([data], fileName, { type: "audio/midi" });
+  const file = new File([data], fileName, { type: mime });
   if (coarse() && navigator.canShare?.({ files: [file] })) {
     try {
-      await navigator.share({ files: [file], title });
+      await navigator.share({ files: [file], title, text });
       return "shared";
     } catch (e) {
       if ((e as Error).name === "AbortError") return "cancelled";
     }
   }
-  download(data, fileName);
+  download(data, fileName, mime);
   return "saved";
+}
+
+export function shareMidi(data: ArrayBuffer, fileName: string, title: string): Promise<ShareResult> {
+  return shareFile(data, fileName, "audio/midi", title);
 }

@@ -3,7 +3,9 @@ import type { DictKey } from "../i18n";
 import { useT } from "../i18n";
 import { closeResults, openSong, updateSession } from "../state/actions";
 import { setPanel, useApp } from "../state/store";
-import { IconCheck, IconPlay, IconStar, IconTrophy } from "../ui/icons";
+import { useState } from "react";
+import { IconCheck, IconPlay, IconShare, IconStar, IconTrophy } from "../ui/icons";
+import { shareResult } from "../lib/shareResult";
 import { Button, Dialog } from "../ui/primitives";
 import { CoachResult, CoachResultActions } from "./CoachUI";
 import { SignInNudge } from "./SignInNudge";
@@ -49,6 +51,26 @@ function NextUp() {
         {faster ? t("nextUpPlayAt", { speed: pct }) : t("coachNextSong")}
       </Button>
     </div>
+  );
+}
+
+function ShareButton() {
+  const t = useT();
+  const [busy, setBusy] = useState(false);
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      className="mt-3"
+      disabled={busy}
+      onClick={() => {
+        setBusy(true);
+        void shareResult().finally(() => setBusy(false));
+      }}
+    >
+      <IconShare size={15} />
+      {t("shareResult")}
+    </Button>
   );
 }
 
@@ -164,6 +186,7 @@ export function ResultsDialog() {
             {t("wrong")}: {stats.wrong}
           </p>
         )}
+        <ShareButton />
         {dirty && <p className="mt-3 rounded-xl bg-white/[0.04] px-3 py-2 text-xs text-mist-400">{t("practiceRun")}</p>}
         <InsightsCard insights={results.insights} />
         {results.achievements.length > 0 && (
