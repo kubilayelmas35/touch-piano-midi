@@ -75,6 +75,20 @@ export const IconWait = (p: IconProps) => (
     <path d="M7 22v-4a5 5 0 0 1 10 0v4" />
   </Svg>
 );
+export const IconRoute = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="6" cy="19" r="2.5" />
+    <circle cx="18" cy="5" r="2.5" />
+    <path d="M8.5 19H16a3.5 3.5 0 0 0 0-7H8a3.5 3.5 0 0 1 0-7h7.5" />
+  </Svg>
+);
+export const IconMore = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none" />
+    <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
+    <circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none" />
+  </Svg>
+);
 export const IconPedal = (p: IconProps) => (
   <Svg {...p}>
     <path d="M12 3v9" />

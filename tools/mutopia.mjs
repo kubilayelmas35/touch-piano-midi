@@ -45,6 +45,7 @@ for (const p of list) {
     const tracks = m.tracks.filter((t) => t.notes.length);
     const notes = tracks.reduce((n, t) => n + t.notes.length, 0);
     p.seconds = Math.round(Math.max(...tracks.flatMap((t) => t.notes.map((n) => n.time + n.duration))));
+    p.notes = notes;
     console.log(`${p.id.padEnd(26)} ${String(Math.round(m.duration)).padStart(4)}s ${String(notes).padStart(5)} notes ${tracks.length} tr  ${license}`);
     lines.push(
       [

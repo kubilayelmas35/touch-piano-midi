@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { engine } from "../engine/engine";
 import type { InstrumentKind } from "../engine/types";
 import { useT } from "../i18n";
@@ -16,6 +17,8 @@ import {
   IconLibrary,
   IconLoop,
   IconMetronome,
+  IconMore,
+  IconRoute,
   IconPause,
   IconPedal,
   IconPiano,
@@ -42,7 +45,7 @@ function Logo() {
         draggable={false}
         className="rounded-[7px] shadow-[0_0_14px_rgba(139,92,246,0.45)]"
       />
-      <span className="hidden bg-gradient-to-r from-white via-violet-200 to-violet-400 bg-clip-text text-[17px] font-extrabold tracking-tight text-transparent md:inline">
+      <span className="hidden bg-gradient-to-r from-white via-violet-200 to-violet-400 bg-clip-text text-[17px] font-extrabold tracking-tight text-transparent xl:inline">
         Sonatrio
       </span>
     </div>
@@ -277,6 +280,62 @@ function AccountButton() {
   );
 }
 
+/** Narrow screens: the less used buttons, folded into one menu so the song title keeps its room. */
+function MoreMenu() {
+  const t = useT();
+  const freePlay = useApp((s) => !!s.song && s.song.notes.length === 0);
+  const accountOn = useApp((s) => s.account.status !== "disabled");
+  const p = useApp((s) => s.progress);
+  const n = streak(p);
+  const items: { label: string; icon: ReactNode; onClick: () => void; active?: boolean; extra?: ReactNode }[] = [
+    { label: t("studio"), icon: <IconSparkles size={18} />, onClick: () => setPanel("studio") },
+    { label: t("freePlay"), icon: <IconKeyboard size={18} />, onClick: openFreePlay, active: freePlay },
+    {
+      label: t("progress"),
+      icon: <IconFlame size={18} className={n > 0 ? "text-orange-400" : ""} />,
+      onClick: () => setPanel("progress"),
+      extra: <span className="text-xs font-bold text-orange-200 tabular-nums">{t("streakDays", { n })}</span>,
+    },
+    ...(accountOn ? [{ label: t("account"), icon: <IconUser size={18} />, onClick: () => setPanel("account") }] : []),
+    { label: t("settings"), icon: <IconSettings size={18} />, onClick: () => setPanel("settings") },
+  ];
+  return (
+    <Popover
+      label={t("more")}
+      align="end"
+      trigger={({ open, toggle, ref }) => (
+        <IconButton label={t("more")} active={open} onClick={toggle} ref={ref} aria-expanded={open}>
+          <IconMore size={20} />
+        </IconButton>
+      )}
+    >
+      {(close) => (
+        <ul className="-m-1 space-y-0.5">
+          {items.map((it) => (
+            <li key={it.label}>
+              <button
+                type="button"
+                onClick={() => {
+                  close();
+                  it.onClick();
+                }}
+                className={cx(
+                  "flex h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-semibold transition-colors hover:bg-white/[0.07]",
+                  it.active && "bg-brand-500/20 text-brand-100"
+                )}
+              >
+                <span className="text-mist-300">{it.icon}</span>
+                <span className="flex-1">{it.label}</span>
+                {it.extra}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Popover>
+  );
+}
+
 /** Flame with the current day streak; opens the progress panel. Fills in once today's goal is met. */
 function StreakButton({ className }: { className?: string }) {
   const t = useT();
@@ -329,15 +388,19 @@ export function TopBar() {
   const hand = fretHand ?? session.hand;
   const handLabel = hand === "right" ? t("handRight") : hand === "left" ? t("handLeft") : null;
   const trackCount = session.playTracks.length;
+  const coach = useApp((s) => !!s.coach);
 
   return (
     <header className="relative z-20 shrink-0 border-b border-white/[0.06] bg-ink-900/85 backdrop-blur-xl">
       <div className="flex h-14 items-center gap-1.5 px-2 sm:gap-2 sm:px-3">
         <Logo />
-        <IconButton label={t("library")} onClick={() => setPanel("library")} showLabel className="shrink-0 max-sm:[&>span]:hidden">
+        <IconButton label={t("library")} onClick={() => setPanel("library")} showLabel className="shrink-0 max-lg:[&>span]:hidden">
           <IconLibrary size={19} />
         </IconButton>
-        <IconButton label={t("studio")} onClick={() => setPanel("studio")} showLabel className="shrink-0 max-xl:[&>span]:hidden">
+        <IconButton label={t("myPath")} active={coach} onClick={() => setPanel("path")} showLabel className="shrink-0 max-xl:[&>span]:hidden">
+          <IconRoute size={19} />
+        </IconButton>
+        <IconButton label={t("studio")} onClick={() => setPanel("studio")} showLabel className="shrink-0 max-lg:hidden max-xl:[&>span]:hidden">
           <IconSparkles size={19} />
         </IconButton>
         <IconButton
@@ -345,7 +408,7 @@ export function TopBar() {
           active={freePlay}
           onClick={openFreePlay}
           showLabel
-          className="shrink-0 max-xl:[&>span]:hidden"
+          className="shrink-0 max-lg:hidden max-xl:[&>span]:hidden"
         >
           <IconKeyboard size={19} />
         </IconButton>
@@ -355,7 +418,7 @@ export function TopBar() {
           disabled={!song}
           onClick={() => setPanel("setup")}
           title={t("songSetup")}
-          className="group flex min-w-0 flex-1 items-center gap-1 rounded-xl px-2 py-1 text-left transition-colors hover:bg-white/[0.06] lg:max-w-[26rem] lg:flex-initial"
+          className="group flex min-w-[4.5rem] flex-1 items-center gap-1 rounded-xl px-2 py-1 text-left transition-colors hover:bg-white/[0.06] lg:max-w-[26rem] lg:flex-initial"
         >
           <span className="min-w-0">
             <span className="block truncate text-[15px] leading-tight font-bold">{song?.title ?? "—"}</span>
@@ -385,7 +448,7 @@ export function TopBar() {
           >
             {playing ? <IconPause size={20} /> : <IconPlay size={20} className="translate-x-px" />}
           </button>
-          <div className="w-[88px] text-center text-xs font-semibold tabular-nums text-mist-300">
+          <div className="hidden w-[88px] text-center text-xs font-semibold tabular-nums text-mist-300 md:block">
             {formatTime(Math.max(0, time))} <span className="text-mist-400">/ {formatTime(Math.max(0, endTime - 0.6))}</span>
           </div>
         </div>
@@ -395,17 +458,22 @@ export function TopBar() {
         <div className="hidden shrink-0 lg:block">
           <PracticeToggles />
         </div>
-        <div className="shrink-0 lg:hidden">
+        <div className="hidden shrink-0 sm:block lg:hidden">
           <PracticeMenu />
         </div>
         <div className="hidden shrink-0 sm:block">
           <InstrumentSwitch />
         </div>
-        <StreakButton className="max-sm:hidden" />
-        <AccountButton />
-        <IconButton label={t("settings")} onClick={() => setPanel("settings")} className="shrink-0">
-          <IconSettings size={19} />
-        </IconButton>
+        <div className="hidden shrink-0 items-center gap-1 lg:flex">
+          <StreakButton />
+          <AccountButton />
+          <IconButton label={t("settings")} onClick={() => setPanel("settings")} className="shrink-0">
+            <IconSettings size={19} />
+          </IconButton>
+        </div>
+        <div className="shrink-0 lg:hidden">
+          <MoreMenu />
+        </div>
       </div>
 
       {/* Mobile transport row */}
@@ -428,7 +496,7 @@ export function TopBar() {
         </div>
         <div className="flex-1" />
         <PedalButton />
-        <StreakButton />
+        <PracticeMenu />
         <InstrumentSwitch compact />
       </div>
 

@@ -273,6 +273,8 @@ export interface BuiltinInfo {
   category: BuiltinCategory;
   /** Length in seconds at normal speed. */
   seconds: number;
+  /** Notes per second (both hands), the finer difficulty measure within a level. */
+  nps: number;
 }
 
 /** Song length without building it: last verse start plus the longer hand. */
@@ -285,13 +287,50 @@ function specSeconds(spec: BuiltinSpec): number {
 }
 
 /** Complete pieces shipped as unmodified Mutopia Project MIDI files (see tools/mutopia.mjs for the credits). */
-const MUTOPIA = MUTOPIA_LIST as (BuiltinInfo & { m: number })[];
+const MUTOPIA = MUTOPIA_LIST as (Omit<BuiltinInfo, "nps"> & { m: number; notes: number })[];
+
+const round2 = (v: number) => Math.round(v * 100) / 100;
 
 export const BUILTIN_SONGS: BuiltinInfo[] = [
-  ...SPECS.map((s) => ({ id: s.id, title: s.title, titleTr: s.titleTr, composer: s.composer, level: s.level, category: s.category, seconds: specSeconds(s) })),
-  { id: "bach-846", title: "Prelude in C major, BWV 846", composer: "J. S. Bach", level: 3, category: "classical", seconds: 115 },
-  ...MUTOPIA.map(({ id, title, titleTr, composer, level, category, seconds }) => ({ id, title, titleTr, composer, level, category, seconds })),
+  ...SPECS.map((s) => {
+    const seconds = specSeconds(s);
+    const { id, title, titleTr, composer, level, category } = s;
+    return { id, title, titleTr, composer, level, category, seconds, nps: round2(build(s).notes.length / Math.max(1, seconds)) };
+  }),
+  { id: "bach-846", title: "Prelude in C major, BWV 846", composer: "J. S. Bach", level: 3, category: "classical", seconds: 115, nps: round2(549 / 115) },
+  ...MUTOPIA.map(({ id, title, titleTr, composer, level, category, seconds, notes }) => ({
+    id,
+    title,
+    titleTr,
+    composer,
+    level,
+    category,
+    seconds,
+    nps: round2(notes / Math.max(1, seconds)),
+  })),
 ];
+
+/** One number for sorting: note density, plus a step per level so a calm "medium" piece can still beat a busy etude. */
+export function difficultyOf(s: Pick<BuiltinInfo, "level" | "nps">): number {
+  return s.nps + 2.5 * (s.level - 1);
+}
+
+export function byDifficulty(a: BuiltinInfo, b: BuiltinInfo): number {
+  return difficultyOf(a) - difficultyOf(b) || a.level - b.level;
+}
+
+/** Songs arranged in-app (melody in the right hand, simple left hand): the learning path's material. */
+export function isArranged(id: string): boolean {
+  return SPECS.some((s) => s.id === id);
+}
+
+export const BUILTIN_BY_DIFFICULTY: BuiltinInfo[] = [...BUILTIN_SONGS].sort(byDifficulty);
+
+export function builtinTitle(id: string, lang: "tr" | "en"): string {
+  const s = BUILTIN_SONGS.find((x) => x.id === id);
+  if (!s) return id;
+  return lang === "tr" && s.titleTr ? s.titleTr : s.title;
+}
 
 export function isBuiltin(id: string): boolean {
   return BUILTIN_SONGS.some((s) => s.id === id);

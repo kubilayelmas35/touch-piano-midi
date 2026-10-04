@@ -1,6 +1,7 @@
 import type { NoteNaming } from "../lib/notes";
 import type { GuitarTone, InstrumentKind } from "../engine/types";
 import { readLegacySettings } from "../storage/migrate";
+import type { Goal, Skill } from "../coach/path";
 import { defaultKeymaps, sanitizeKeymaps, type FretKeyMode, type Keymaps } from "../input/keyboard";
 import {
   APPROACH_STYLES,
@@ -91,6 +92,9 @@ export interface Settings {
   glideSnap: boolean;
   /** Fretless guitar / violin: hide the fret wires, numbers and inlays. */
   hideFrets: boolean;
+  /** Answers from the welcome questions; they shape the learning path. */
+  skill: Skill;
+  goal: Goal;
   onboarded: boolean;
 }
 
@@ -153,6 +157,8 @@ export function defaultSettings(): Settings {
     glideViolin: false,
     glideSnap: true,
     hideFrets: false,
+    skill: "some",
+    goal: "songs",
     onboarded: false,
   };
 }
@@ -231,6 +237,8 @@ function sanitize(s: Settings): Settings {
     glideViolin: s.glideViolin === true,
     glideSnap: s.glideSnap !== false,
     hideFrets: s.hideFrets === true,
+    skill: s.skill === "new" || s.skill === "good" ? s.skill : "some",
+    goal: s.goal === "learn" || s.goal === "free" ? s.goal : "songs",
   };
 }
 

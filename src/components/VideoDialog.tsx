@@ -4,6 +4,7 @@ import { isNativeApp, SITE_URL } from "../lib/platform";
 import { useApp, type VideoKind } from "../state/store";
 import type { Language } from "../state/settings";
 import { Button, Dialog } from "../ui/primitives";
+import { followGoal } from "../coach/coach";
 
 /** The app package leaves the videos out (size), so it streams them from the website. */
 export function videoUrl(kind: VideoKind, lang: Language, ext: "mp4" | "jpg" = "mp4"): string {
@@ -16,7 +17,11 @@ export function VideoDialog() {
   const video = useApp((s) => s.video);
   const lang = useApp((s) => s.settings.language);
   const [failed, setFailed] = useState<string | null>(null);
-  const close = () => useApp.setState({ video: null });
+  const close = () => {
+    const first = useApp.getState().video?.first;
+    useApp.setState({ video: null });
+    if (first) followGoal();
+  };
   const src = video ? videoUrl(video.kind, lang) : "";
 
   return (

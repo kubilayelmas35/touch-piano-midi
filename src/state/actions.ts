@@ -27,6 +27,7 @@ import { cloudAfterDelete, cloudAfterImport, cloudAfterRename } from "../auth/cl
 import { initSettingsSync, pushSettings } from "../auth/settingsSync";
 import { OVERLAY_EVENT } from "../ui/primitives";
 import { initProgress, recordRun } from "../progress/tracker";
+import { coachAfterRun } from "../coach/coach";
 
 const LAST_SONG = "staveflow-last-song";
 
@@ -115,8 +116,11 @@ export async function refreshLibrary(): Promise<void> {
 }
 
 export function updateSettings(patch: Partial<Settings>): void {
-  const settings = { ...useApp.getState().settings, ...patch };
-  useApp.setState({ settings });
+  const prev = useApp.getState().settings;
+  const settings = { ...prev, ...patch };
+  // A path step belongs to one instrument and skill level.
+  const leaveCoach = settings.instrument !== prev.instrument || settings.skill !== prev.skill;
+  useApp.setState(leaveCoach ? { settings, coach: null } : { settings });
   saveSettings(settings);
   applyAudioSettings(settings);
   engine.configure(engineConfig());
@@ -134,8 +138,9 @@ export function applyRemoteSettings(settings: Settings): void {
 let prefsTimer = 0;
 
 function persistSession(): void {
-  const { currentId, session } = useApp.getState();
-  if (!currentId) return;
+  const { currentId, session, coach } = useApp.getState();
+  // Path lessons set their own hand and speed; the song keeps the player's own choices.
+  if (!currentId || coach) return;
   window.clearTimeout(prefsTimer);
   prefsTimer = window.setTimeout(() => {
     void patchPrefs(currentId, {
@@ -173,8 +178,36 @@ function sessionFor(song: Song, prefs: SongPrefs | undefined): Session {
   };
 }
 
-export async function openSong(id: string, opts: { quiet?: boolean } = {}): Promise<boolean> {
-  useApp.setState({ songLoading: true });
+export function handTracks(song: Song): { right: number; left: number } | null {
+  const right = song.tracks.find((t) => /right|\brh\b|sağ/i.test(t.name));
+  const left = song.tracks.find((t) => /left|\blh\b|sol el/i.test(t.name));
+  return right && left ? { right: right.index, left: left.index } : null;
+}
+
+/** Which hand the player takes. Piano: picks the hand tracks (or splits at middle C). Guitar / violin: strike vs. fret. */
+export function setHand(h: "both" | "right" | "left"): void {
+  const { settings, song, session } = useApp.getState();
+  if (!song) return;
+  if (settings.instrument !== "piano") {
+    updateSettings({ autoFret: h === "right", tapToPlay: h === "left" });
+    return;
+  }
+  const ht = handTracks(song);
+  if (!ht) {
+    updateSession({ hand: h });
+    return;
+  }
+  const others = session.playTracks.filter((x) => x !== ht.right && x !== ht.left);
+  const next = h === "right" ? [ht.right] : h === "left" ? [ht.left] : [ht.right, ht.left];
+  updateSession({
+    hand: "both",
+    playTracks: [...others, ...next].sort((a, b) => a - b),
+    mutedTracks: session.mutedTracks.filter((x) => !next.includes(x)),
+  });
+}
+
+export async function openSong(id: string, opts: { quiet?: boolean; coach?: boolean } = {}): Promise<boolean> {
+  useApp.setState(opts.coach ? { songLoading: true } : { songLoading: true, coach: null });
   try {
     let song: Song;
     if (isBuiltin(id)) {
@@ -288,7 +321,7 @@ export async function exportUserSong(id: string): Promise<void> {
 /** An empty stage with no falling notes, for playing (and recording) freely. */
 export function openFreePlay(): void {
   const song = finalizeSong(tNow("freePlay"), [], [], [], 120, 4);
-  useApp.setState({ song, currentId: null, session: { ...DEFAULT_SESSION, loop: { ...NO_LOOP } }, results: null });
+  useApp.setState({ song, currentId: null, session: { ...DEFAULT_SESSION, loop: { ...NO_LOOP } }, results: null, coach: null });
   engine.load(song, engineConfig() as EngineConfig);
 }
 
@@ -341,6 +374,8 @@ function handleComplete(r: { stats: import("../engine/types").Stats; dirty: bool
     speed: r.config.speed,
     practice,
   });
+  // Skipping around or looping doesn't say how the whole step went.
+  const coach = r.dirty || r.config.loop.enabled ? undefined : coachAfterRun({ accuracy, stars, speed: r.config.speed, wait: r.config.waitMode });
   useApp.setState({
     results: {
       stats: r.stats,
@@ -350,6 +385,7 @@ function handleComplete(r: { stats: import("../engine/types").Stats; dirty: bool
       newBest,
       bestScore: newBest ? r.stats.score : prev?.score ?? null,
       achievements,
+      coach,
     },
   });
   if (newBest && currentId) {

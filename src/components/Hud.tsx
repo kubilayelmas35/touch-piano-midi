@@ -4,6 +4,7 @@ import { useT } from "../i18n";
 import { useApp } from "../state/store";
 import { IconHeadphones, IconPlay, IconWait } from "../ui/icons";
 import { cx } from "../ui/primitives";
+import { CoachCard, CoachChip } from "./CoachUI";
 
 export function Hud() {
   const t = useT();
@@ -20,6 +21,7 @@ export function Hud() {
   const mult = comboMultiplier(stats.combo);
   const idle = status === "ready" || status === "paused";
   const freePlay = useApp((s) => !!s.song && s.song.notes.length === 0);
+  const coach = useApp((s) => !!s.coach);
 
   return (
     <>
@@ -93,7 +95,11 @@ export function Hud() {
         </div>
       )}
 
-      {idle && !freePlay && !audioLoading && !songLoading && (
+      {coach && !freePlay && !songLoading && status !== "ready" && <CoachChip />}
+
+      {coach && status === "ready" && !freePlay && !audioLoading && !songLoading && <CoachCard />}
+
+      {idle && !(coach && status === "ready") && !freePlay && !audioLoading && !songLoading && (
         <div className="absolute inset-0 flex items-center justify-center">
           <button
             type="button"

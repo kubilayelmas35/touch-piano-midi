@@ -25,6 +25,24 @@ export interface Results {
   bestScore: number | null;
   /** Achievement ids this run unlocked. */
   achievements: string[];
+  /** Set when the run was a learning-path step. */
+  coach?: CoachOutcome;
+}
+
+/** A learning-path step being played. */
+export interface CoachRun {
+  step: number;
+}
+
+export interface CoachOutcome {
+  verdict: import("../coach/path").Verdict;
+  /** The step played and the one the next attempt will be. */
+  played: import("../coach/path").PathStep;
+  next: import("../coach/path").PathStep;
+  speed: number;
+  wait: boolean;
+  total: number;
+  stepIndex: number;
 }
 
 export interface Toast {
@@ -44,6 +62,7 @@ export type Panel =
   | "studio"
   | "editor"
   | "feedback"
+  | "path"
   | null;
 
 export type VideoKind = "tutorial" | "promo";
@@ -118,6 +137,9 @@ export interface AppState {
   /** Live recording of the player's notes (Pro). */
   recording: { startedAt: number; notes: number } | null;
   take: Take | null;
+  coach: CoachRun | null;
+  /** Bumped whenever the saved learning path changes, so views re-read it. */
+  pathRev: number;
 }
 
 export const DEFAULT_SESSION: Session = {
@@ -178,6 +200,8 @@ export const useApp = create<AppState>(() => ({
   progress: loadProgress(),
   recording: null,
   take: null,
+  coach: null,
+  pathRev: 0,
 }));
 
 let toastId = 1;

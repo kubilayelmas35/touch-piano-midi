@@ -1,17 +1,10 @@
 import { useT } from "../i18n";
 import { noteName } from "../lib/notes";
-import type { Song } from "../midi/song";
-import { updateSession, updateSettings } from "../state/actions";
+import { handTracks, setHand, updateSession } from "../state/actions";
 import { setPanel, useApp } from "../state/store";
 import { Button, Dialog, Segmented } from "../ui/primitives";
 
 type Role = "play" | "accomp" | "mute";
-
-function handTracks(song: Song): { right: number; left: number } | null {
-  const right = song.tracks.find((t) => /right|\brh\b|sağ/i.test(t.name));
-  const left = song.tracks.find((t) => /left|\blh\b|sol el/i.test(t.name));
-  return right && left ? { right: right.index, left: left.index } : null;
-}
 
 export function SongSetupDialog() {
   const t = useT();
@@ -57,22 +50,6 @@ export function SongSetupDialog() {
     const l = session.playTracks.includes(ht.left);
     handValue = r && !l ? "right" : l && !r ? "left" : "both";
   }
-  const setHand = (h: "both" | "right" | "left") => {
-    if (fretted) {
-      updateSettings({ autoFret: h === "right", tapToPlay: h === "left" });
-    } else if (ht) {
-      const others = session.playTracks.filter((x) => x !== ht.right && x !== ht.left);
-      const next = h === "right" ? [ht.right] : h === "left" ? [ht.left] : [ht.right, ht.left];
-      updateSession({
-        hand: "both",
-        playTracks: [...others, ...next].sort((a, b) => a - b),
-        mutedTracks: session.mutedTracks.filter((x) => !next.includes(x)),
-      });
-    } else {
-      updateSession({ hand: h });
-    }
-  };
-
   const pitched = song.tracks.filter((tr) => !tr.isDrum);
 
   return (

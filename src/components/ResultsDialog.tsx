@@ -5,6 +5,8 @@ import { closeResults } from "../state/actions";
 import { setPanel, useApp } from "../state/store";
 import { IconStar, IconTrophy } from "../ui/icons";
 import { Button, Dialog } from "../ui/primitives";
+import { CoachResult, CoachResultActions } from "./CoachUI";
+import { startCoach } from "../coach/coach";
 
 export function ResultsDialog() {
   const t = useT();
@@ -24,11 +26,18 @@ export function ResultsDialog() {
   return (
     <Dialog
       open={open}
-      onClose={closeResults}
+      onClose={() => {
+        closeResults();
+        // The next path attempt is set up even when the dialog is just closed.
+        if (results.coach && results.coach.verdict !== "finished") void startCoach();
+      }}
       width="max-w-md"
       closeLabel={t("close")}
       title={t("results")}
       footer={
+        results.coach ? (
+          <CoachResultActions outcome={results.coach} />
+        ) : (
         <>
           <Button
             variant="ghost"
@@ -51,8 +60,10 @@ export function ResultsDialog() {
             {t("playAgain")}
           </Button>
         </>
+        )
       }
     >
+      {results.coach && <CoachResult outcome={results.coach} />}
       <div className="text-center">
         <p className="truncate text-sm text-mist-400">{title}</p>
         <div className="mt-3 flex justify-center gap-1.5" role="img" aria-label={t("starsOf", { n: stars })}>

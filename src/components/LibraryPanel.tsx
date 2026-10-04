@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useT } from "../i18n";
 import { formatTime } from "../lib/notes";
-import { BUILTIN_CATEGORIES, BUILTIN_SONGS, type BuiltinCategory } from "../midi/builtin";
+import { BUILTIN_BY_DIFFICULTY, BUILTIN_CATEGORIES, BUILTIN_SONGS, type BuiltinCategory } from "../midi/builtin";
 import { canImport } from "../auth/account";
 import { PRO_CLOUD_SONGS, syncCloud, toggleCloud } from "../auth/cloud";
 import { formatBytes } from "../lib/format";
@@ -12,6 +12,7 @@ import { bestKey, type SongPrefs } from "../storage/db";
 import { dayKey } from "../progress/progress";
 import { IconCheck, IconCloud, IconEdit, IconKeyboard, IconNote, IconPlay, IconSearch, IconShare, IconSparkles, IconStar, IconSync, IconTrash, IconUpload } from "../ui/icons";
 import { Button, Dialog, IconButton, cx } from "../ui/primitives";
+import { PathCard } from "./CoachUI";
 
 function Stars({ n, size = 12 }: { n: number; size?: number }) {
   return (
@@ -71,7 +72,7 @@ export function LibraryPanel() {
   const q = normalize(query.trim());
   const builtins = useMemo(
     () =>
-      BUILTIN_SONGS.filter(
+      BUILTIN_BY_DIFFICULTY.filter(
         (s) =>
           (category === "all" || s.category === category) &&
           (!q || normalize(`${s.title} ${s.titleTr ?? ""} ${s.composer}`).includes(q))
@@ -105,7 +106,7 @@ export function LibraryPanel() {
 
   return (
     <Dialog open={open} onClose={close} title={t("library")} side="left" closeLabel={t("close")}>
-      <div className="sticky top-0 z-10 -mx-5 bg-gradient-to-b from-ink-850 via-ink-850/95 to-transparent px-5 pt-1 pb-3">
+      <div className="sticky top-0 z-10 -mx-5 bg-ink-850 px-5 pt-1 pb-3 shadow-[0_10px_14px_-6px_rgba(10,11,26,0.95)]">
         <div className="flex gap-2">
           <label className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-xl border border-white/[0.08] bg-black/30 px-3 focus-within:border-brand-400/60">
             <IconSearch size={16} className="shrink-0 text-mist-400" />
@@ -139,8 +140,10 @@ export function LibraryPanel() {
           />
         </div>
         <p className="mt-2 hidden text-xs text-mist-400 sm:block">{t("dropHint")}</p>
-        {cloud && (
-          <div className="mt-3 flex items-center gap-3 rounded-2xl border border-sky-300/15 bg-sky-400/[0.07] px-3 py-2">
+      </div>
+
+      {cloud && (
+          <div className="mb-4 flex items-center gap-3 rounded-2xl border border-sky-300/15 bg-sky-400/[0.07] px-3 py-2">
             <IconCloud size={18} className="shrink-0 text-sky-300" />
             <div className="min-w-0 flex-1">
               <div className="flex items-baseline justify-between gap-2 text-xs">
@@ -165,8 +168,9 @@ export function LibraryPanel() {
               <IconSync size={16} className={cloudBusy ? "animate-spin" : ""} />
             </IconButton>
           </div>
-        )}
-      </div>
+      )}
+
+      {!q && <PathCard onStart={close} />}
 
       {!q && (
         <button
