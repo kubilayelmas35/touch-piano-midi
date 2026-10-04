@@ -113,10 +113,13 @@ function Section({ title, children }: { title?: string; children: ReactNode }) {
   );
 }
 
-function Row({ label, children }: { label: string; children: ReactNode }) {
+function Row({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-2">
-      <span className="text-sm font-medium">{label}</span>
+      <span className="min-w-0">
+        <span className="block text-sm font-medium">{label}</span>
+        {hint && <span className="mt-0.5 block text-xs text-mist-400">{hint}</span>}
+      </span>
       {children}
     </div>
   );
@@ -436,6 +439,27 @@ export function SettingsDialog() {
             <Switch label={t("tapToPlay")} hint={t("tapToPlayHint")} checked={s.tapToPlay} onChange={(v) => updateSettings({ tapToPlay: v })} />
             <Switch label={t("multiNote")} hint={t("multiNoteHint")} checked={s.multiNote} onChange={(v) => updateSettings({ multiNote: v })} />
             <Switch label={t("columnPress")} hint={t("columnPressHint")} checked={s.columnPress} onChange={(v) => updateSettings({ columnPress: v })} />
+          </Section>
+        )}
+        {tab === "gameplay" && (
+          <Section title={t("glideSection")}>
+            <p className="text-xs leading-relaxed text-mist-400">{t("glideIntro")}</p>
+            <Switch label={t("glidePiano")} hint={t("glidePianoHint")} checked={s.glidePiano} onChange={(v) => updateSettings({ glidePiano: v })} />
+            <Switch label={t("glideGuitar")} checked={s.glideGuitar} onChange={(v) => updateSettings({ glideGuitar: v })} />
+            <Switch label={t("glideViolin")} checked={s.glideViolin} onChange={(v) => updateSettings({ glideViolin: v })} />
+            {(s.glidePiano || s.glideGuitar || s.glideViolin) && (
+              <Row label={t("glideTuning")} hint={s.glideSnap ? t("glideSnapHint") : t("glideFreeHint")}>
+                <Segmented
+                  label={t("glideTuning")}
+                  value={s.glideSnap ? "snap" : "free"}
+                  onChange={(v) => updateSettings({ glideSnap: v === "snap" })}
+                  options={[
+                    { value: "snap", label: t("glideSnap") },
+                    { value: "free", label: t("glideFree") },
+                  ]}
+                />
+              </Row>
+            )}
           </Section>
         )}
 

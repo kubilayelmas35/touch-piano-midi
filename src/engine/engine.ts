@@ -62,6 +62,10 @@ export const DEFAULT_CONFIG: EngineConfig = {
 
 /** Fade of a key let go with the piano pedal mode on (seconds to silence). */
 const PEDAL_TAIL = 3;
+/** A gliding note bends its sample at most this many semitones, then carries on from a sample nearer the pitch. */
+const GLIDE_RANGE = 6;
+/** Where the carried-on sample starts, past its attack (seconds). */
+const GLIDE_OFFSET = 0.15;
 
 export function fretSpecFor(kind: EngineConfig["instrument"]): FrettedSpec | null {
   return kind === "guitar" ? GUITAR : kind === "violin" ? VIOLIN : null;
@@ -139,6 +143,10 @@ export class Engine {
   private pedaled = new Map<string, Voice>();
   /** Piano notes fading out under pedal mode, by pitch, so striking the key again damps the old one. */
   private tails = new Map<number, Voice>();
+  /** Fretless play: notes re-pitched without restriking, by source (sample pitch, judged note, offset in cents). */
+  private glides = new Map<string, { base: number; note: number; offset: number }>();
+  /** Vibrato / bend per source in cents, added on top of a glide. */
+  private bends = new Map<string, number>();
   /** Loudness set through setLevel (string energy / bow pressure). */
   private levels = new Map<string, number>();
   /** Long notes that were hit and are still running. */
@@ -760,6 +768,8 @@ export class Engine {
     this.tails.get(midi)?.stop();
     this.tails.delete(midi);
     this.levels.delete(sourceKey);
+    this.glides.delete(sourceKey);
+    this.bends.delete(sourceKey);
     const voice = playNote(this.instrumentId, midi, velocity, { volume: this.config.playerVolume });
     if (voice) this.voices.set(sourceKey, voice);
     const spec = this.fretSpec;
@@ -804,6 +814,7 @@ export class Engine {
     if (!v) return;
     this.ringing.delete(sourceKey);
     this.levels.delete(sourceKey);
+    this.glides.delete(sourceKey);
     v.stop(release);
     this.onInput?.({ type: "mute", key: sourceKey });
   }
@@ -819,7 +830,8 @@ export class Engine {
   /** Whether the note a source played is still audibly going (held, ringing or pedaled). */
   isSounding(sourceKey: string, midi: number): boolean {
     const v = this.voices.get(sourceKey) ?? this.ringing.get(sourceKey) ?? this.pedaled.get(sourceKey);
-    return !!v && !v.done && v.midi === midi && (this.levels.get(sourceKey) ?? 1) > 0.15;
+    const note = this.glides.get(sourceKey)?.note ?? v?.midi;
+    return !!v && !v.done && note === midi && (this.levels.get(sourceKey) ?? 1) > 0.15;
   }
 
   isHeld(sourceKey: string): boolean {
@@ -833,7 +845,45 @@ export class Engine {
 
   /** Vibrato / slide for a held note, in cents. */
   bend(sourceKey: string, cents: number): void {
-    (this.voices.get(sourceKey) ?? this.ringing.get(sourceKey))?.bend(cents);
+    this.bends.set(sourceKey, cents);
+    (this.voices.get(sourceKey) ?? this.ringing.get(sourceKey))?.bend((this.glides.get(sourceKey)?.offset ?? 0) + cents);
+  }
+
+  /**
+   * Fretless play: moves a source's sounding note to a continuous `pitch` (fractional MIDI) without restriking.
+   * Only a `settled` pitch close to a semitone becomes the played note, so sliding past notes doesn't judge them.
+   */
+  glide(sourceKey: string, pitch: number, settled = false, pos?: PressPos): void {
+    const held = this.voices.get(sourceKey);
+    let v = held ?? this.ringing.get(sourceKey);
+    if (!v) return;
+    const g = this.glides.get(sourceKey) ?? { base: v.midi, note: v.midi, offset: 0 };
+    if (Math.abs(pitch - g.base) > GLIDE_RANGE) {
+      const base = Math.round(pitch);
+      const next = playNote(this.instrumentId, base, 0.7, { volume: this.config.playerVolume, offset: GLIDE_OFFSET });
+      if (next) {
+        const level = this.levels.get(sourceKey);
+        if (level !== undefined) next.setLevel?.(level, 0.01);
+        v.stop(0.08);
+        if (held) this.voices.set(sourceKey, next);
+        else this.ringing.set(sourceKey, next);
+        v = next;
+        g.base = base;
+      }
+    }
+    g.offset = (pitch - g.base) * 100;
+    v.bend(g.offset + (this.bends.get(sourceKey) ?? 0));
+    this.glides.set(sourceKey, g);
+
+    const nearest = Math.round(pitch);
+    if (!settled || nearest === g.note || Math.abs(pitch - nearest) > 0.3) return;
+    g.note = nearest;
+    if (held && this.held.has(sourceKey)) {
+      this.onInput?.({ type: "off", key: sourceKey, ring: false });
+      this.held.set(sourceKey, { midi: nearest, string: pos?.string ?? -1, fret: pos?.fret ?? -1 });
+      this.onInput?.({ type: "on", key: sourceKey, midi: nearest, velocity: 0.7 });
+    }
+    this.judgePress(sourceKey, nearest, pos);
   }
 
   /** Sustain pedal from one source; the pedal is down while any source holds it. */

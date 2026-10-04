@@ -83,6 +83,12 @@ export interface Settings {
   landscapeLock: boolean;
   /** Piano: let go keys keep ringing softly, as with the sustain pedal. */
   pianoPedal: boolean;
+  /** Fretless play per instrument: sliding a finger glides the pitch instead of stepping key by key. */
+  glidePiano: boolean;
+  glideGuitar: boolean;
+  glideViolin: boolean;
+  /** Fretless: a resting finger settles on the nearest note (false = pitch stays exactly where the finger is). */
+  glideSnap: boolean;
   onboarded: boolean;
 }
 
@@ -140,6 +146,10 @@ export function defaultSettings(): Settings {
     rotateHint: true,
     landscapeLock: false,
     pianoPedal: true,
+    glidePiano: false,
+    glideGuitar: false,
+    glideViolin: false,
+    glideSnap: true,
     onboarded: false,
   };
 }
@@ -213,6 +223,10 @@ function sanitize(s: Settings): Settings {
     rotateHint: s.rotateHint !== false,
     landscapeLock: s.landscapeLock === true,
     pianoPedal: s.pianoPedal !== false,
+    glidePiano: s.glidePiano === true,
+    glideGuitar: s.glideGuitar === true,
+    glideViolin: s.glideViolin === true,
+    glideSnap: s.glideSnap !== false,
   };
 }
 

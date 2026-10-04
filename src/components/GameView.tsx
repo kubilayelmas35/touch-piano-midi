@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { engine } from "../engine/engine";
 import { FretLayout, PianoLayout, pluckWidth, visibleFrets } from "../engine/layout";
 import { fretted } from "../input/fretted";
+import { glider } from "../input/glide";
 import { keyLabel, keyLabelMap, keyLabelRevision } from "../input/keyboard";
 import { INSTRUMENT_HEIGHT_RANGE } from "../state/settings";
 import { niceKeyboardRange } from "../lib/notes";
@@ -198,6 +199,7 @@ export function GameView() {
         fretted.tapToPlay = s.tapToPlay;
         fretted.multiNote = s.multiNote;
         fretted.columnPress = s.columnPress;
+        fretted.glide = s.instrument === "violin" ? s.glideViolin : s.glideGuitar;
         fretted.tick(now);
         const km = s.instrument === "violin" ? s.keymaps.violin : s.keymaps.guitar;
         if (!fretLabels || fretLabels.src !== km || fretLabels.rev !== rev) {
@@ -216,6 +218,8 @@ export function GameView() {
           keyLabels: s.showKeyLabels && s.fretKeyMode === "strings" ? fretLabels : null,
         });
       }
+      glider.snap = s.glideSnap;
+      glider.tick(now);
       if (engine.status === "playing" && now - lastStore > 90) {
         lastStore = now;
         useApp.setState({ time });
@@ -258,6 +262,7 @@ export function GameView() {
       if (midi == null) return;
       const vel = e.pressure && e.pressure !== 0.5 ? e.pressure : 0.55 + 0.4 * Math.min(1, y / v.instH);
       engine.press(key, midi, vel);
+      if (useApp.getState().settings.glidePiano) glider.start(key, midi);
       pointers.current.set(e.pointerId, { key, midi, x0: x, y0: y, string: -1, fret: -1, zone: "keys", lastX: x, lastY: y, lastT: e.timeStamp });
     } else if (v.layout.fret && renderers.current) {
       const L = v.layout.fret;
@@ -270,7 +275,7 @@ export function GameView() {
       } else {
         const string = renderers.current.fb.stringAt(y, count);
         const fret = L.fretAt(x);
-        fretted.neckDown(e.pointerId, string, fret, stringsAt(y, e, count));
+        fretted.neckDown(e.pointerId, string, fret, stringsAt(y, e, count), L.posAt(x));
         pointers.current.set(e.pointerId, { ...base, string, fret, zone: "neck" });
       }
     }
@@ -284,6 +289,11 @@ export function GameView() {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     if (v.layout.piano) {
+      if (glider.has(p.key)) {
+        const L = v.layout.piano;
+        glider.move(p.key, p.midi + L.pitchAt(x) - L.pitchAt(p.x0));
+        return;
+      }
       const midi = v.layout.piano.hit(x, y, v.instH * BLACK_KEY_RATIO);
       if (midi != null && midi !== p.midi) {
         engine.release(p.key);
@@ -304,9 +314,21 @@ export function GameView() {
         // Moving on a string bows it (violin) or keeps it vibrating (guitar).
         fretted.stroke(e.pointerId, speed);
       } else {
-        const fret = Math.min(L.fretAt(x), L.lastFret);
+        const pos = L.posAt(x);
+        const fret = fretted.glide ? Math.round(pos) : Math.min(L.fretAt(x), L.lastFret);
         if (fretted.multiNote) fretted.neckTouch(e.pointerId, stringsAt(y, e, count));
-        if (fret !== p.fret) {
+        if (fretted.glide) {
+          // Fretless: the pitch follows the finger; moving keeps the string alive, a vertical wobble adds vibrato.
+          fretted.neckMove(e.pointerId, fret, pos);
+          p.fret = fret;
+          const dt = Math.max(1, e.timeStamp - p.lastT);
+          fretted.vibrate(e.pointerId, Math.hypot(x - p.lastX, y - p.lastY) / dt);
+          if (!fretted.multiNote) {
+            const rowH = v.instH / count;
+            const cents = instrument === "violin" ? Math.max(-45, Math.min(45, (p.y0 - y) * 2.2)) : Math.min(200, (Math.abs(y - p.y0) / rowH) * 200);
+            fretted.neckBend(e.pointerId, cents);
+          }
+        } else if (fret !== p.fret) {
           // Slide to another fret on the same string.
           fretted.neckMove(e.pointerId, fret);
           p.fret = fret;
@@ -336,7 +358,10 @@ export function GameView() {
     pointers.current.delete(e.pointerId);
     if (p.zone === "pluck") fretted.strikeEnd(e.pointerId);
     else if (p.zone === "neck") fretted.neckUp(e.pointerId);
-    else engine.release(p.key);
+    else {
+      glider.end(p.key);
+      engine.release(p.key);
+    }
   };
 
   // Resize handle between the highway and the instrument.

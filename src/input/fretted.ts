@@ -1,6 +1,7 @@
 import { engine } from "../engine/engine";
 import { midiAt } from "../engine/fretting";
 import { NoteState } from "../engine/types";
+import { glider } from "./glide";
 
 type Source = number | string;
 
@@ -36,6 +37,8 @@ class FrettedController {
   multiNote = false;
   /** A finger frets its whole fret column (barre); tap-to-play sounds the notes due in that column. */
   columnPress = false;
+  /** Fretless: a neck finger slides the pitch continuously instead of stepping fret by fret. */
+  glide = false;
 
   private get spec() {
     return engine.fretSpec;
@@ -148,6 +151,7 @@ class FrettedController {
     this.struckAt[string] = performance.now();
     this.energy[string] = this.violin ? 0.85 : 1;
     engine.press(strKey(string), midiAt(spec, string, fret), velocity, { string, fret });
+    glider.touch(strKey(string));
   }
 
   energyOf(string: number): number {
@@ -292,18 +296,53 @@ class FrettedController {
     this.strikeSync(key, targets.filter((s) => own?.has(s) || !engine.isHeld(strKey(s))), velocity);
   }
 
-  /** `under`: every string beneath the fingertip (several with multi-note play), `string` the one at its centre. */
-  neckDown(source: Source, string: number, fret: number, under: number[] = [string]): void {
+  /**
+   * Fretless: the strings this finger decides the pitch of follow `pos` (fractional fret) without restriking;
+   * they're marked as already sounding at `fret` so refresh() leaves them alone.
+   */
+  private glideStrings(source: Source, pos: number): void {
+    const p = this.neck.get(source);
+    const spec = this.spec;
+    if (!p || !spec) return;
+    for (const s of p.strings) {
+      const key = strKey(s);
+      if (this.fretOf(s) !== p.fret) {
+        glider.end(key);
+        continue;
+      }
+      this.sounding[s] = p.fret;
+      const pitch = spec.tuning[s] + pos;
+      if (glider.has(key)) glider.move(key, pitch);
+      else glider.start(key, pitch, (at) => ({ string: s, fret: Math.max(0, Math.round(at - spec.tuning[s])) }));
+    }
+  }
+
+  /**
+   * `under`: every string beneath the fingertip (several with multi-note play), `string` the one at its centre.
+   * `pos`: exact position in frets, for fretless play.
+   */
+  neckDown(source: Source, string: number, fret: number, under: number[] = [string], pos?: number): void {
     const touched = new Set(this.multiNote ? [string, ...under] : [string]);
     this.neck.set(source, { string, fret, strings: this.fretsFor(touched), touched });
     this.refresh();
+    if (this.glide && pos !== undefined) this.glideStrings(source, pos);
     this.tapStrike(source, 0.75);
   }
 
-  /** Slide along the neck to another fret. */
-  neckMove(source: Source, fret: number): void {
+  /** Slide along the neck to another fret (fretless: to the exact position `pos`). */
+  neckMove(source: Source, fret: number, pos?: number): void {
     const p = this.neck.get(source);
-    if (!p || p.fret === fret) return;
+    if (!p) return;
+    if (this.glide && pos !== undefined) {
+      const changed = p.fret !== fret;
+      p.fret = fret;
+      this.glideStrings(source, pos);
+      if (!changed) return;
+      this.refresh();
+      if (this.columnPress) this.tapStrike(source, 0.6);
+      return;
+    }
+    if (p.fret === fret) return;
     p.fret = fret;
     this.refresh();
     if (this.columnPress) this.tapStrike(source, 0.6);
@@ -331,6 +370,7 @@ class FrettedController {
     const p = this.neck.get(source);
     if (!p) return;
     engine.bend(strKey(p.string), 0);
+    for (const s of p.strings) glider.end(strKey(s));
     this.neck.delete(source);
     this.strikeEnd(`tap:${source}`);
     this.refresh();
@@ -361,6 +401,7 @@ class FrettedController {
     for (const source of [...this.striking.keys()]) this.strikeEnd(source);
     this.neck.clear();
     this.kbFrets.clear();
+    glider.clear();
     const spec = this.spec;
     if (spec) for (let s = 0; s < 6; s++) engine.mute(strKey(s));
     this.sounding = [];

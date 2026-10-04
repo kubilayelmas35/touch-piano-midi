@@ -102,6 +102,20 @@ export class PianoLayout {
     return null;
   }
 
+  /** Continuous pitch under x, interpolated between key centres (fretless glide). */
+  pitchAt(x: number): number {
+    let prevMidi = -1;
+    let prevX = 0;
+    for (const m of this.keys) {
+      const l = this.lanes.get(m)!;
+      const c = l.x + l.w / 2;
+      if (x <= c) return prevMidi < 0 ? m : prevMidi + ((x - prevX) / Math.max(1e-6, c - prevX)) * (m - prevMidi);
+      prevMidi = m;
+      prevX = c;
+    }
+    return prevMidi < 0 ? this.low : prevMidi;
+  }
+
   /** Pan (0–1) that centres the keys from `a` to `b` on screen. */
   panFor(a: number, b = a): number {
     const la = this.lanes.get(a);
@@ -150,6 +164,11 @@ export class FretLayout {
 
   fretAt(x: number): number {
     return Math.max(0, Math.min(this.lastFret, Math.floor(x / this.colW)));
+  }
+
+  /** Exact position in frets (column centres are whole frets), for fretless play. */
+  posAt(x: number): number {
+    return Math.max(0, Math.min(this.lastFret, x / this.colW - 0.5));
   }
 }
 

@@ -4,6 +4,7 @@ const audio = vi.hoisted(() => ({
   currentTime: 0,
   played: [] as { midi: number; when?: number }[],
   stops: [] as { midi: number; release?: number }[],
+  bends: [] as number[],
 }));
 
 vi.mock("../audio/context", () => ({
@@ -17,7 +18,8 @@ vi.mock("../audio/sampler", () => ({
   playNote: (_id: string, midi: number, _vel: number, opts: { when?: number } = {}) => {
     audio.played.push({ midi, when: opts.when });
     const stop = (release?: number) => void audio.stops.push({ midi, release });
-    return { midi, done: false, stop, bend: () => {}, kill: () => {}, setLevel: () => {} };
+    const bend = (cents: number) => void audio.bends.push(cents);
+    return { midi, done: false, stop, bend, kill: () => {}, setLevel: () => {} };
   },
 }));
 
@@ -67,6 +69,7 @@ beforeEach(() => {
   audio.currentTime = 0;
   audio.played = [];
   audio.stops = [];
+  audio.bends = [];
   vi.spyOn(performance, "now").mockImplementation(() => now);
 });
 
@@ -290,6 +293,31 @@ describe("engine", () => {
     expect(audio.stops.length).toBe(0);
     engine.setSustain(false);
     expect(audio.stops.length).toBe(1);
+  });
+
+  it("glides to the next note without restriking and only judges where it settles", async () => {
+    const engine = await startEngine();
+    advance(-engine.startTime, engine);
+    engine.press("k", 60);
+    expect(engine.notes[0].state).toBe(NoteState.Hit);
+    advance(1, engine);
+    const struck = audio.played.length;
+    engine.glide("k", 61);
+    engine.glide("k", 61.6);
+    expect(engine.stats.wrong).toBe(0);
+    engine.glide("k", 62, true);
+    expect(audio.bends.at(-1)).toBeCloseTo(200);
+    expect(audio.played.length).toBe(struck);
+    expect(engine.notes[1].state).toBe(NoteState.Hit);
+    expect(engine.stats.wrong).toBe(0);
+  });
+
+  it("carries a long glide on from a fresh sample instead of bending one too far", async () => {
+    const engine = new Engine();
+    engine.press("k", 60);
+    engine.glide("k", 70);
+    expect(audio.played.at(-1)?.midi).toBe(70);
+    expect(audio.bends.at(-1)).toBeCloseTo(0);
   });
 
   it("guitar mode assigns every note a string and fret", async () => {

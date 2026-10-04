@@ -10,6 +10,8 @@ export interface PlayOptions {
   release?: number;
   /** Output gain multiplier (e.g. accompaniment volume). */
   volume?: number;
+  /** Start this many seconds into the sample, past its attack (continuing a note at a new pitch). */
+  offset?: number;
 }
 
 export interface Voice {
@@ -304,8 +306,9 @@ export function playNote(id: InstrumentId, midi: number, velocity: number, opts:
 
   const env = ctx.createGain();
   const peak = velocityGain(velocity) * def.gain * (opts.volume ?? 1);
+  const offset = Math.max(0, Math.min(buffer.duration - 0.05, opts.offset ?? 0));
   env.gain.setValueAtTime(0, when);
-  env.gain.linearRampToValueAtTime(peak, when + def.attack);
+  env.gain.linearRampToValueAtTime(peak, when + (offset ? Math.max(def.attack, 0.04) : def.attack));
   // Scheduled plucks have nobody keeping the string alive, so they fade like a real string.
   if (def.pluckSustain && sample.loopStart !== null && opts.duration != null) {
     env.gain.setTargetAtTime(0, when + def.attack + sample.loopStart, def.pluckSustain.decay);
@@ -333,7 +336,7 @@ export function playNote(id: InstrumentId, midi: number, velocity: number, opts:
   pan.connect(input);
   nodes.push(pan);
 
-  source.start(when);
+  source.start(when, offset);
   const voice = new VoiceImpl(midi, id, source, env, nodes, def, detune, when, level);
   active.add(voice);
   if (opts.duration != null) {
