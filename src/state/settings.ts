@@ -90,6 +90,10 @@ export interface Settings {
   landscapeLock: boolean;
   /** Piano: let go keys keep ringing softly, as with the sustain pedal. */
   pianoPedal: boolean;
+  /** Piano: how long held and pedalled notes ring, 0 short … 1 long. */
+  pianoSustain: number;
+  /** Falling notes also show the computer key that plays them. */
+  noteKeyLabels: boolean;
   /** Fretless play per instrument: sliding a finger glides the pitch instead of stepping key by key. */
   glidePiano: boolean;
   glideGuitar: boolean;
@@ -112,6 +116,11 @@ const KEY = "staveflow-settings-v2";
 function detectLanguage(): Language {
   const langs = navigator.languages?.length ? navigator.languages : [navigator.language];
   return langs.some((l) => l?.toLowerCase().startsWith("tr")) ? "tr" : "en";
+}
+
+/** A device with a precise pointer usually has a keyboard too; phones and tablets don't. */
+function hasKeyboard(): boolean {
+  return typeof matchMedia !== "function" || matchMedia("(any-pointer: fine)").matches;
 }
 
 export function defaultSettings(): Settings {
@@ -161,6 +170,8 @@ export function defaultSettings(): Settings {
     rotateHint: true,
     landscapeLock: false,
     pianoPedal: true,
+    pianoSustain: 0.7,
+    noteKeyLabels: hasKeyboard(),
     glidePiano: false,
     glideGuitar: false,
     glideViolin: false,
@@ -260,6 +271,8 @@ function sanitize(s: Settings): Settings {
     rotateHint: s.rotateHint !== false,
     landscapeLock: s.landscapeLock === true,
     pianoPedal: s.pianoPedal !== false,
+    pianoSustain: num(s.pianoSustain, 0, 1, d.pianoSustain),
+    noteKeyLabels: typeof s.noteKeyLabels === "boolean" ? s.noteKeyLabels : d.noteKeyLabels,
     glidePiano: s.glidePiano === true,
     glideGuitar: s.glideGuitar === true,
     glideViolin: s.glideViolin === true,

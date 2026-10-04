@@ -1,5 +1,6 @@
 import { setClickVolume } from "../audio/click";
 import { setMasterVolume, setReverbAmount } from "../audio/context";
+import { setPianoSustain } from "../audio/sampler";
 import { engine } from "../engine/engine";
 import { accuracyOf, starsFor, type EngineConfig } from "../engine/types";
 import { tNow } from "../i18n";
@@ -41,6 +42,7 @@ export function engineConfig(): Partial<EngineConfig> {
     timingWindowMs: settings.timingWindowMs,
     accompVolume: settings.accompVolume,
     pianoPedal: settings.pianoPedal,
+    pianoSustain: settings.pianoSustain,
     playTracks: session.playTracks,
     mutedTracks: session.mutedTracks,
     // On guitar/violin the hands split the playing technique (strike vs. fret), not the notes.
@@ -74,6 +76,7 @@ function applyAudioSettings(s: Settings): void {
   setMasterVolume(s.volume);
   setReverbAmount(s.reverb);
   setClickVolume(s.clickVolume);
+  setPianoSustain(s.pianoSustain);
 }
 
 let initialized = false;

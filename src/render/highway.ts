@@ -27,6 +27,8 @@ export interface HighwayView {
   hideFrets?: boolean;
   naming: NoteNaming;
   showNames: boolean;
+  /** Piano: computer key per MIDI note, shown on the falling notes. */
+  keyLabels?: Map<number, string> | null;
   effects: boolean;
   /** 0.1–1 intensity of particles and glows. */
   effectLevel: number;
@@ -491,11 +493,32 @@ export class Highway {
         ctx.font = `800 ${fs}px system-ui, sans-serif`;
         ctx.fillStyle = ink;
         ctx.fillText(String(n.fret), lane.x + lane.w / 2, headMid + 0.5);
-      } else if (view.showNames && lane.w >= 13 && headH >= 14) {
+      } else if (lane.w >= 13 && headH >= 14) {
+        const key = view.keyLabels?.get(n.midi);
+        const name = view.showNames ? noteName(n.midi, view.naming).replace("#", "♯") : null;
         const fs = Math.min(12, Math.max(8, lane.w * 0.5));
-        ctx.font = `700 ${fs}px system-ui, sans-serif`;
+        const cx = lane.x + lane.w / 2;
         ctx.fillStyle = ink;
-        ctx.fillText(noteName(n.midi, view.naming).replace("#", "♯"), lane.x + lane.w / 2, headMid + 0.5);
+        if (key && name && headH >= 26) {
+          ctx.font = `800 ${fs + 1}px system-ui, sans-serif`;
+          ctx.fillText(key, cx, headMid - fs * 0.55);
+          ctx.font = `600 ${fs - 1}px system-ui, sans-serif`;
+          ctx.fillText(name, cx, headMid + fs * 0.6);
+        } else if (key && !name) {
+          ctx.font = `800 ${fs + 1}px system-ui, sans-serif`;
+          ctx.fillText(key, cx, headMid + 0.5);
+        } else {
+          if (name) {
+            ctx.font = `700 ${fs}px system-ui, sans-serif`;
+            ctx.fillText(name, cx, headMid + 0.5);
+          }
+          // No room for both in the head: the key rides just above the note.
+          if (key && yTop > 10) {
+            ctx.font = `800 ${fs}px system-ui, sans-serif`;
+            ctx.fillStyle = "rgba(255,255,255,0.9)";
+            ctx.fillText(key, cx, yTop - fs * 0.7);
+          }
+        }
       }
     }
     ctx.globalAlpha = 1;

@@ -44,7 +44,7 @@ export const INSTRUMENTS: Record<InstrumentId, InstrumentDef> = {
     attack: 0.003,
     minRelease: 0.5,
     sustained: false,
-    holdSustain: { dropDb: 12, slopeDb: 0.8, maxBoostDb: 22 },
+    holdSustain: { dropDb: 12, slopeDb: 0, maxBoostDb: 24 },
     maxRing: 10,
     velocityTone: true,
   },

@@ -383,6 +383,10 @@ export function playNote(id: InstrumentId, midi: number, velocity: number, opts:
   if (def.pluckSustain && sample.loopStart !== null && opts.duration != null) {
     env.gain.setTargetAtTime(0, when + def.attack + sample.loopStart, def.pluckSustain.decay);
   }
+  // Held piano keys: the sample itself barely fades, the sustain setting decides how fast they do.
+  if (def.holdSustain && sample === base.held && holdFadeDb > 0) {
+    env.gain.setTargetAtTime(0, when + def.attack, (20 / Math.LN10) / holdFadeDb);
+  }
   const level = ctx.createGain();
   const nodes: AudioNode[] = [source, env, level];
   let tail: AudioNode = level;
@@ -416,6 +420,18 @@ export function playNote(id: InstrumentId, midi: number, velocity: number, opts:
 
 export function stopAllVoices(): void {
   for (const v of [...active]) v.kill();
+}
+
+/** Fade of a held piano key in dB a second; set from the sustain setting. */
+let holdFadeDb = sustainFadeDb(0.7);
+
+/** 0 short … 1 long → how fast a held piano key fades (dB a second; 0 = it never fades). */
+export function sustainFadeDb(sustain: number): number {
+  return 3 * (1 - Math.max(0, Math.min(1, sustain))) ** 2;
+}
+
+export function setPianoSustain(sustain: number): void {
+  holdFadeDb = sustainFadeDb(sustain);
 }
 
 export function activeVoiceCount(): number {

@@ -126,6 +126,8 @@ export interface EngineConfig {
   playerVolume: number;
   /** Piano: released keys keep ringing and fade slowly, like playing with the pedal down. */
   pianoPedal: boolean;
+  /** Piano: how long held and pedalled notes ring, 0 short … 1 long. */
+  pianoSustain: number;
   loop: LoopRange;
   /** Song time (s) the run stops at; notes from there on are left out. 0 = the whole song. */
   segmentEnd: number;

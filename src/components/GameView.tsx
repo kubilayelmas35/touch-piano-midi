@@ -169,6 +169,13 @@ export function GameView() {
       labels.miss = t("miss");
       labels.early = t("early");
       labels.late = t("late");
+      const rev = keyLabelRevision();
+      if (v.layout.piano) {
+        const keys = pianoKeyMap(s);
+        if (!pianoLabels || pianoLabels.src !== keys || pianoLabels.rev !== rev) {
+          pianoLabels = { src: keys, rev, map: keyLabelMap(keys) };
+        }
+      }
       const fretless = v.layout.piano ? s.glidePiano : s.instrument === "violin" ? s.glideViolin : s.instrument === "guitar" && s.glideGuitar;
       const hideFrets = fretless && s.hideFrets;
       r.hw.resize(v.w, v.hwH);
@@ -180,6 +187,7 @@ export function GameView() {
         hideFrets,
         naming: s.noteNaming,
         showNames: s.showNoteNames,
+        keyLabels: v.layout.piano && s.noteKeyLabels ? pianoLabels?.map : null,
         effects: s.effects,
         effectLevel: s.effectLevel,
         effectStyle: s.effectStyle,
@@ -192,12 +200,7 @@ export function GameView() {
         background: s.background,
         labels,
       });
-      const rev = keyLabelRevision();
-      if (v.layout.piano) {
-        const keys = pianoKeyMap(s);
-        if (!pianoLabels || pianoLabels.src !== keys || pianoLabels.rev !== rev) {
-          pianoLabels = { src: keys, rev, map: keyLabelMap(keys) };
-        }
+      if (v.layout.piano && pianoLabels) {
         r.kb.resize(v.w, v.instH);
         r.kb.draw({
           layout: v.layout.piano,

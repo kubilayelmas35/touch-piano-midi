@@ -248,6 +248,12 @@ export function SettingsDialog() {
                 />
               </Row>
               <Switch label={t("showNoteNames")} checked={s.showNoteNames} onChange={(v) => updateSettings({ showNoteNames: v })} />
+              <Switch
+                label={t("noteKeyLabels")}
+                hint={t("noteKeyLabelsHint")}
+                checked={s.noteKeyLabels}
+                onChange={(v) => updateSettings({ noteKeyLabels: v })}
+              />
               {fs.supported && <Switch label={t("fullscreen")} hint="F11" checked={fs.full} onChange={fs.toggle} />}
               {isNativeApp && (
                 <Switch
@@ -386,6 +392,16 @@ export function SettingsDialog() {
             <Slider label={t("accompVolume")} value={s.accompVolume} min={0} max={1} step={0.05} onChange={(v) => updateSettings({ accompVolume: v })} format={pct} />
             <Slider label={t("reverb")} value={s.reverb} min={0} max={0.6} step={0.02} onChange={(v) => updateSettings({ reverb: v })} format={(v) => pct(v / 0.6)} />
             <Slider label={t("clickVolume")} value={s.clickVolume} min={0} max={1} step={0.05} onChange={(v) => updateSettings({ clickVolume: v })} format={pct} />
+            <Slider
+              label={t("pianoSustain")}
+              value={s.pianoSustain}
+              min={0}
+              max={1}
+              step={0.05}
+              onChange={(v) => updateSettings({ pianoSustain: v })}
+              format={(v) => (v >= 0.99 ? t("sustainEndless") : pct(v))}
+            />
+            <p className="pb-2 text-xs leading-relaxed text-mist-400">{t("pianoSustainHint")}</p>
             <Switch label={t("pianoPedal")} hint={t("pianoPedalHint")} checked={s.pianoPedal} onChange={(v) => updateSettings({ pianoPedal: v })} />
             <Row label={t("guitarTone")}>
               <Segmented

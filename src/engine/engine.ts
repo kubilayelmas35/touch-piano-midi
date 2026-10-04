@@ -57,12 +57,13 @@ export const DEFAULT_CONFIG: EngineConfig = {
   accompVolume: 0.7,
   playerVolume: 1,
   pianoPedal: false,
+  pianoSustain: 0.7,
   loop: { a: -1, b: -1, enabled: false },
   segmentEnd: 0,
 };
 
-/** Fade of a key let go with the piano pedal mode on (seconds to silence). */
-const PEDAL_TAIL = 3;
+/** Fade of a key let go with the piano pedal mode on (seconds to silence), from shortest to longest sustain. */
+const PEDAL_TAIL = [1.5, 7.5];
 /** A gliding note bends its sample at most this many semitones, then carries on from a sample nearer the pitch. */
 const GLIDE_RANGE = 6;
 /** Where the carried-on sample starts, past its attack (seconds). */
@@ -805,7 +806,7 @@ export class Engine {
       this.pedaled.set(sourceKey, v);
       this.levels.delete(sourceKey);
     } else if (tail) {
-      v.stop(PEDAL_TAIL);
+      v.stop(this.pedalTail);
       this.tails.get(v.midi)?.stop();
       this.tails.set(v.midi, v);
       this.levels.delete(sourceKey);
@@ -893,6 +894,10 @@ export class Engine {
     this.judgePress(sourceKey, nearest, pos);
   }
 
+  private get pedalTail(): number {
+    return PEDAL_TAIL[0] + (PEDAL_TAIL[1] - PEDAL_TAIL[0]) * this.config.pianoSustain;
+  }
+
   /** Sustain pedal from one source; the pedal is down while any source holds it. */
   setSustain(down: boolean, source = "pedal"): void {
     if (down) this.sustainBy.add(source);
@@ -901,7 +906,7 @@ export class Engine {
     if (this.sustain !== on) this.onInput?.({ type: "sustain", on });
     this.sustain = on;
     if (!on) {
-      const fade = this.config.pianoPedal && this.instrumentId === "piano" ? PEDAL_TAIL : 0.35;
+      const fade = this.config.pianoPedal && this.instrumentId === "piano" ? this.pedalTail : 0.35;
       for (const v of this.sustained) v.stop(fade);
       this.sustained = [];
       this.pedaled.clear();
