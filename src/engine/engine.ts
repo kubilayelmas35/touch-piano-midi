@@ -264,6 +264,7 @@ export class Engine {
           holdStart: 0,
           held: 0,
           holding: false,
+          rejoined: false,
         });
       });
     });
@@ -372,6 +373,7 @@ export class Engine {
     n.holdStart = 0;
     n.held = 0;
     n.holding = false;
+    n.rejoined = false;
   }
 
   private seekInternal(t: number): void {
@@ -583,10 +585,15 @@ export class Engine {
         keep.push(n);
         continue;
       }
-      const span = Math.max(0.05, end - n.holdStart);
       const w = holdWeight(n.duration);
-      s.holdEarned += w * Math.min(1, n.held / (span * 0.92));
-      s.holdPossible += w;
+      if (n.rejoined) {
+        // The miss already counted the full hold as possible; credit the share of the whole note that was held.
+        s.holdEarned += w * Math.min(1, n.held / (n.duration * 0.92));
+      } else {
+        const span = Math.max(0.05, end - n.holdStart);
+        s.holdEarned += w * Math.min(1, n.held / (span * 0.92));
+        s.holdPossible += w;
+      }
       finished = true;
     }
     this.holds = keep;
@@ -807,6 +814,20 @@ export class Engine {
       }
     }
     if (!best) {
+      // Catching a long note somewhere in its tail (after missing its head or letting go) picks the hold back up.
+      const tail = this.tailNote(midi, t);
+      if (tail) {
+        if (tail.state === NoteState.Missed && !tail.rejoined) {
+          tail.rejoined = true;
+          tail.holdStart = t;
+          tail.held = 0;
+        }
+        tail.holdSrc = sourceKey;
+        tail.holding = true;
+        if (!this.holds.includes(tail)) this.holds.push(tail);
+        this.emit();
+        return;
+      }
       // A press just after a note slipped past is a late attempt, not a stray key; the miss already counted.
       const [m0, m1] = this.visibleRange(t - late - 0.35, t);
       for (let i = m0; i < m1; i++) {
@@ -840,6 +861,19 @@ export class Engine {
     this.pushFx(best, j);
     this.advancePending();
     this.emit();
+  }
+
+  /** A long note of this pitch whose tail is passing the hit line, preferring one nobody is holding. */
+  private tailNote(midi: number, t: number): PlayNote | null {
+    const [i0, i1] = this.visibleRange(t, t + 0.0001);
+    let found: PlayNote | null = null;
+    for (let i = i0; i < i1; i++) {
+      const n = this.notes[i];
+      if (n.midi !== midi || (n.state !== NoteState.Hit && n.state !== NoteState.Missed)) continue;
+      if (holdWeight(n.duration) <= 0 || t < n.time || t > n.time + n.duration - 0.08) continue;
+      if (!found || (found.holding && !n.holding)) found = n;
+    }
+    return found;
   }
 
   // --------------------------------------------------------------- queries

@@ -35,6 +35,14 @@ interface Particle {
   max: number;
   size: number;
   color: string;
+  /** Drawn as a short motion streak instead of a soft dot. */
+  streak?: boolean;
+}
+
+interface SprayLane {
+  x: number;
+  w: number;
+  color: string;
 }
 
 interface Popup {
@@ -44,7 +52,9 @@ interface Popup {
   born: number;
 }
 
-const MAX_PARTICLES = 400;
+const MAX_PARTICLES = 700;
+/** Sparks per second thrown off each side of a note that is being held. */
+const SPRAY_RATE = 60;
 
 export class Highway {
   private readonly ctx: CanvasRenderingContext2D;
@@ -451,14 +461,17 @@ export class Highway {
     ctx.textBaseline = "middle";
 
     const slots = view.fret ? this.fretSlots(i0, i1, 10 / pps) : null;
+    const holdingLanes: SprayLane[] = [];
     for (let i = i0; i < i1; i++) {
       const n = notes[i];
       const lane = this.laneOf(n, view, slots?.get(n.id));
       if (!lane) continue;
       const sounding = n.time <= t && t < n.time + n.duration;
       const isLong = n.holdSrc !== null || n.duration * pps > Math.max(36, lane.w * 1.4);
-      // A hit long note sticks to the hit line and its tail drains into it.
-      const sticky = n.state === NoteState.Hit && sounding && isLong;
+      const caught = n.state === NoteState.Missed && n.rejoined;
+      const missed = n.state === NoteState.Missed && !caught;
+      // A hit (or later caught) long note sticks to the hit line and its tail drains into it.
+      const sticky = (n.state === NoteState.Hit || caught) && sounding && isLong;
       const brokenHold = sticky && n.holdSrc !== null && !n.holding;
       const holdingNow = sticky && !brokenHold;
       let yBottom = yOf(n.time);
@@ -470,12 +483,12 @@ export class Highway {
       const color = this.noteColor(n);
       let alpha = 1;
       let fill = color;
-      if (n.state === NoteState.Missed) {
+      if (missed) {
         fill = "#5b5f7a";
         alpha = 0.7;
       } else if (n.state === NoteState.Skipped) {
         alpha = 0.25;
-      } else if (n.state === NoteState.Hit && !sticky) {
+      } else if ((n.state === NoteState.Hit || caught) && !sticky) {
         alpha = Math.max(0, 1 - (now - n.resolvedAt) / 450);
         if (alpha <= 0) continue;
       }
@@ -491,12 +504,13 @@ export class Highway {
         long: isLong,
         live,
         holding: holdingNow,
-        missed: n.state === NoteState.Missed,
+        missed,
         target: isTarget,
         pulse,
         now,
         effects: view.effects,
       });
+      if (holdingNow) holdingLanes.push({ x: lane.x, w: lane.w, color: fill });
 
       // Matching marker in the string lane above the strike zone.
       const sl = this.stringLaneOf(n, view);
@@ -541,6 +555,7 @@ export class Highway {
     ctx.fillStyle = engine.waiting ? `rgba(250,204,21,${0.6 + 0.4 * pulse})` : COLORS.hitLine;
     ctx.fillRect(0, hitY - 1, this.w, 3);
 
+    if (view.effects) this.spray(holdingLanes, hitY, dt, now);
     this.consumeFx(view, hitY);
     this.drawEffects(dt, now, hitY);
   }
@@ -555,7 +570,8 @@ export class Highway {
     const t = view.t;
     for (let i = i0; i < i1; i++) {
       const n = engine.notes[i];
-      if (n.state === NoteState.Hit && n.time <= t && t < n.time + n.duration && (n.holdSrc === null || n.holding)) {
+      const lit = n.state === NoteState.Hit || (n.state === NoteState.Missed && n.rejoined);
+      if (lit && n.time <= t && t < n.time + n.duration && (n.holdSrc === null || n.holding)) {
         add(this.laneOf(n, view), this.noteColor(n));
       }
     }
@@ -585,22 +601,64 @@ export class Highway {
     ctx.globalCompositeOperation = "source-over";
   }
 
-  private fxX(fx: { midi: number; string: number; fret: number }, view: HighwayView): number | null {
+  private fxLane(fx: { midi: number; string: number; fret: number }, view: HighwayView): { x: number; w: number } | null {
     if (view.fret) {
       if (fx.fret < 0) return null;
       const col = view.fret.column(fx.fret);
-      return col.x + col.w / 2;
+      return { x: col.x, w: col.w };
     }
     const lane = view.piano?.lane(fx.midi);
-    return lane ? lane.x + lane.w / 2 : null;
+    return lane ? { x: lane.x, w: lane.w } : null;
+  }
+
+  /** Throws sparks sideways and up off both edges of a lane at the hit line. */
+  private sideSparks(lane: { x: number; w: number }, color: string, hitY: number, count: number, power = 1): void {
+    for (let i = 0; i < count && this.particles.length < MAX_PARTICLES; i++) {
+      const side = Math.random() < 0.5 ? -1 : 1;
+      const a = 0.3 + Math.random() * 1.0;
+      const sp = (170 + Math.random() * 300) * power;
+      this.particles.push({
+        x: side < 0 ? lane.x + 1 : lane.x + lane.w - 1,
+        y: hitY - 2 - Math.random() * 10,
+        vx: side * Math.cos(a) * sp,
+        vy: -Math.sin(a) * sp,
+        life: 0,
+        max: 0.3 + Math.random() * 0.45,
+        size: 1.8 + Math.random() * 2.2,
+        color: Math.random() < 0.45 ? "#ffffff" : color,
+        streak: true,
+      });
+    }
+  }
+
+  /** Held notes: a hot bloom where they meet the hit line and a steady spray of sparks off both edges. */
+  private spray(lanes: SprayLane[], hitY: number, dt: number, now: number): void {
+    if (!lanes.length) return;
+    const { ctx } = this;
+    ctx.globalCompositeOperation = "lighter";
+    for (const l of lanes) {
+      const cx = l.x + l.w / 2;
+      const flicker = 0.8 + 0.2 * Math.sin(now / 37 + l.x);
+      ctx.globalAlpha = 0.7 * flicker;
+      const cw = Math.max(110, l.w * 4.5);
+      ctx.drawImage(glowSprite(l.color, 64), cx - cw / 2, hitY - cw * 0.5, cw, cw);
+      ctx.globalAlpha = 0.95 * flicker;
+      const ww = Math.max(56, l.w * 2.4);
+      ctx.drawImage(glowSprite("#ffffff", 64), cx - ww / 2, hitY - ww * 0.4, ww, ww * 0.8);
+      const n = SPRAY_RATE * 2 * dt;
+      this.sideSparks(l, l.color, hitY, Math.floor(n) + (Math.random() < n % 1 ? 1 : 0), 0.85);
+    }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = "source-over";
   }
 
   private consumeFx(view: HighwayView, hitY: number): void {
     const list = this.engine.fx;
     for (const fx of list) {
       if (fx.at <= this.lastFxAt) continue;
-      const x = this.fxX(fx, view);
-      if (x == null) continue;
+      const lane = this.fxLane(fx, view);
+      if (!lane) continue;
+      const x = lane.x + lane.w / 2;
       const color = JUDGEMENT_COLORS[fx.judgement] ?? "#ffffff";
       if (fx.judgement !== "wrong") {
         // Labels are wider than a key, so neighbours replace each other instead of piling up.
@@ -624,6 +682,7 @@ export class Highway {
             color,
           });
         }
+        this.sideSparks(lane, color, hitY, fx.judgement === "perfect" ? 22 : fx.judgement === "great" ? 16 : 10, 1.15);
       }
     }
     if (list.length) this.lastFxAt = Math.max(this.lastFxAt, list[list.length - 1].at);
@@ -633,6 +692,7 @@ export class Highway {
     const { ctx } = this;
     if (this.particles.length) {
       ctx.globalCompositeOperation = "lighter";
+      ctx.lineCap = "round";
       const alive: Particle[] = [];
       for (const p of this.particles) {
         p.life += dt;
@@ -642,8 +702,17 @@ export class Highway {
         p.y += p.vy * dt;
         const k = 1 - p.life / p.max;
         ctx.globalAlpha = k;
-        const s = p.size * (0.6 + 0.4 * k);
-        ctx.drawImage(glowSprite(p.color, 32), p.x - s / 2, p.y - s / 2, s, s);
+        if (p.streak) {
+          ctx.strokeStyle = p.color;
+          ctx.lineWidth = p.size * (0.5 + 0.5 * k);
+          ctx.beginPath();
+          ctx.moveTo(p.x, p.y);
+          ctx.lineTo(p.x - p.vx * 0.035, p.y - p.vy * 0.035);
+          ctx.stroke();
+        } else {
+          const s = p.size * (0.6 + 0.4 * k);
+          ctx.drawImage(glowSprite(p.color, 32), p.x - s / 2, p.y - s / 2, s, s);
+        }
         alive.push(p);
       }
       this.particles = alive;

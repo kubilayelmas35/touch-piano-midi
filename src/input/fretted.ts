@@ -9,8 +9,8 @@ const strKey = (s: number) => `str:${s}`;
 /**
  * Guitar / violin playing model: the left hand frets (touching the neck or holding fret keys sets the pitch
  * of a string without sounding it), the right hand strikes strings in the pluck zone (several at once,
- * strumming by sliding across). Guitar strings ring on after release and fade unless kept vibrating
- * (scrubbing the string or vibrato); violin sounds only while bowing and gets louder with bow speed.
+ * strumming by sliding across). A string keeps sounding only while it is kept moving (scrubbing / bowing in
+ * the strike zone or vibrato on the neck) and dies away once it is left still; violin gets louder with bow speed.
  */
 class FrettedController {
   /** Fingers on the neck. */
@@ -23,7 +23,7 @@ class FrettedController {
   private sounding: number[] = [];
   /** performance.now() of the last strike per string, for the vibration animation. */
   readonly struckAt: number[] = [];
-  /** 0–1 vibration per string; drives loudness. Guitar strings decay unless kept vibrating; violin needs bow motion. */
+  /** 0–1 vibration per string; drives loudness and decays unless the string is kept moving. */
   private energy: number[] = [];
   /** Excitation gathered since the last tick (bow speed, vibrato, scrubbing the string). */
   private feed: number[] = [];
@@ -125,15 +125,13 @@ class FrettedController {
       }
       let e = this.energy[s] ?? 0;
       let feed = this.feed[s] ?? 0;
-      // Computer keys and tap-to-play can't move, so they bow steadily.
-      if (violin && held && this.steadyBow(s)) feed = Math.max(feed, 0.8);
-      if (violin) {
-        if (feed > 0.02) e += (Math.min(1, 0.45 + feed) - e) * (1 - Math.exp(-dt / 0.06));
-        else e *= Math.exp(-dt / 0.45);
-      } else {
-        e *= Math.exp(-dt / 2.2);
-        if (feed > 0.02) e = Math.min(1, e + feed * dt * 2.5);
-      }
+      // Computer keys and tap-to-play can't move, so they play steadily while held.
+      if (held && this.steadyBow(s)) feed = Math.max(feed, 0.8);
+      // Both instruments sound only while the string is kept moving; a still string dies away (guitar a bit slower).
+      if (feed > 0.02) {
+        const target = violin ? Math.min(1, 0.45 + feed) : Math.min(1, 0.6 + feed * 0.6);
+        e += (Math.max(e, target) - e) * (1 - Math.exp(-dt / (violin ? 0.06 : 0.04)));
+      } else e *= Math.exp(-dt / (violin ? 0.45 : 0.6));
       this.feed[s] = 0;
       this.energy[s] = e;
       if (!violin && e < 0.04) {

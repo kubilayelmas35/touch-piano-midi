@@ -29,6 +29,8 @@ export interface PlayNote extends SongNote {
   held: number;
   /** Still being held/sounding right now (drawn lit). */
   holding: boolean;
+  /** Missed at the head but caught later in its tail; earns hold credit from then on. */
+  rejoined: boolean;
 }
 
 export type Status = "empty" | "loading" | "ready" | "playing" | "paused" | "complete";

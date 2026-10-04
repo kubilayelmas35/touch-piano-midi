@@ -119,6 +119,24 @@ describe("engine", () => {
     expect(engine.stats.wrong).toBe(0);
   });
 
+  it("picks a missed long note back up when caught in its tail", async () => {
+    const engine = await startEngine();
+    advance(-engine.startTime + 0.4, engine);
+    expect(engine.notes[0].state).toBe(NoteState.Missed);
+    const possible = engine.stats.holdPossible;
+    const before = engine.stats.score;
+    engine.press("k", 60);
+    expect(engine.stats.wrong).toBe(0);
+    expect(engine.notes[0].rejoined).toBe(true);
+    expect(engine.notes[0].holding).toBe(true);
+    advance(0.6, engine);
+    engine.release("k");
+    expect(engine.stats.score).toBeGreaterThan(before);
+    expect(engine.stats.holdEarned).toBeGreaterThan(0);
+    expect(engine.stats.holdEarned).toBeLessThan(possible * 0.7);
+    expect(engine.stats.holdPossible).toBeCloseTo(possible, 5);
+  });
+
   it("counts a wrong key without consuming a note", async () => {
     const engine = await startEngine();
     advance(-engine.startTime, engine);
