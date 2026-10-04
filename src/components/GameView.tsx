@@ -4,7 +4,7 @@ import { FretLayout, PianoLayout, pluckWidth, visibleFrets } from "../engine/lay
 import { fretted } from "../input/fretted";
 import { glider } from "../input/glide";
 import { keyLabel, keyLabelMap, keyLabelRevision } from "../input/keyboard";
-import { keyboardBase } from "../input/keyboardBase";
+import { pianoKeyMap } from "../input/keyboardBase";
 import { INSTRUMENT_HEIGHT_RANGE } from "../state/settings";
 import { niceKeyboardRange } from "../lib/notes";
 import { Highway } from "../render/highway";
@@ -153,7 +153,7 @@ export function GameView() {
     let raf = 0;
     let lastStore = 0;
     const labels: Record<string, string> = {};
-    let pianoLabels: { src: unknown; base: number; rev: number; map: Map<number, string> } | null = null;
+    let pianoLabels: { src: unknown; rev: number; map: Map<number, string> } | null = null;
     let fretLabels: { src: unknown; rev: number; strings: string[]; frets: string[] } | null = null;
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
@@ -194,9 +194,9 @@ export function GameView() {
       });
       const rev = keyLabelRevision();
       if (v.layout.piano) {
-        const base = keyboardBase(s);
-        if (!pianoLabels || pianoLabels.src !== s.keymaps.piano || pianoLabels.base !== base || pianoLabels.rev !== rev) {
-          pianoLabels = { src: s.keymaps.piano, base, rev, map: keyLabelMap(s.keymaps.piano, base) };
+        const keys = pianoKeyMap(s);
+        if (!pianoLabels || pianoLabels.src !== keys || pianoLabels.rev !== rev) {
+          pianoLabels = { src: keys, rev, map: keyLabelMap(keys) };
         }
         r.kb.resize(v.w, v.instH);
         r.kb.draw({

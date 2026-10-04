@@ -4,7 +4,7 @@ import { engine } from "../engine/engine";
 import { tNow } from "../i18n";
 import { fretted } from "../input/fretted";
 import { isEditableTarget } from "../input/keyboard";
-import { keyboardBase, keyboardOctaveNow } from "../input/keyboardBase";
+import { keyboardOctaveNow, pianoKeyMap, songKeysActive } from "../input/keyboardBase";
 import { cycleLoop, importFiles, updateSession, updateSettings } from "../state/actions";
 import { setPanel, toast, useApp } from "../state/store";
 import { chooseAudio } from "../studio/studioStore";
@@ -21,7 +21,7 @@ export function useGlobalInput(): void {
     };
 
     /** Which instrument action a key triggers under the current settings. */
-    const actionFor = (code: string): { kind: "note"; offset: number } | { kind: "fret" | "string"; index: number } | null => {
+    const actionFor = (code: string): { kind: "note"; midi: number } | { kind: "fret" | "string"; index: number } | null => {
       const s = useApp.getState().settings;
       if (s.instrument !== "piano" && s.fretKeyMode === "strings") {
         const km = s.instrument === "violin" ? s.keymaps.violin : s.keymaps.guitar;
@@ -31,8 +31,8 @@ export function useGlobalInput(): void {
         if (fi >= 0) return { kind: "fret", index: fi + 1 };
         return null;
       }
-      const offset = s.keymaps.piano[code];
-      return offset === undefined ? null : { kind: "note", offset };
+      const midi = pianoKeyMap(s).get(code);
+      return midi === undefined ? null : { kind: "note", midi };
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
@@ -52,7 +52,7 @@ export function useGlobalInput(): void {
         if (e.repeat || down.has(e.code)) return;
         down.set(e.code, action.kind);
         void unlockAudio();
-        if (action.kind === "note") engine.press(`key:${e.code}`, keyboardBase(st.settings) + action.offset, 0.8);
+        if (action.kind === "note") engine.press(`key:${e.code}`, action.midi, 0.8);
         else if (action.kind === "string") fretted.stringKeyDown(e.code, action.index);
         else fretted.fretKeyDown(e.code, action.index);
         return;
@@ -110,6 +110,7 @@ export function useGlobalInput(): void {
         case "KeyX":
         case "PageUp": {
           e.preventDefault();
+          if (songKeysActive(st.settings)) break;
           const up = e.code === "KeyX" || e.code === "PageUp";
           const oct = Math.max(1, Math.min(7, keyboardOctaveNow(st.settings) + (up ? 1 : -1)));
           updateSettings({ keyboardOctave: oct, autoOctave: false });

@@ -20,10 +20,10 @@ export interface InstrumentDef {
    */
   pluckSustain?: { decay: number };
   /**
-   * Struck strings that keep ringing while the key is held: after decaying by `dropDb` the body loops, then fades
-   * slowly (time constant `fade` s) towards `floor` × the attack level instead of dying out.
+   * Struck strings that keep ringing while the key is held: after decaying by `dropDb` the note only fades by
+   * `slopeDb` a second, boosted by at most `maxBoostDb`.
    */
-  holdSustain?: { dropDb: number; floor: number; fade: number };
+  holdSustain?: { dropDb: number; slopeDb: number; maxBoostDb: number };
   /** Natural decay is inside the sample; cap ring time after release. */
   maxRing: number;
   /** Whether velocity also darkens the tone (lowpass). */
@@ -44,7 +44,7 @@ export const INSTRUMENTS: Record<InstrumentId, InstrumentDef> = {
     attack: 0.003,
     minRelease: 0.5,
     sustained: false,
-    holdSustain: { dropDb: 12, floor: 0.6, fade: 6 },
+    holdSustain: { dropDb: 12, slopeDb: 0.8, maxBoostDb: 22 },
     maxRing: 10,
     velocityTone: true,
   },

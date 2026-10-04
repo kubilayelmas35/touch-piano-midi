@@ -58,6 +58,8 @@ export interface Settings {
   keyboardOctave: number;
   /** Piano: the computer-keyboard octave follows the open song so its notes land on the keys. */
   autoOctave: boolean;
+  /** Computer keys follow the open song: its white notes along the home row, black notes along the row above. */
+  songKeys: boolean;
   keymaps: Keymaps;
   /** Version of the default keymap the stored keymaps have been migrated to. */
   keymapRev: number;
@@ -142,6 +144,7 @@ export function defaultSettings(): Settings {
     background: "night",
     keyboardOctave: 3,
     autoOctave: true,
+    songKeys: true,
     keymaps: defaultKeymaps(),
     keymapRev: KEYMAP_REV,
     fretKeyMode: "strings",
@@ -195,17 +198,19 @@ export function sanitizeSettings(raw: unknown): Settings {
   return sanitize({ ...defaultSettings(), ...obj });
 }
 
-const KEYMAP_REV = 1;
+const KEYMAP_REV = 2;
 
-/** The old default piano keymap left most keys unbound; anyone still on it moves to the full one. */
+/** Anyone still on an earlier default piano keymap moves to the current one. */
 function migrate(s: Partial<Settings>): Partial<Settings> {
   if (!s || typeof s !== "object" || (s.keymapRev ?? 0) >= KEYMAP_REV) return s;
   const piano = s.keymaps?.piano;
-  const old = !!piano && typeof piano === "object" && isPianoPreset(piano, "classic");
+  const rev = s.keymapRev ?? 0;
+  const old =
+    !!piano && typeof piano === "object" && (isPianoPreset(piano, "classic") || (rev >= 1 && isPianoPreset(piano, "twoRow")));
   return {
     ...s,
     keymapRev: KEYMAP_REV,
-    ...(old && s.keymaps ? { keymaps: { ...s.keymaps, piano: { ...PIANO_PRESETS.twoRow } } } : {}),
+    ...(old && s.keymaps ? { keymaps: { ...s.keymaps, piano: { ...PIANO_PRESETS.home } } } : {}),
   };
 }
 
@@ -239,6 +244,7 @@ function sanitize(s: Settings): Settings {
     background: oneOf(BACKGROUNDS, s.background, d.background),
     keyboardOctave: Math.round(num(s.keyboardOctave, 1, 7, d.keyboardOctave)),
     autoOctave: s.autoOctave !== false,
+    songKeys: s.songKeys !== false,
     keymaps: sanitizeKeymaps(s.keymaps),
     keymapRev: KEYMAP_REV,
     fretKeyMode: s.fretKeyMode === "chromatic" ? "chromatic" : "strings",

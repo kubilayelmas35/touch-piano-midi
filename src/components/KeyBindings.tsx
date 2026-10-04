@@ -8,6 +8,7 @@ import {
   defaultKeymaps,
   isReservedKey,
   keyLabel,
+  keymapSpan,
   type FretKeymap,
   type Keymaps,
   type PianoPreset,
@@ -19,7 +20,7 @@ import { toast, useApp } from "../state/store";
 import { Button, Segmented, cx } from "../ui/primitives";
 
 const PIANO_SLOTS = 32;
-const CLASSIC_SLOTS = 18;
+const MIN_SLOTS = 12;
 
 /** Slot ids: "p:<semitone>" piano note, "s:<string>" string key, "f:<fret>" fret key (from 1). */
 type Slot = string;
@@ -126,7 +127,7 @@ export function KeyBindings() {
   };
 
   const base = keyboardBase(s);
-  const slots = presetOf() === "classic" ? CLASSIC_SLOTS : PIANO_SLOTS;
+  const slots = Math.min(PIANO_SLOTS, Math.max(MIN_SLOTS, keymapSpan(s.keymaps.piano)[1] + 1));
   const spec = inst === "violin" ? VIOLIN : GUITAR;
   const fkm = inst === "piano" ? null : s.keymaps[inst];
 
@@ -150,17 +151,18 @@ export function KeyBindings() {
       {inst === "piano" ? (
         <>
           <div className="mb-3 flex flex-wrap gap-2">
-            {(["twoRow", "classic"] as PianoPreset[]).map((p) => (
+            {(["home", "twoRow", "classic"] as PianoPreset[]).map((p) => (
               <Button
                 key={p}
                 size="sm"
                 variant={presetOf() === p ? "primary" : "subtle"}
                 onClick={() => updateSettings({ keymaps: { ...s.keymaps, piano: { ...PIANO_PRESETS[p] } } })}
               >
-                {p === "classic" ? t("presetClassic") : t("presetTwoRow")}
+                {p === "home" ? t("presetHome") : p === "classic" ? t("presetClassic") : t("presetTwoRow")}
               </Button>
             ))}
           </div>
+          {s.songKeys && <p className="mb-2 text-xs leading-relaxed text-mist-400">{t("keyBindingsSongHint")}</p>}
           <div className="grid grid-cols-6 gap-1.5 sm:grid-cols-8">
             {Array.from({ length: slots }, (_, off) => {
               const midi = base + off;

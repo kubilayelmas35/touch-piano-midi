@@ -105,18 +105,51 @@ function makePluckLoop(ctx: BaseAudioContext, src: AudioBuffer): Sample {
 }
 
 /**
- * A held piano key: the note decays naturally until it is `dropDb` quieter than its attack (or 2.5 s in),
- * then a slice of its body is levelled and looped so it keeps sounding for as long as the key is down.
+ * A held piano key: the note decays naturally until it is `dropDb` quieter than its attack, from there a slowly
+ * changing gain holds it up so it only fades by `slopeDb` a second. No loop, so the tone never pulses.
  */
-function makeHoldLoop(ctx: BaseAudioContext, src: AudioBuffer, dropDb: number): Sample {
+function makeHoldSample(ctx: BaseAudioContext, src: AudioBuffer, hold: NonNullable<InstrumentDef["holdSustain"]>): Sample {
   const { win, nWin, smooth, peak } = envelope(src);
   const rate = src.sampleRate;
-  const target = smooth(peak) * Math.pow(10, -dropDb / 20);
-  let startW = peak + 12;
-  while (startW < nWin - 50 && (startW * win) / rate < 2.5 && smooth(startW) > target) startW++;
-  const endW = Math.min(nWin - 2, startW + 40);
-  if (endW - startW < 15) return { buffer: src, loopStart: null };
-  return levelledLoop(ctx, src, win, nWin, smooth, startW, endW);
+  if (nWin < 40) return { buffer: src, loopStart: null };
+  // Loudness averaged over 0.6 s, so the gain follows the decay but not the beating of the strings.
+  const span = 15;
+  const sums = new Float64Array(nWin + 1);
+  for (let w = 0; w < nWin; w++) sums[w + 1] = sums[w] + smooth(w) ** 2;
+  const level = (w: number) => {
+    const a = Math.max(0, w - span);
+    const b = Math.min(nWin, w + span + 1);
+    return Math.max(1e-6, Math.sqrt((sums[b] - sums[a]) / (b - a)));
+  };
+  let top = 0;
+  for (let w = 0; w < Math.min(nWin, 20); w++) top = Math.max(top, level(w));
+  const floor = top * Math.pow(10, -hold.dropDb / 20);
+  let from = peak;
+  while (from < nWin && level(from) > floor) from++;
+  const maxBoost = Math.pow(10, hold.maxBoostDb / 20);
+  const fadeW = Math.round(0.4 / (win / rate));
+  const gain = new Float32Array(nWin);
+  for (let w = 0; w < nWin; w++) {
+    let g = 1;
+    if (w > from) {
+      const want = floor * Math.pow(10, (-hold.slopeDb * (w - from) * win) / rate / 20);
+      g = Math.max(1, Math.min(maxBoost, want / level(w)));
+    }
+    if (w > nWin - fadeW) g *= Math.max(0, (nWin - w) / fadeW);
+    gain[w] = g;
+  }
+  const out = ctx.createBuffer(src.numberOfChannels, nWin * win, rate);
+  for (let ch = 0; ch < src.numberOfChannels; ch++) {
+    const a = src.getChannelData(ch);
+    const b = out.getChannelData(ch);
+    for (let i = 0; i < b.length; i++) {
+      const fw = i / win - 0.5;
+      const w0 = Math.max(0, Math.floor(fw));
+      const k = Math.min(1, Math.max(0, fw - w0));
+      b[i] = a[i] * (gain[w0] * (1 - k) + gain[Math.min(nWin - 1, w0 + 1)] * k);
+    }
+  }
+  return { buffer: out, loopStart: null };
 }
 
 function levelledLoop(
@@ -157,7 +190,7 @@ function levelledLoop(
 function prepare(ctx: BaseAudioContext, decoded: AudioBuffer, def: InstrumentDef): Sample {
   if (def.sustained && def.loop) return { buffer: makeLoopBuffer(ctx, decoded, def), loopStart: Math.max(0, def.loop.start) };
   if (def.pluckSustain) return makePluckLoop(ctx, decoded);
-  if (def.holdSustain) return { buffer: decoded, loopStart: null, held: makeHoldLoop(ctx, decoded, def.holdSustain.dropDb) };
+  if (def.holdSustain) return { buffer: decoded, loopStart: null, held: makeHoldSample(ctx, decoded, def.holdSustain) };
   return { buffer: decoded, loopStart: null };
 }
 
@@ -350,10 +383,6 @@ export function playNote(id: InstrumentId, midi: number, velocity: number, opts:
   if (def.pluckSustain && sample.loopStart !== null && opts.duration != null) {
     env.gain.setTargetAtTime(0, when + def.attack + sample.loopStart, def.pluckSustain.decay);
   }
-  if (def.holdSustain && sample.loopStart !== null) {
-    env.gain.setTargetAtTime(peak * def.holdSustain.floor, Math.max(when + 0.05, when + sample.loopStart - offset), def.holdSustain.fade);
-  }
-
   const level = ctx.createGain();
   const nodes: AudioNode[] = [source, env, level];
   let tail: AudioNode = level;
@@ -392,3 +421,5 @@ export function stopAllVoices(): void {
 export function activeVoiceCount(): number {
   return active.size;
 }
+
+export const __test = { makeHoldSample };

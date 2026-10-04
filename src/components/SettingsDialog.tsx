@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { useT } from "../i18n";
-import { keyboardOctaveNow } from "../input/keyboardBase";
+import { keyboardOctaveNow, pianoKeyMap } from "../input/keyboardBase";
 import { startMidi } from "../input/midi";
 import { useFullscreen } from "../lib/fullscreen";
 import { updateSettings } from "../state/actions";
@@ -174,7 +174,8 @@ export function SettingsDialog() {
     { id: "input", label: t("input") },
   ];
 
-  const asNote = (code: string) => code in s.keymaps.piano;
+  const noteKeys = pianoKeyMap(s);
+  const asNote = (code: string) => noteKeys.has(code);
   /** A letter shortcut, or its stand-in when that key plays a note. */
   const sc = (code: string, label: string, alt?: string) => (!asNote(code) ? [label] : alt ? [alt] : null);
   const shortcuts = (
@@ -551,6 +552,7 @@ export function SettingsDialog() {
             </Section>
             <Section title={t("computerKeyboard")}>
               <Switch label={t("showKeyLabels")} checked={s.showKeyLabels} onChange={(v) => updateSettings({ showKeyLabels: v })} />
+              <Switch label={t("songKeys")} hint={t("songKeysHint")} checked={s.songKeys} onChange={(v) => updateSettings({ songKeys: v })} />
               <Switch label={t("autoOctave")} hint={t("autoOctaveHint")} checked={s.autoOctave} onChange={(v) => updateSettings({ autoOctave: v })} />
               <Slider
                 label={t("keyboardOctave")}

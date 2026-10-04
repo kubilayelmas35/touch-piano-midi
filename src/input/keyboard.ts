@@ -14,12 +14,64 @@ export interface Keymaps {
   violin: FretKeymap;
 }
 
-export type PianoPreset = "classic" | "twoRow";
+export type PianoPreset = "home" | "classic" | "twoRow";
 export type FretKeyMode = "strings" | "chromatic";
 
 export const FRET_KEY_COUNT = 12;
 
+/** Song keys: white notes go left → right along the home row, black notes along the row above. */
+export const WHITE_ROW = ["KeyA", "KeyS", "KeyD", "KeyF", "KeyG", "KeyH", "KeyJ", "KeyK", "KeyL", "Semicolon", "Quote", "Backslash"];
+export const BLACK_ROW = ["KeyQ", "KeyW", "KeyE", "KeyR", "KeyT", "KeyY", "KeyU", "KeyI", "KeyO", "KeyP", "BracketLeft", "BracketRight"];
+/** When a song has more: its lowest white notes move to the bottom row, its highest black notes to the digits. */
+export const LOW_WHITE_ROW = ["KeyZ", "KeyX", "KeyC", "KeyV", "KeyB", "KeyN", "KeyM", "Comma", "Period", "Slash"];
+export const HIGH_BLACK_ROW = ["Digit1", "Digit2", "Digit3", "Digit4", "Digit5", "Digit6", "Digit7", "Digit8", "Digit9", "Digit0", "Minus", "Equal"];
+
+const BLACK_PCS = new Set([1, 3, 6, 8, 10]);
+const isBlackKey = (midi: number) => BLACK_PCS.has(((midi % 12) + 12) % 12);
+
+/** The `size` consecutive entries of a sorted note list that the song plays most often. */
+function busiest(notes: number[], size: number, count: Map<number, number>): number[] {
+  let best = 0;
+  let bestSum = -1;
+  for (let i = 0; i + size <= notes.length; i++) {
+    let sum = 0;
+    for (let j = i; j < i + size; j++) sum += count.get(notes[j]) ?? 0;
+    if (sum > bestSum) {
+      bestSum = sum;
+      best = i;
+    }
+  }
+  return notes.slice(best, best + size);
+}
+
+/** Key code → MIDI note for a song: every note it uses gets a key, in order, white and black on their own rows. */
+export function songKeyMap(midis: number[]): Map<string, number> {
+  const count = new Map<number, number>();
+  for (const m of midis) count.set(m, (count.get(m) ?? 0) + 1);
+  const notes = [...count.keys()].sort((a, b) => a - b);
+  const maxWhite = WHITE_ROW.length + LOW_WHITE_ROW.length;
+  const maxBlack = BLACK_ROW.length + HIGH_BLACK_ROW.length;
+  let whites = notes.filter((m) => !isBlackKey(m));
+  const cut = whites.length > maxWhite;
+  if (cut) whites = busiest(whites, maxWhite, count);
+  let blacks = notes.filter((m) => isBlackKey(m) && (!cut || (m > whites[0] && m < whites[whites.length - 1])));
+  if (blacks.length > maxBlack) blacks = busiest(blacks, maxBlack, count);
+
+  const out = new Map<string, number>();
+  const low = Math.max(0, whites.length - WHITE_ROW.length);
+  whites.slice(0, low).forEach((m, i) => out.set(LOW_WHITE_ROW[i], m));
+  whites.slice(low).forEach((m, i) => out.set(WHITE_ROW[i], m));
+  blacks.forEach((m, i) => out.set(i < BLACK_ROW.length ? BLACK_ROW[i] : HIGH_BLACK_ROW[i - BLACK_ROW.length], m));
+  return out;
+}
+
 export const PIANO_PRESETS: Record<PianoPreset, Record<string, number>> = {
+  // White keys along the home row, black keys in order along the row above.
+  home: {
+    KeyA: 0, KeyS: 2, KeyD: 4, KeyF: 5, KeyG: 7, KeyH: 9, KeyJ: 11, KeyK: 12, KeyL: 14, Semicolon: 16, Quote: 17,
+    Backslash: 19,
+    KeyQ: 1, KeyW: 3, KeyE: 6, KeyR: 8, KeyT: 10, KeyY: 13, KeyU: 15, KeyI: 18,
+  },
   // One and a half octaves on the home row, sharps on the row above (Synthesia style).
   classic: {
     KeyA: 0, KeyW: 1, KeyS: 2, KeyE: 3, KeyD: 4, KeyF: 5, KeyT: 6, KeyG: 7, KeyY: 8, KeyH: 9, KeyU: 10, KeyJ: 11,
@@ -78,7 +130,7 @@ export function fitKeyboardBase(midis: number[], span: [number, number]): number
 
 export function defaultKeymaps(): Keymaps {
   return {
-    piano: { ...PIANO_PRESETS.twoRow },
+    piano: { ...PIANO_PRESETS.home },
     guitar: { strings: ["KeyH", "KeyJ", "KeyK", "KeyL", "Semicolon", "Quote"], frets: [...FRET_KEYS] },
     violin: { strings: ["KeyJ", "KeyK", "KeyL", "Semicolon"], frets: [...FRET_KEYS] },
   };
@@ -177,13 +229,10 @@ export function keyLabel(code: string): string {
   return PUNCT[code] ?? code;
 }
 
-/** midi → key label for the piano keymap (first key wins when two keys share a note). */
-export function keyLabelMap(piano: Record<string, number>, baseMidi: number): Map<number, string> {
+/** midi → key label for a key code → midi map (first key wins when two keys share a note). */
+export function keyLabelMap(keys: Map<string, number>): Map<number, string> {
   const out = new Map<number, string>();
-  for (const [code, offset] of Object.entries(piano)) {
-    const midi = baseMidi + offset;
-    if (!out.has(midi)) out.set(midi, keyLabel(code));
-  }
+  for (const [code, midi] of keys) if (!out.has(midi)) out.set(midi, keyLabel(code));
   return out;
 }
 
