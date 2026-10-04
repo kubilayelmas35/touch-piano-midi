@@ -33,7 +33,9 @@ import { initReminders } from "../lib/reminders";
 import { coachAfterRun } from "../coach/coach";
 import { drillAfterPass } from "../coach/drill";
 import { analyzeRun, type Hand } from "../coach/insights";
-import { HAND_SPLIT } from "../midi/song";
+import { HAND_SPLIT, handTracks } from "../midi/song";
+
+export { handTracks };
 
 const LAST_SONG = "staveflow-last-song";
 
@@ -193,12 +195,6 @@ function sessionFor(song: Song, prefs: SongPrefs | undefined): Session {
     autoPlay: false,
     loop: prefs?.loop ? { ...prefs.loop } : { ...NO_LOOP },
   };
-}
-
-export function handTracks(song: Song): { right: number; left: number } | null {
-  const right = song.tracks.find((t) => /right|\brh\b|sağ/i.test(t.name));
-  const left = song.tracks.find((t) => /left|\blh\b|sol el/i.test(t.name));
-  return right && left ? { right: right.index, left: left.index } : null;
 }
 
 /** Which hand the player takes. Piano: picks the hand tracks (or splits at middle C). Guitar / violin: strike vs. fret. */

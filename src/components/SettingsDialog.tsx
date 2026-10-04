@@ -255,6 +255,13 @@ export function SettingsDialog() {
                 checked={s.noteKeyLabels}
                 onChange={(v) => updateSettings({ noteKeyLabels: v })}
               />
+              <Switch
+                label={t("fingerNumbers")}
+                hint={t("fingerNumbersHint")}
+                checked={s.fingerNumbers}
+                onChange={(v) => updateSettings({ fingerNumbers: v })}
+              />
+              <Switch label={t("staffView")} hint={t("staffViewHint")} checked={s.staffView} onChange={(v) => updateSettings({ staffView: v })} />
               <ReminderSettings />
               {fs.supported && <Switch label={t("fullscreen")} hint="F11" checked={fs.full} onChange={fs.toggle} />}
               {isNativeApp && (

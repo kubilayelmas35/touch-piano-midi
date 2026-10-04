@@ -167,6 +167,19 @@ export function selectAccompanimentNotes(song: Song, playTracks: number[], hand:
   });
 }
 
+/** The right- and left-hand tracks, when the song names them. */
+export function handTracks(song: Song): { right: number; left: number } | null {
+  const right = song.tracks.find((t) => /right|\brh\b|sağ/i.test(t.name));
+  const left = song.tracks.find((t) => /left|\blh\b|sol el/i.test(t.name));
+  return right && left ? { right: right.index, left: left.index } : null;
+}
+
+/** Which hand plays a note: by hand track when the song has them, else either side of middle C. */
+export function handOfNote(song: Song): (n: { track: number; midi: number }) => "left" | "right" {
+  const ht = handTracks(song);
+  return (n) => (ht && n.track === ht.left ? "left" : ht && n.track === ht.right ? "right" : n.midi < HAND_SPLIT ? "left" : "right");
+}
+
 /** Picks sensible default player tracks: the busiest non-drum track(s) typical of piano parts. */
 export function defaultPlayTracks(song: Song): number[] {
   const pitched = song.tracks.filter((t) => !t.isDrum && t.noteCount > 0);

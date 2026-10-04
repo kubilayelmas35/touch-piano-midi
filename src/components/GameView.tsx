@@ -8,6 +8,7 @@ import { pianoKeyMap } from "../input/keyboardBase";
 import { INSTRUMENT_HEIGHT_RANGE } from "../state/settings";
 import { niceKeyboardRange } from "../lib/notes";
 import { Highway } from "../render/highway";
+import { StaffRenderer, staffMetrics } from "../render/staff";
 import { BLACK_KEY_RATIO, FretboardRenderer, KeyboardRenderer } from "../render/instrument";
 import { toast, useApp } from "../state/store";
 import { updateSettings } from "../state/actions";
@@ -60,6 +61,7 @@ export function GameView() {
   const wrapRef = useRef<HTMLDivElement>(null);
   const hwRef = useRef<HTMLCanvasElement>(null);
   const instRef = useRef<HTMLCanvasElement>(null);
+  const staffRef = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [notesRev, setNotesRev] = useState(0);
 
@@ -136,19 +138,24 @@ export function GameView() {
   }, [size.h, instrumentHeight, instrument]);
   const showStrip = !!layout?.piano && (keyZoom > 1 || compactKeys || size.w < 760);
   const stripH = showStrip ? KEY_STRIP_H : 0;
-  const hwH = Math.max(0, size.h - instH - stripH);
+  const staffOn = useApp((s) => s.settings.staffView) && instrument === "piano" && hasSong && used.length > 0;
+  const room = size.h - instH - stripH;
+  const staff = useMemo(() => (staffOn && room > 0 ? staffMetrics(used, room * 0.32) : null), [staffOn, used, room]);
+  const staffH = staff && room - staff.height >= 110 ? staff.height : 0;
+  const hwH = Math.max(0, size.h - instH - stripH - staffH);
 
   // Renderers live for the component lifetime; the frame loop reads the latest view through a ref.
-  const renderers = useRef<{ hw: Highway; kb: KeyboardRenderer; fb: FretboardRenderer } | null>(null);
-  const viewRef = useRef({ layout, instH, hwH, w: size.w });
-  viewRef.current = { layout, instH, hwH, w: size.w };
+  const renderers = useRef<{ hw: Highway; kb: KeyboardRenderer; fb: FretboardRenderer; staff: StaffRenderer } | null>(null);
+  const viewRef = useRef({ layout, instH, hwH, w: size.w, staff: staffH ? staff : null });
+  viewRef.current = { layout, instH, hwH, w: size.w, staff: staffH ? staff : null };
 
   useEffect(() => {
-    if (!hwRef.current || !instRef.current) return;
+    if (!hwRef.current || !instRef.current || !staffRef.current) return;
     renderers.current = {
       hw: new Highway(hwRef.current, engine),
       kb: new KeyboardRenderer(instRef.current, engine),
       fb: new FretboardRenderer(instRef.current, engine),
+      staff: new StaffRenderer(staffRef.current, engine),
     };
     let raf = 0;
     let lastStore = 0;
@@ -188,6 +195,7 @@ export function GameView() {
         naming: s.noteNaming,
         showNames: s.showNoteNames,
         keyLabels: v.layout.piano && s.noteKeyLabels ? pianoLabels?.map : null,
+        fingers: !!v.layout.piano && s.fingerNumbers,
         effects: s.effects,
         effectLevel: s.effectLevel,
         effectStyle: s.effectStyle,
@@ -200,6 +208,10 @@ export function GameView() {
         background: s.background,
         labels,
       });
+      if (v.staff) {
+        r.staff.resize(v.w, v.staff.height);
+        r.staff.draw({ t: time, metrics: v.staff, fingers: s.fingerNumbers });
+      }
       if (v.layout.piano && pianoLabels) {
         r.kb.resize(v.w, v.instH);
         r.kb.draw({
@@ -410,7 +422,13 @@ export function GameView() {
 
   return (
     <div ref={wrapRef} className="relative min-h-0 flex-1 overflow-hidden">
-      <div className="absolute inset-x-0 top-0" style={{ height: hwH }}>
+      <canvas
+        ref={staffRef}
+        className="absolute inset-x-0 top-0 block w-full"
+        style={{ height: staffH, display: staffH ? undefined : "none" }}
+        aria-hidden="true"
+      />
+      <div className="absolute inset-x-0" style={{ top: staffH, height: hwH }}>
         <canvas ref={hwRef} className="block h-full w-full" aria-hidden="true" />
         {hasSong ? <Hud /> : <EmptyState />}
         <RecordingBar />
@@ -421,7 +439,7 @@ export function GameView() {
           aria-orientation="horizontal"
           aria-label={t("instrumentHeight")}
           className="group absolute inset-x-0 z-10 flex h-3 -translate-y-1/2 cursor-row-resize items-center justify-center touch-none"
-          style={{ top: hwH }}
+          style={{ top: staffH + hwH }}
           onPointerDown={onHandleDown}
           onPointerMove={onHandleMove}
           onPointerUp={onHandleUp}
@@ -431,7 +449,7 @@ export function GameView() {
         </div>
       )}
       {showStrip && layout?.piano && (
-        <div className="absolute inset-x-0" style={{ top: hwH, height: stripH }}>
+        <div className="absolute inset-x-0" style={{ top: staffH + hwH, height: stripH }}>
           <KeyStrip piano={layout.piano} used={used} />
         </div>
       )}

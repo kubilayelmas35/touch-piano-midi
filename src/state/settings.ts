@@ -97,6 +97,10 @@ export interface Settings {
   pianoSustain: number;
   /** Falling notes also show the computer key that plays them. */
   noteKeyLabels: boolean;
+  /** Piano: suggested finger numbers (1 thumb … 5 little finger) on the falling notes. */
+  fingerNumbers: boolean;
+  /** Piano: a scrolling staff with the notes above the falling notes. */
+  staffView: boolean;
   /** Fretless play per instrument: sliding a finger glides the pitch instead of stepping key by key. */
   glidePiano: boolean;
   glideGuitar: boolean;
@@ -177,6 +181,8 @@ export function defaultSettings(): Settings {
     pianoPedal: true,
     pianoSustain: 0.7,
     noteKeyLabels: hasKeyboard(),
+    fingerNumbers: false,
+    staffView: false,
     glidePiano: false,
     glideGuitar: false,
     glideViolin: false,
@@ -280,6 +286,8 @@ function sanitize(s: Settings): Settings {
     pianoPedal: s.pianoPedal !== false,
     pianoSustain: num(s.pianoSustain, 0, 1, d.pianoSustain),
     noteKeyLabels: typeof s.noteKeyLabels === "boolean" ? s.noteKeyLabels : d.noteKeyLabels,
+    fingerNumbers: s.fingerNumbers === true,
+    staffView: s.staffView === true,
     glidePiano: s.glidePiano === true,
     glideGuitar: s.glideGuitar === true,
     glideViolin: s.glideViolin === true,

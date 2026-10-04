@@ -64,7 +64,7 @@ export function WelcomeDialog() {
   const finish = () => {
     void unlockAudio();
     const first = !settings.onboarded;
-    updateSettings({ instrument: pick, skill, goal, onboarded: true, ...(first ? { compactKeys: true } : {}) });
+    updateSettings({ instrument: pick, skill, goal, onboarded: true, ...(first ? { compactKeys: true, fingerNumbers: skill === "new" } : {}) });
     useApp.setState({ welcomeOpen: false });
     if (first) openVideo("tutorial", true);
     else setPanel("path");

@@ -33,6 +33,8 @@ export interface PlayNote extends SongNote {
   rejoined: boolean;
   /** How far off the hit was in real milliseconds (> 0 late); null when not timed (wait mode, early hold). */
   offsetMs: number | null;
+  /** Piano: suggested finger, 1 thumb … 5 little finger; 0 = none. */
+  finger: number;
 }
 
 export type Status = "empty" | "loading" | "ready" | "playing" | "paused" | "complete";

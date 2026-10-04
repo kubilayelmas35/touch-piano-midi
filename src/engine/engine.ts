@@ -2,7 +2,8 @@ import { getBus, unlockAudio } from "../audio/context";
 import { scheduleClick } from "../audio/click";
 import type { InstrumentId } from "../audio/instruments";
 import { isLoaded, loadInstrument, playNote, type Voice } from "../audio/sampler";
-import { selectAccompanimentNotes, selectPlayerNotes, type Song, type SongNote } from "../midi/song";
+import { HAND_SPLIT, handOfNote, handTracks, selectAccompanimentNotes, selectPlayerNotes, type Song, type SongNote } from "../midi/song";
+import { assignPianoFingers } from "./fingering";
 import { GUITAR, VIOLIN, assignFingerings, foldIntoRange, type FrettedSpec } from "./fretting";
 import {
   EARLY_FACTOR,
@@ -312,10 +313,24 @@ export class Engine {
           holding: false,
           rejoined: false,
           offsetMs: null,
+          finger: 0,
         });
       });
     });
     notes.sort((a, b) => a.time - b.time || a.midi - b.midi);
+    if (cfg.instrument === "piano" && notes.length) {
+      let hand = handOfNote(song);
+      const lo = Math.min(...notes.map((n) => n.midi));
+      const hi = Math.max(...notes.map((n) => n.midi));
+      // A single narrow line (no hand tracks) is one hand's, even where it dips below middle C.
+      if (cfg.hand !== "both") hand = () => cfg.hand as "left" | "right";
+      else if (!handTracks(song) && hi - lo < 19) {
+        const side = (lo + hi) / 2 < HAND_SPLIT - 6 ? "left" : "right";
+        hand = () => side;
+      }
+      const fingers = assignPianoFingers(notes.map((n) => ({ midi: n.midi, time: n.time, duration: n.duration, group: n.group, hand: hand(n) })));
+      notes.forEach((n, i) => (n.finger = fingers[i]));
+    }
     this.notes = notes;
     this.maxNoteDuration = notes.reduce((m, n) => Math.max(m, n.duration), 0);
 

@@ -29,6 +29,8 @@ export interface HighwayView {
   showNames: boolean;
   /** Piano: computer key per MIDI note, shown on the falling notes. */
   keyLabels?: Map<number, string> | null;
+  /** Piano: suggested finger numbers in a badge above each note. */
+  fingers?: boolean;
   effects: boolean;
   /** 0.1–1 intensity of particles and glows. */
   effectLevel: number;
@@ -286,6 +288,25 @@ export class Highway {
     return isBlack(n.midi) ? pair[1] : pair[0];
   }
 
+  /** Finger number in a badge inside the top of a long note, or just above a short one (`lift` px higher to clear a key label). */
+  private drawFinger(finger: number, cx: number, yTop: number, height: number, headH: number, laneW: number, color: string, lift: number): void {
+    const ctx = this.ctx;
+    const r = Math.min(10, Math.max(6, laneW * 0.4));
+    let by = height >= headH + r * 2 + 8 ? yTop + r + 3 : yTop - r - 3;
+    if (by < yTop) by -= lift;
+    if (by <= r) return;
+    ctx.beginPath();
+    ctx.arc(cx, by, r, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(255,255,255,0.94)";
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = color;
+    ctx.stroke();
+    ctx.font = `800 ${Math.round(r * 1.25)}px system-ui, sans-serif`;
+    ctx.fillStyle = "#1e1b4b";
+    ctx.fillText(String(finger), cx, by + 0.5);
+  }
+
   /** Note colour in the chosen palette; gradient palettes depend on the height `y` (default: at the hit line). */
   private noteColor(n: PlayNote, y = this.h): string {
     if (this.palette === "auto") return this.baseColor(n);
@@ -498,6 +519,7 @@ export class Highway {
         const name = view.showNames ? noteName(n.midi, view.naming).replace("#", "♯") : null;
         const fs = Math.min(12, Math.max(8, lane.w * 0.5));
         const cx = lane.x + lane.w / 2;
+        if (view.fingers && n.finger) this.drawFinger(n.finger, cx, yTop, height, headH, lane.w, color, key && name && headH < 26 ? fs * 1.5 : 0);
         ctx.fillStyle = ink;
         if (key && name && headH >= 26) {
           ctx.font = `800 ${fs + 1}px system-ui, sans-serif`;
@@ -519,6 +541,8 @@ export class Highway {
             ctx.fillText(key, cx, yTop - fs * 0.7);
           }
         }
+      } else if (view.fingers && n.finger && lane.w >= 10) {
+        this.drawFinger(n.finger, lane.x + lane.w / 2, yTop, height, headH, lane.w, color, 0);
       }
     }
     ctx.globalAlpha = 1;
