@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { setPanel, useApp } from "../state/store";
+import { SITE_URL, isApp } from "../lib/platform";
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
@@ -17,7 +18,7 @@ export const STORE_LINKS = {
 export const USERNAME_RE = /^[A-Za-z0-9_.]{3,24}$/;
 
 function redirectUrl(): string {
-  return window.location.origin + window.location.pathname;
+  return isApp ? SITE_URL : window.location.origin + window.location.pathname;
 }
 
 async function loadProfile(userId: string, email: string | null): Promise<void> {
@@ -44,6 +45,8 @@ async function loadProfile(userId: string, email: string | null): Promise<void> 
 }
 
 async function loadProviders(): Promise<void> {
+  // Google/Apple sign-in returns to a web address; the packaged apps use e-mail or username sign-in.
+  if (isApp) return;
   try {
     const res = await fetch(`${url}/auth/v1/settings`, { headers: { apikey: key! } });
     const ext = (await res.json())?.external ?? {};

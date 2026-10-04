@@ -3,3 +3,7 @@ dist/
 legacy/node_modules/
 *.log
 .DS_Store
+release/
+android/keystore.properties
+*.jks
+*.keystore

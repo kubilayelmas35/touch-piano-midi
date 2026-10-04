@@ -2,11 +2,13 @@ import { engine } from "../engine/engine";
 import type { InstrumentKind } from "../engine/types";
 import { useT } from "../i18n";
 import { formatTime } from "../lib/notes";
+import { dayKey, streak } from "../progress/progress";
 import { cycleLoop, NO_LOOP, updateSession, updateSettings } from "../state/actions";
 import { setPanel, useApp } from "../state/store";
 import {
   IconChevronDown,
   IconCrown,
+  IconFlame,
   IconGauge,
   IconGuitar,
   IconHeadphones,
@@ -253,6 +255,36 @@ function AccountButton() {
   );
 }
 
+/** Flame with the current day streak; opens the progress panel. Fills in once today's goal is met. */
+function StreakButton({ className }: { className?: string }) {
+  const t = useT();
+  const p = useApp((s) => s.progress);
+  const goal = useApp((s) => s.settings.dailyGoalMin * 60);
+  const n = streak(p);
+  const today = p.days[dayKey()] ?? 0;
+  const met = today >= goal;
+  return (
+    <button
+      type="button"
+      onClick={() => setPanel("progress")}
+      title={`${t("progress")} · ${t("streakDays", { n })}`}
+      aria-label={`${t("progress")}, ${t("streakDays", { n })}`}
+      className={cx(
+        "relative flex h-9 shrink-0 items-center gap-1 overflow-hidden rounded-full px-2.5 text-sm font-bold tabular-nums transition-colors hover:bg-white/[0.08]",
+        className
+      )}
+    >
+      <IconFlame size={18} filled={met} className={n > 0 || met ? "text-orange-400" : "text-mist-400"} />
+      <span className={n > 0 ? "text-orange-200" : "text-mist-400"}>{n}</span>
+      {!met && (
+        <span className="absolute inset-x-2.5 bottom-1 h-[2px] rounded-full bg-white/10" aria-hidden="true">
+          <span className="block h-full rounded-full bg-orange-400/80" style={{ width: `${Math.min(100, (today / goal) * 100)}%` }} />
+        </span>
+      )}
+    </button>
+  );
+}
+
 export function TopBar() {
   const t = useT();
   const status = useApp((s) => s.status);
@@ -333,6 +365,7 @@ export function TopBar() {
         <div className="hidden shrink-0 sm:block">
           <InstrumentSwitch />
         </div>
+        <StreakButton className="max-sm:hidden" />
         <AccountButton />
         <IconButton label={t("settings")} onClick={() => setPanel("settings")} className="shrink-0">
           <IconSettings size={19} />
@@ -358,6 +391,7 @@ export function TopBar() {
           <span className="text-mist-400"> / {formatTime(Math.max(0, endTime - 0.6))}</span>
         </div>
         <div className="flex-1" />
+        <StreakButton />
         <InstrumentSwitch compact />
       </div>
 

@@ -354,6 +354,7 @@ export function Popover({
         <div
           ref={panel}
           role="dialog"
+          data-popover-open=""
           aria-label={label}
           className={cx(
             "glass absolute top-[calc(100%+8px)] z-50 w-72 max-w-[calc(100vw-16px)] rounded-2xl p-3 animate-pop",

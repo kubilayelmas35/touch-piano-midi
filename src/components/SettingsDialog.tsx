@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { useT } from "../i18n";
 import { startMidi } from "../input/midi";
+import { useFullscreen } from "../lib/fullscreen";
 import { updateSettings } from "../state/actions";
 import { INSTRUMENT_HEIGHT_RANGE, KEY_ZOOM_MAX, defaultSettings } from "../state/settings";
 import { setPanel, useApp } from "../state/store";
@@ -126,6 +127,7 @@ export function SettingsDialog() {
   const midiSupported = useApp((st) => st.midiSupported);
   const midiDevices = useApp((st) => st.midiDevices);
   const midiAccess = useApp((st) => st.midiAccess);
+  const fs = useFullscreen();
   const [tab, setTab] = useState<Tab>("general");
   const close = () => setPanel(null);
   const choice = { solid: s.solidColor, from: s.gradFrom, to: s.gradTo };
@@ -204,6 +206,7 @@ export function SettingsDialog() {
                 />
               </Row>
               <Switch label={t("showNoteNames")} checked={s.showNoteNames} onChange={(v) => updateSettings({ showNoteNames: v })} />
+              {fs.supported && <Switch label={t("fullscreen")} hint="F11" checked={fs.full} onChange={fs.toggle} />}
             </Section>
             <Section title={t("about")}>
               <p className="py-2 text-xs leading-relaxed text-mist-400">{t("aboutBody")}</p>

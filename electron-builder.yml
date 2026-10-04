@@ -1,0 +1,44 @@
+appId: com.sonatrio.desktop
+productName: Sonatrio
+copyright: Copyright © 2026 Sonatrio
+directories:
+  # Outside the repo: editors and virus scanners lock files inside the workspace while it is packed.
+  output: ../sonatrio-release
+  buildResources: resources
+files:
+  - desktop/**/*
+  - package.json
+asarUnpack:
+  - node_modules/steamworks.js/**/*
+extraResources:
+  - from: docs
+    to: web
+    filter:
+      - "**/*"
+      - "!CNAME"
+      - "!.nojekyll"
+      - "!assets/*.md"
+win:
+  icon: resources/desktop-icon.png
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: dir
+      arch: [x64]
+  executableName: Sonatrio
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Sonatrio
+  artifactName: Sonatrio-Setup-${version}.${ext}
+mac:
+  icon: resources/desktop-icon.png
+  category: public.app-category.music
+  target: [dmg]
+linux:
+  icon: resources/desktop-icon.png
+  category: Audio
+  target: [AppImage]

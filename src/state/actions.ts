@@ -24,6 +24,7 @@ import { canImport } from "../auth/account";
 import { cloudAfterDelete, cloudAfterImport, cloudAfterRename } from "../auth/cloud";
 import { initSettingsSync, pushSettings } from "../auth/settingsSync";
 import { OVERLAY_EVENT } from "../ui/primitives";
+import { initProgress, recordRun } from "../progress/tracker";
 
 const LAST_SONG = "staveflow-last-song";
 
@@ -82,6 +83,7 @@ export async function initApp(): Promise<void> {
   engine.onComplete = handleComplete;
   window.addEventListener(OVERLAY_EVENT, () => engine.pause());
   initSettingsSync(applyRemoteSettings);
+  initProgress();
 
   const migrated = await migrateLegacyLibrary();
   await refreshLibrary();
@@ -284,6 +286,18 @@ function handleComplete(r: { stats: import("../engine/types").Stats; dirty: bool
   const key = bestKey(r.config.instrument, r.config.waitMode);
   const prev = currentId ? prefs[currentId]?.best?.[key] : undefined;
   const newBest = !practice && r.stats.score > 0 && (!prev || r.stats.score > prev.score);
+  const achievements = recordRun({
+    songId: currentId,
+    instrument: r.config.instrument,
+    stars,
+    accuracy,
+    maxCombo: r.stats.maxCombo,
+    notesHit: r.stats.perfect + r.stats.great + r.stats.good,
+    misses: r.stats.miss,
+    waitMode: r.config.waitMode,
+    speed: r.config.speed,
+    practice,
+  });
   useApp.setState({
     results: {
       stats: r.stats,
@@ -292,6 +306,7 @@ function handleComplete(r: { stats: import("../engine/types").Stats; dirty: bool
       dirty: practice,
       newBest,
       bestScore: newBest ? r.stats.score : prev?.score ?? null,
+      achievements,
     },
   });
   if (newBest && currentId) {

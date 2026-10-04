@@ -1,33 +1,51 @@
 {
   "name": "sonatrio",
+  "productName": "Sonatrio",
   "private": true,
   "version": "2.0.0",
   "description": "Sonatrio — piano, guitar & violin with falling MIDI notes",
+  "author": "Sonatrio",
+  "homepage": "https://sonatrio.com",
   "type": "module",
+  "main": "desktop/main.cjs",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && node tools/clean-docs.mjs && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "samples": "node tools/fetch-samples.mjs"
+    "samples": "node tools/fetch-samples.mjs",
+    "desktop": "npm run build && electron .",
+    "desktop:dist": "npm run build && electron-builder --win --publish never",
+    "steam:dist": "npm run build && electron-builder --win dir --publish never && node scripts/steam-appid.mjs",
+    "android:sync": "npm run build && cap sync android",
+    "android:apk": "npm run android:sync && cd android && gradlew.bat assembleRelease",
+    "android:aab": "npm run android:sync && cd android && gradlew.bat bundleRelease"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.117.2",
-    "@tonejs/midi": "^2.0.28",
-    "idb": "^8.0.3",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0",
-    "zustand": "^5.0.15"
+    "steamworks.js": "^0.4.0"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/cli": "^8.5.2",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@supabase/supabase-js": "^2.117.2",
     "@tailwindcss/vite": "^4.3.3",
+    "@tonejs/midi": "^2.0.28",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3",
+    "idb": "^8.0.3",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
     "vite": "^8.3.2",
-    "vitest": "^5.0.3"
+    "vitest": "^5.0.3",
+    "zustand": "^5.0.15"
   }
 }

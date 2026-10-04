@@ -268,6 +268,32 @@ export const IconCopy = (p: IconProps) => (
     <path d="M5 15V6a2 2 0 0 1 2-2h9" />
   </Svg>
 );
+export const IconTrophy = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M8 21h8M12 17v4" />
+    <path d="M7 4h10v5a5 5 0 0 1-10 0V4Z" />
+    <path d="M17 6h2.5a1.5 1.5 0 0 1 1.5 1.5v.5a4 4 0 0 1-4 4M7 6H4.5A1.5 1.5 0 0 0 3 7.5V8a4 4 0 0 0 4 4" />
+  </Svg>
+);
+export const IconFlame = ({ filled, ...p }: IconProps & { filled?: boolean }) => (
+  <Svg {...p}>
+    <path
+      d="M12 22c4 0 7-2.8 7-6.8 0-3.2-2-5.6-3.6-7.4-.4 1.8-1.4 3-2.6 3.4.4-3.4-1-6.6-4.3-9.2.3 3.4-1.2 5.6-2.8 7.6C4.6 11.1 5 12.4 5 15.2 5 19.2 8 22 12 22Z"
+      fill={filled ? "currentColor" : "none"}
+    />
+  </Svg>
+);
+export const IconLock = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="5" y="11" width="14" height="10" rx="2" />
+    <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+  </Svg>
+);
+export const IconExpand = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+  </Svg>
+);
 export const IconGoogle = ({ size = 18, ...p }: IconProps) => (
   <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false" {...p}>
     <path fill="#4285F4" d="M21.6 12.23c0-.68-.06-1.36-.18-2.02H12v3.83h5.4a4.6 4.6 0 0 1-2 3.02v2.5h3.24c1.9-1.75 2.96-4.33 2.96-7.33Z" />

@@ -1,0 +1,13 @@
+"AppBuild"
+{
+	"AppID" "APP_ID"
+	"Desc" "Sonatrio desktop build"
+	"BuildOutput" "../../../sonatrio-release/steam-output/"
+	"ContentRoot" "../../../sonatrio-release/win-unpacked/"
+	"SetLive" ""
+	"Preview" "0"
+	"Depots"
+	{
+		"DEPOT_ID" "depot_build.vdf"
+	}
+}

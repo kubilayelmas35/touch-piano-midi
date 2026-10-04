@@ -3,6 +3,8 @@ import type { Song } from "../midi/song";
 import type { SongMeta, SongPrefs } from "../storage/db";
 import { emptyStats, type LoopRange, type Stats, type Status } from "../engine/types";
 import { loadSettings, type Settings } from "./settings";
+import type { Progress } from "../progress/progress";
+import { loadProgress } from "../progress/storage";
 
 export interface Session {
   playTracks: number[];
@@ -21,6 +23,8 @@ export interface Results {
   dirty: boolean;
   newBest: boolean;
   bestScore: number | null;
+  /** Achievement ids this run unlocked. */
+  achievements: string[];
 }
 
 export interface Toast {
@@ -29,7 +33,7 @@ export interface Toast {
   kind: "info" | "success" | "error";
 }
 
-export type Panel = "library" | "settings" | "setup" | "account" | "pro" | "admin" | null;
+export type Panel = "library" | "settings" | "setup" | "account" | "pro" | "admin" | "progress" | null;
 
 export interface Account {
   /** "disabled" when no Supabase project is configured. */
@@ -87,6 +91,7 @@ export interface AppState {
   cloudBusy: boolean;
   /** Which part of a zoomed piano is on screen (0 left … 1 right). */
   keyPan: number;
+  progress: Progress;
 }
 
 export const DEFAULT_SESSION: Session = {
@@ -143,6 +148,7 @@ export const useApp = create<AppState>(() => ({
   cloudBytes: 0,
   cloudBusy: false,
   keyPan: 0.5,
+  progress: loadProgress(),
 }));
 
 let toastId = 1;

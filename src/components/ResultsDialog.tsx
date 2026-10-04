@@ -3,7 +3,7 @@ import type { DictKey } from "../i18n";
 import { useT } from "../i18n";
 import { closeResults } from "../state/actions";
 import { setPanel, useApp } from "../state/store";
-import { IconStar } from "../ui/icons";
+import { IconStar, IconTrophy } from "../ui/icons";
 import { Button, Dialog } from "../ui/primitives";
 
 export function ResultsDialog() {
@@ -103,6 +103,27 @@ export function ResultsDialog() {
           </p>
         )}
         {dirty && <p className="mt-3 rounded-xl bg-white/[0.04] px-3 py-2 text-xs text-mist-400">{t("practiceRun")}</p>}
+        {results.achievements.length > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              closeResults();
+              setPanel("progress");
+            }}
+            className="mt-4 w-full rounded-2xl bg-gradient-to-r from-amber-400/20 to-brand-500/15 px-3 py-3 text-left ring-1 ring-amber-300/30 animate-pop"
+          >
+            <div className="text-xs font-bold tracking-[0.12em] text-amber-200 uppercase">{t("newAchievements")}</div>
+            <ul className="mt-1.5 space-y-1">
+              {results.achievements.map((id) => (
+                <li key={id} className="flex items-center gap-2 text-sm font-semibold">
+                  <IconTrophy size={16} className="shrink-0 text-amber-300" />
+                  <span className="truncate">{t(`ach_${id}` as DictKey)}</span>
+                  <span className="truncate text-xs font-normal text-mist-400">{t(`ach_${id}_d` as DictKey)}</span>
+                </li>
+              ))}
+            </ul>
+          </button>
+        )}
       </div>
     </Dialog>
   );

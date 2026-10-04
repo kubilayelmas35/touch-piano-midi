@@ -69,6 +69,8 @@ export interface Settings {
   keyZoom: number;
   /** Piano shows only the keys the song uses. */
   compactKeys: boolean;
+  /** Minutes of practice a day that count as the daily goal. */
+  dailyGoalMin: number;
   onboarded: boolean;
 }
 
@@ -119,6 +121,7 @@ export function defaultSettings(): Settings {
     instrumentHeight: 0.3,
     keyZoom: 1,
     compactKeys: false,
+    dailyGoalMin: 10,
     onboarded: false,
   };
 }
@@ -185,6 +188,7 @@ function sanitize(s: Settings): Settings {
     instrumentHeight: num(s.instrumentHeight, ...INSTRUMENT_HEIGHT_RANGE, d.instrumentHeight),
     keyZoom: num(s.keyZoom, 1, KEY_ZOOM_MAX, d.keyZoom),
     compactKeys: s.compactKeys === true,
+    dailyGoalMin: Math.round(num(s.dailyGoalMin, 5, 60, d.dailyGoalMin)),
   };
 }
 

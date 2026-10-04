@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Sonatrio</string>
+    <string name="title_activity_main">Sonatrio</string>
+    <string name="package_name">com.sonatrio.app</string>
+    <string name="custom_url_scheme">com.sonatrio.app</string>
+</resources>
