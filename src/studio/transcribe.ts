@@ -37,7 +37,9 @@ async function decodeMono(file: Blob): Promise<Float32Array> {
 }
 
 type BasicPitchModule = typeof import("@spotify/basic-pitch");
-let model: { mod: BasicPitchModule; bp: InstanceType<BasicPitchModule["BasicPitch"]> } | null = null;
+type Tf = typeof import("@tensorflow/tfjs");
+type GraphModel = import("@tensorflow/tfjs").GraphModel;
+let model: { mod: BasicPitchModule; tf: Tf; graph: GraphModel } | null = null;
 
 async function loadModel() {
   if (model) return model;
@@ -48,14 +50,75 @@ async function loadModel() {
     await tf.setBackend("cpu");
   }
   await tf.ready();
-  const bp = new mod.BasicPitch(`${import.meta.env.BASE_URL}models/basic-pitch/model.json`);
+  let graph: GraphModel;
   try {
-    await bp.model;
+    graph = await tf.loadGraphModel(`${import.meta.env.BASE_URL}models/basic-pitch/model.json`);
   } catch {
     throw new TranscribeError("model");
   }
-  model = { mod, bp };
+  model = { mod, tf, graph };
   return model;
+}
+
+/** Basic Pitch windowing: 2 s windows (minus one hop) overlapping by 30 frames, half an overlap of silence in front. */
+const FFT_HOP = 256;
+const WINDOW = SAMPLE_RATE * 2 - FFT_HOP;
+const OVERLAP_FRAMES = 30;
+const WINDOW_HOP = WINDOW - OVERLAP_FRAMES * FFT_HOP;
+const LEAD = (OVERLAP_FRAMES / 2) * FFT_HOP;
+
+/**
+ * Splits the audio into model windows on the CPU. The library does this with GPU concat/frame ops, which fail
+ * to compile for some input lengths on WebGL.
+ */
+function frameAudio(audio: Float32Array): { data: Float32Array; count: number } {
+  const total = audio.length + LEAD;
+  const count = Math.max(1, Math.ceil(total / WINDOW_HOP));
+  const data = new Float32Array(count * WINDOW);
+  for (let i = 0; i < count; i++) {
+    const start = i * WINDOW_HOP;
+    const from = Math.max(0, start - LEAD);
+    const to = Math.min(audio.length, start + WINDOW - LEAD);
+    if (to > from) data.set(audio.subarray(from, to), i * WINDOW + from + LEAD - start);
+  }
+  return { data, count };
+}
+
+export interface ModelOutput {
+  frames: number[][];
+  onsets: number[][];
+  contours: number[][];
+}
+
+/** Runs the network window by window, freeing GPU memory as it goes (the library version leaks every window). */
+export async function analyzeAudio(samples: Float32Array, onProgress: (fraction: number) => void): Promise<ModelOutput> {
+  const { tf, graph } = await loadModel();
+  const { data, count } = frameAudio(samples);
+  const wanted = Math.floor(samples.length * (Math.floor(SAMPLE_RATE / FFT_HOP) / SAMPLE_RATE));
+  const out: ModelOutput = { frames: [], onsets: [], contours: [] };
+  const trim = OVERLAP_FRAMES / 2;
+  for (let i = 0; i < count && out.frames.length < wanted; i++) {
+    onProgress(i / count);
+    const results = tf.tidy(() => {
+      const input = tf.tensor3d(data.subarray(i * WINDOW, (i + 1) * WINDOW), [1, WINDOW, 1]);
+      const raw = graph.execute(input, ["Identity_1", "Identity_2", "Identity"]) as import("@tensorflow/tfjs").Tensor[];
+      return raw.map((t) => {
+        const kept = t.slice([0, trim, 0], [-1, t.shape[1]! - 2 * trim, -1]);
+        return kept.reshape([kept.shape[1]!, kept.shape[2]!]);
+      });
+    });
+    const [f, o, c] = (await Promise.all(results.map((t) => t.array()))) as number[][][];
+    tf.dispose(results);
+    const take = Math.min(f.length, wanted - out.frames.length);
+    for (let k = 0; k < take; k++) {
+      out.frames.push(f[k]);
+      out.onsets.push(o[k]);
+      out.contours.push(c[k]);
+    }
+    await new Promise((r) => setTimeout(r, 0));
+  }
+  onProgress(1);
+  return out;
 }
 
 /** Audio file → playable tracks, with Spotify's Basic Pitch model running on the device. */
@@ -67,20 +130,9 @@ export async function transcribeFile(
   onProgress("decode", 0);
   const samples = await decodeMono(file);
   onProgress("model", 0);
-  const { mod, bp } = await loadModel();
-  const frames: number[][] = [];
-  const onsets: number[][] = [];
-  const contours: number[][] = [];
+  const { mod } = await loadModel();
   onProgress("analyze", 0);
-  await bp.evaluateModel(
-    samples,
-    (f, o, c) => {
-      frames.push(...f);
-      onsets.push(...o);
-      contours.push(...c);
-    },
-    (p) => onProgress("analyze", p)
-  );
+  const { frames, onsets, contours } = await analyzeAudio(samples, (p) => onProgress("analyze", p));
   onProgress("notes", 1);
   const p = modelParams(opts);
   const events = mod.outputToNotesPoly(
@@ -89,10 +141,10 @@ export async function transcribeFile(
     p.onsetThresh,
     p.frameThresh,
     p.minNoteLenFrames,
-    true,
+    p.inferOnsets,
     p.maxFreq,
     p.minFreq,
-    true,
+    p.melodiaTrick,
     11
   );
   const detected: DetectedNote[] = mod.noteFramesToTime(mod.addPitchBendsToNoteEvents(contours, events));

@@ -20,7 +20,11 @@ export interface DetectedNote {
   amplitude: number;
 }
 
-/** Basic Pitch thresholds for a sensitivity; frequency limits keep each instrument's range. */
+/**
+ * Basic Pitch thresholds for a sensitivity; frequency limits keep each instrument's range.
+ * Inferred onsets and the "melodia trick" stay off: on rendered test pieces they mostly re-trigger held
+ * notes, and a frame threshold around 0.4 keeps sustained notes in one piece.
+ */
 export function modelParams(o: TranscribeOptions) {
   const s = Math.max(0, Math.min(1, o.sensitivity));
   const range: Record<TranscribeInstrument, [number, number]> = {
@@ -29,9 +33,11 @@ export function modelParams(o: TranscribeOptions) {
     violin: [190, 3600],
   };
   return {
-    onsetThresh: 0.65 - 0.35 * s,
-    frameThresh: 0.45 - 0.25 * s,
-    minNoteLenFrames: Math.round(11 - 5 * s),
+    onsetThresh: 0.8 - 0.3 * s,
+    frameThresh: 0.5 - 0.2 * s,
+    minNoteLenFrames: Math.round(11 - 4 * s),
+    inferOnsets: false,
+    melodiaTrick: false,
     minFreq: range[o.instrument][0],
     maxFreq: range[o.instrument][1],
   };
@@ -117,7 +123,7 @@ export interface Transcription {
  * starts the song on the detected first beat, optionally quantizes, and splits piano into two hands.
  */
 export function buildTranscription(detected: DetectedNote[], o: TranscribeOptions): Transcription {
-  const minAmp = 0.12 + 0.18 * (1 - o.sensitivity);
+  const minAmp = 0.1 + 0.15 * (1 - o.sensitivity);
   let notes: RawNote[] = detected
     .filter((n) => n.durationSeconds >= 0.05 && n.amplitude >= minAmp && n.pitchMidi >= 21 && n.pitchMidi <= 108)
     .map((n) => ({

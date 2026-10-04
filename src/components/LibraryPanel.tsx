@@ -3,13 +3,14 @@ import { useT } from "../i18n";
 import { formatTime } from "../lib/notes";
 import { BUILTIN_CATEGORIES, BUILTIN_SONGS, type BuiltinCategory } from "../midi/builtin";
 import { canImport } from "../auth/account";
-import { syncCloud } from "../auth/cloud";
+import { PRO_CLOUD_SONGS, syncCloud, toggleCloud } from "../auth/cloud";
 import { formatBytes } from "../lib/format";
-import { exportUserSong, importFiles, openSong, removeSong, renameUserSong } from "../state/actions";
+import { exportUserSong, importFiles, openFreePlay, openSong, removeSong, renameUserSong } from "../state/actions";
 import { setPanel, useApp } from "../state/store";
+import { openEditor } from "../studio/editorStore";
 import { bestKey, type SongPrefs } from "../storage/db";
 import { dayKey } from "../progress/progress";
-import { IconCheck, IconCloud, IconEdit, IconPlay, IconSearch, IconShare, IconSparkles, IconStar, IconSync, IconTrash, IconUpload } from "../ui/icons";
+import { IconCheck, IconCloud, IconEdit, IconKeyboard, IconNote, IconPlay, IconSearch, IconShare, IconSparkles, IconStar, IconSync, IconTrash, IconUpload } from "../ui/icons";
 import { Button, Dialog, IconButton, cx } from "../ui/primitives";
 
 function Stars({ n, size = 12 }: { n: number; size?: number }) {
@@ -52,7 +53,8 @@ export function LibraryPanel() {
   const currentId = useApp((s) => s.currentId);
   const instrument = useApp((s) => s.settings.instrument);
   const pro = useApp((s) => s.account.pro);
-  const cloud = useApp((s) => s.account.status === "signedIn" && s.account.cloud);
+  const cloud = useApp((s) => s.account.status === "signedIn" && (s.account.cloud || s.account.pro));
+  const limited = useApp((s) => s.account.status === "signedIn" && s.account.pro && !s.account.cloud);
   const quotaMb = useApp((s) => s.account.cloudQuotaMb);
   const cloudIds = useApp((s) => s.cloudIds);
   const cloudBytes = useApp((s) => s.cloudBytes);
@@ -144,15 +146,20 @@ export function LibraryPanel() {
               <div className="flex items-baseline justify-between gap-2 text-xs">
                 <span className="font-semibold text-sky-100">{t("cloudOn")}</span>
                 <span className="tabular-nums text-mist-300">
-                  {formatBytes(cloudBytes)} / {quotaMb} MB · {t("cloudSongs", { n: cloudIds.length })}
+                  {limited
+                    ? t("cloudSongsOf", { n: cloudIds.length, max: PRO_CLOUD_SONGS })
+                    : `${formatBytes(cloudBytes)} / ${quotaMb} MB · ${t("cloudSongs", { n: cloudIds.length })}`}
                 </span>
               </div>
               <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-sky-400 to-brand-400"
-                  style={{ width: `${Math.min(100, quotaMb ? (cloudBytes / (quotaMb * 1048576)) * 100 : 0)}%` }}
+                  style={{
+                    width: `${Math.min(100, limited ? (cloudIds.length / PRO_CLOUD_SONGS) * 100 : quotaMb ? (cloudBytes / (quotaMb * 1048576)) * 100 : 0)}%`,
+                  }}
                 />
               </div>
+              {limited && <p className="mt-1.5 text-[11px] leading-snug text-mist-400">{t("cloudProHint", { max: PRO_CLOUD_SONGS })}</p>}
             </div>
             <IconButton size="sm" label={t("cloudSync")} disabled={cloudBusy} onClick={() => void syncCloud()}>
               <IconSync size={16} className={cloudBusy ? "animate-spin" : ""} />
@@ -179,6 +186,25 @@ export function LibraryPanel() {
           </div>
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-brand-400 to-brand-600 text-white shadow-lg transition-transform group-hover:scale-105">
             <IconPlay size={18} className="translate-x-px" />
+          </span>
+        </button>
+      )}
+
+      {!q && (
+        <button
+          type="button"
+          onClick={() => {
+            openFreePlay();
+            close();
+          }}
+          className="mb-5 -mt-2 flex w-full items-center gap-3 rounded-2xl bg-white/[0.04] px-4 py-3 text-left ring-1 ring-white/[0.08] transition-colors hover:bg-white/[0.07]"
+        >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-400/15 text-sky-200">
+            <IconKeyboard size={18} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-bold">{t("freePlay")}</span>
+            <span className="block truncate text-xs text-mist-400">{t("freePlayHint")}</span>
           </span>
         </button>
       )}
@@ -257,6 +283,27 @@ export function LibraryPanel() {
                     )}
                     {!isEditing && (
                       <div className="flex shrink-0 opacity-70 transition-opacity group-hover:opacity-100">
+                        {limited && (
+                          <IconButton
+                            size="sm"
+                            label={cloudIds.includes(s.id) ? t("cloudRemove") : t("cloudAdd")}
+                            active={cloudIds.includes(s.id)}
+                            disabled={cloudBusy}
+                            onClick={() => void toggleCloud(s.id)}
+                          >
+                            <IconCloud size={15} />
+                          </IconButton>
+                        )}
+                        <IconButton
+                          size="sm"
+                          label={t("editSong")}
+                          onClick={() => {
+                            close();
+                            void openEditor(s.id);
+                          }}
+                        >
+                          <IconNote size={15} />
+                        </IconButton>
                         <IconButton size="sm" label={t("exportSong")} onClick={() => void exportUserSong(s.id)}>
                           <IconShare size={15} />
                         </IconButton>

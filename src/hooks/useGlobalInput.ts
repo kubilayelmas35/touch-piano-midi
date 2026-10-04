@@ -58,7 +58,7 @@ export function useGlobalInput(): void {
         case "Space":
           e.preventDefault();
           (document.activeElement as HTMLElement | null)?.blur?.();
-          engine.toggle();
+          if (engine.notes.length || engine.status === "playing") engine.toggle();
           break;
         case "ArrowLeft":
           e.preventDefault();

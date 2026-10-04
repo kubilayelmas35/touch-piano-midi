@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { canImport } from "../auth/account";
 import { addUserMidi } from "../state/actions";
 import { setPanel, useApp } from "../state/store";
+import { openEditor } from "./editorStore";
 import { writeMidi } from "./midiFile";
 import { DEFAULT_TRANSCRIBE, titleFromFileName, type TranscribeOptions, type Transcription } from "./transcribePost";
 import type { TranscribeStage } from "./transcribe";
@@ -80,12 +81,14 @@ export async function convertAudio(): Promise<void> {
   }
 }
 
-export async function saveTranscription(): Promise<void> {
+/** Saves the transcription as a library song and opens it, or straight in the note editor with `edit`. */
+export async function saveTranscription(edit = false): Promise<void> {
   const { result, title } = useStudio.getState();
   if (!result) return;
   const name = title.trim() || "MIDI";
   const data = writeMidi({ title: name, bpm: result.bpm, timeSignature: [4, 4], tracks: result.tracks });
-  await addUserMidi(name, data);
+  const id = await addUserMidi(name, data);
   resetAudio();
   setPanel(null);
+  if (edit) await openEditor(id);
 }

@@ -33,7 +33,7 @@ export interface Toast {
   kind: "info" | "success" | "error";
 }
 
-export type Panel = "library" | "settings" | "setup" | "account" | "pro" | "admin" | "progress" | "studio" | null;
+export type Panel = "library" | "settings" | "setup" | "account" | "pro" | "admin" | "progress" | "studio" | "editor" | null;
 
 /** A finished recording waiting to be named and saved. */
 export interface Take {

@@ -9,6 +9,7 @@ import { SettingsDialog } from "./components/SettingsDialog";
 import { SongSetupDialog } from "./components/SongSetupDialog";
 import { StudioDialog } from "./components/StudioDialog";
 import { TakeDialog } from "./components/RecordingUI";
+import { NoteEditor } from "./components/NoteEditor";
 import { Toasts } from "./components/Toasts";
 import { TopBar } from "./components/TopBar";
 import { WelcomeDialog } from "./components/WelcomeDialog";
@@ -88,6 +89,7 @@ export function App() {
       <ProDialog />
       <StudioDialog />
       <TakeDialog />
+      <NoteEditor />
       <AdminGate />
       <Toasts />
       <DropOverlay />

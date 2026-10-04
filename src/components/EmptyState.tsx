@@ -1,6 +1,7 @@
 import { useT } from "../i18n";
+import { openFreePlay } from "../state/actions";
 import { setPanel, useApp } from "../state/store";
-import { IconLibrary } from "../ui/icons";
+import { IconKeyboard, IconLibrary } from "../ui/icons";
 import { Button } from "../ui/primitives";
 
 export function EmptyState() {
@@ -15,9 +16,14 @@ export function EmptyState() {
         </div>
         <h2 className="text-xl font-bold">{t("noSong")}</h2>
         <p className="mt-1 text-sm text-mist-300">{t("noSongBody")}</p>
-        <Button variant="primary" className="mt-5" onClick={() => setPanel("library")}>
-          {t("openLibrary")}
-        </Button>
+        <div className="mt-5 flex flex-wrap justify-center gap-2">
+          <Button variant="primary" onClick={() => setPanel("library")}>
+            {t("openLibrary")}
+          </Button>
+          <Button onClick={openFreePlay}>
+            <IconKeyboard size={17} /> {t("freePlay")}
+          </Button>
+        </div>
       </div>
     </div>
   );

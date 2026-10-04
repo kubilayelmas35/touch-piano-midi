@@ -32,7 +32,8 @@ async function loadProfile(userId: string, email: string | null): Promise<void> 
     .select("username, pro, cloud, cloud_quota_mb, is_admin")
     .eq("id", userId)
     .maybeSingle();
-  const hadCloud = useApp.getState().account.cloud;
+  const prev = useApp.getState().account;
+  const hadCloud = prev.status === "signedIn" && (prev.cloud || prev.pro);
   useApp.setState((s) => ({
     account: {
       ...s.account,
@@ -45,7 +46,7 @@ async function loadProfile(userId: string, email: string | null): Promise<void> 
       isAdmin: data?.is_admin === true,
     },
   }));
-  if (data?.cloud === true && !hadCloud) void import("./cloud").then((m) => m.syncCloud({ quiet: true }));
+  if ((data?.cloud === true || data?.pro === true) && !hadCloud) void import("./cloud").then((m) => m.syncCloud({ quiet: true }));
 }
 
 async function loadProviders(): Promise<void> {

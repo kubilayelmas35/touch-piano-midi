@@ -13,6 +13,7 @@ import {
   usernameAvailable,
   type AuthResult,
 } from "../auth/account";
+import { PRO_CLOUD_SONGS } from "../auth/cloud";
 import { useT, type TFn } from "../i18n";
 import { setPanel, toast, useApp } from "../state/store";
 import { IconApple, IconCheck, IconCloud, IconCrown, IconGoogle, IconShield, IconUser } from "../ui/icons";
@@ -228,6 +229,7 @@ function Recovery() {
 function SignedIn() {
   const t = useT();
   const account = useApp((s) => s.account);
+  const cloudCount = useApp((s) => s.cloudIds.length);
   const name = account.username ?? account.email ?? "";
   return (
     <div className="space-y-4">
@@ -245,11 +247,13 @@ function SignedIn() {
           </span>
         )}
       </div>
-      {account.cloud && (
+      {(account.cloud || account.pro) && (
         <div className="flex items-center gap-2 rounded-2xl border border-sky-300/15 bg-sky-400/[0.07] px-3 py-2.5 text-sm text-sky-100">
           <IconCloud size={16} className="shrink-0 text-sky-300" />
           <span className="min-w-0 flex-1">{t("cloudOn")}</span>
-          <span className="text-xs text-mist-400">{account.cloudQuotaMb} MB</span>
+          <span className="text-xs text-mist-400">
+            {account.cloud ? `${account.cloudQuotaMb} MB` : t("cloudSongsOf", { n: cloudCount, max: PRO_CLOUD_SONGS })}
+          </span>
         </div>
       )}
       <p className="flex items-center gap-2 px-1 text-xs text-mist-400">
@@ -379,7 +383,7 @@ export function ProDialog() {
   const open = useApp((s) => s.panel === "pro");
   const account = useApp((s) => s.account);
   const [checking, setChecking] = useState(false);
-  const perks = [t("proPerk1"), t("proPerk4"), t("proPerk5"), t("proPerk6"), t("proPerk2"), t("proPerk3")];
+  const perks = [t("proPerk1"), t("proPerk4"), t("proPerk5"), t("proPerk6"), t("proPerk8"), t("proPerk7"), t("proPerk2"), t("proPerk3")];
   return (
     <Dialog open={open} onClose={() => setPanel(null)} width="max-w-sm" closeLabel={t("close")} title="">
       <div className="pt-1 text-center">

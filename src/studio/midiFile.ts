@@ -13,6 +13,8 @@ export interface MidiTrackSpec {
   name: string;
   /** General MIDI program (0 piano, 24/25 guitar, 40 violin). */
   program: number;
+  /** MIDI channel (9 = drums); defaults to the track's position, skipping 9. */
+  channel?: number;
   notes: RawNote[];
 }
 
@@ -37,7 +39,7 @@ export function writeMidi(spec: MidiFileSpec): ArrayBuffer {
     if (!t.notes.length) return;
     const track = midi.addTrack();
     track.name = t.name;
-    track.channel = i >= 9 ? i + 1 : i;
+    track.channel = t.channel ?? (i >= 9 ? i + 1 : i);
     track.instrument.number = t.program;
     for (const n of t.notes) {
       track.addNote({

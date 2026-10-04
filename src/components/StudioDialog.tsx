@@ -22,7 +22,7 @@ import { startRecording } from "../studio/recording";
 import { shareMidi } from "../studio/share";
 import { chooseAudio, convertAudio, resetAudio, saveTranscription, useStudio, type StudioTab } from "../studio/studioStore";
 import type { TranscribeInstrument } from "../studio/transcribePost";
-import { IconCrown, IconInfo, IconNote, IconRecord, IconShare, IconUpload, IconWave } from "../ui/icons";
+import { IconCrown, IconEdit, IconInfo, IconNote, IconRecord, IconShare, IconUpload, IconWave } from "../ui/icons";
 import { Button, Dialog, Segmented, Slider, Switch, cx } from "../ui/primitives";
 
 /** Pro check that sends free users to the upgrade dialog. */
@@ -187,9 +187,15 @@ function AudioTab() {
           </Button>
         )}
         {result ? (
-          <Button variant="primary" onClick={() => void saveTranscription()}>
-            {t("audioSaveOpen")}
-          </Button>
+          <>
+            <Button onClick={() => void saveTranscription(true)}>
+              <IconEdit size={16} />
+              {t("audioSaveEdit")}
+            </Button>
+            <Button variant="primary" onClick={() => void saveTranscription()}>
+              {t("audioSaveOpen")}
+            </Button>
+          </>
         ) : (
           <Button variant="primary" disabled={!file || busy} onClick={() => void convertAudio()}>
             <IconWave size={16} />

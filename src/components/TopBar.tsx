@@ -3,7 +3,7 @@ import type { InstrumentKind } from "../engine/types";
 import { useT } from "../i18n";
 import { formatTime } from "../lib/notes";
 import { dayKey, streak } from "../progress/progress";
-import { cycleLoop, NO_LOOP, updateSession, updateSettings } from "../state/actions";
+import { cycleLoop, NO_LOOP, openFreePlay, updateSession, updateSettings } from "../state/actions";
 import { setPanel, useApp } from "../state/store";
 import {
   IconChevronDown,
@@ -12,6 +12,7 @@ import {
   IconGauge,
   IconGuitar,
   IconHeadphones,
+  IconKeyboard,
   IconLibrary,
   IconLoop,
   IconMetronome,
@@ -294,6 +295,8 @@ export function TopBar() {
   const endTime = useApp((s) => s.endTime);
   const session = useApp((s) => s.session);
   const playing = status === "playing";
+  const freePlay = !!song && song.notes.length === 0;
+  const canPlay = !!song && !freePlay;
   const fretHand = useApp((s) =>
     s.settings.instrument === "piano"
       ? null
@@ -316,6 +319,15 @@ export function TopBar() {
         </IconButton>
         <IconButton label={t("studio")} onClick={() => setPanel("studio")} showLabel className="shrink-0 max-xl:[&>span]:hidden">
           <IconSparkles size={19} />
+        </IconButton>
+        <IconButton
+          label={t("freePlay")}
+          active={freePlay}
+          onClick={openFreePlay}
+          showLabel
+          className="shrink-0 max-xl:[&>span]:hidden"
+        >
+          <IconKeyboard size={19} />
         </IconButton>
 
         <button
@@ -340,13 +352,13 @@ export function TopBar() {
         <div className="hidden flex-1 lg:block" />
 
         <div className="hidden shrink-0 items-center gap-1 sm:flex">
-          <IconButton label={t("restart")} onClick={() => engine.stop()} disabled={!song}>
+          <IconButton label={t("restart")} onClick={() => engine.stop()} disabled={!canPlay}>
             <IconRestart size={19} />
           </IconButton>
           <button
             type="button"
             onClick={() => engine.toggle()}
-            disabled={!song}
+            disabled={!canPlay}
             aria-label={playing ? t("pause") : t("play")}
             title={`${playing ? t("pause") : t("play")} (Space)`}
             className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-b from-brand-400 to-brand-600 text-white shadow-[0_8px_24px_-8px_rgba(139,92,246,0.9)] transition-transform hover:scale-105 active:scale-95 disabled:opacity-40"
@@ -378,13 +390,13 @@ export function TopBar() {
 
       {/* Mobile transport row */}
       <div className="flex h-12 items-center gap-2 px-2 sm:hidden">
-        <IconButton label={t("restart")} onClick={() => engine.stop()} disabled={!song}>
+        <IconButton label={t("restart")} onClick={() => engine.stop()} disabled={!canPlay}>
           <IconRestart size={19} />
         </IconButton>
         <button
           type="button"
           onClick={() => engine.toggle()}
-          disabled={!song}
+          disabled={!canPlay}
           aria-label={playing ? t("pause") : t("play")}
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-brand-400 to-brand-600 text-white shadow-lg active:scale-95 disabled:opacity-40"
         >
