@@ -39,6 +39,8 @@ export interface Account {
   pro: boolean;
   /** Arrived from a password-reset e-mail; asks for a new password. */
   recovery: boolean;
+  /** OAuth providers switched on in the Supabase dashboard. */
+  providers: { google: boolean; apple: boolean };
 }
 
 export interface MidiDevice {
@@ -116,7 +118,7 @@ export const useApp = create<AppState>(() => ({
   midiDevices: [],
   dragOver: false,
   audioLocked: false,
-  account: { status: "disabled", email: null, username: null, pro: false, recovery: false },
+  account: { status: "disabled", email: null, username: null, pro: false, recovery: false, providers: { google: false, apple: false } },
 }));
 
 let toastId = 1;

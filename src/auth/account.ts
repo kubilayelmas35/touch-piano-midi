@@ -23,20 +23,31 @@ function redirectUrl(): string {
 async function loadProfile(userId: string, email: string | null): Promise<void> {
   if (!supabase) return;
   const { data } = await supabase.from("profiles").select("username, pro").eq("id", userId).maybeSingle();
-  useApp.setState({
+  useApp.setState((s) => ({
     account: {
+      ...s.account,
       status: "signedIn",
       email,
       username: (data?.username as string | null) ?? null,
       pro: data?.pro === true,
-      recovery: useApp.getState().account.recovery,
     },
-  });
+  }));
+}
+
+async function loadProviders(): Promise<void> {
+  try {
+    const res = await fetch(`${url}/auth/v1/settings`, { headers: { apikey: key! } });
+    const ext = (await res.json())?.external ?? {};
+    useApp.setState((s) => ({ account: { ...s.account, providers: { google: ext.google === true, apple: ext.apple === true } } }));
+  } catch {
+    /* offline: keep the buttons hidden */
+  }
 }
 
 export async function initAuth(): Promise<void> {
   if (!supabase) return;
   useApp.setState((s) => ({ account: { ...s.account, status: "loading" } }));
+  void loadProviders();
   supabase.auth.onAuthStateChange((event, session) => {
     if (event === "PASSWORD_RECOVERY") {
       useApp.setState((s) => ({ account: { ...s.account, recovery: true } }));
@@ -47,7 +58,7 @@ export async function initAuth(): Promise<void> {
       // Defer: Supabase forbids awaiting other calls inside this callback.
       window.setTimeout(() => void loadProfile(user.id, user.email ?? null), 0);
     } else {
-      useApp.setState({ account: { status: "signedOut", email: null, username: null, pro: false, recovery: false } });
+      useApp.setState((s) => ({ account: { ...s.account, status: "signedOut", email: null, username: null, pro: false, recovery: false } }));
     }
   });
   const { data } = await supabase.auth.getSession();

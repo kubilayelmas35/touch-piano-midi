@@ -62,6 +62,7 @@ function ProviderButton({ onClick, icon, children, dark }: { onClick: () => void
 
 function SignedOut() {
   const t = useT();
+  const providers = useApp((s) => s.account.providers);
   const [mode, setMode] = useState<"signin" | "signup" | "reset">("signin");
   const [identifier, setIdentifier] = useState("");
   const [email, setEmail] = useState("");
@@ -123,19 +124,27 @@ function SignedOut() {
               { value: "signup", label: t("signUp") },
             ]}
           />
-          <div className="space-y-2">
-            <ProviderButton onClick={() => void run(() => signInWithProvider("google"))} icon={<IconGoogle />}>
-              {t("continueGoogle")}
-            </ProviderButton>
-            <ProviderButton onClick={() => void run(() => signInWithProvider("apple"))} icon={<IconApple />} dark>
-              {t("continueApple")}
-            </ProviderButton>
-          </div>
-          <div className="flex items-center gap-3 text-xs text-mist-400">
-            <span className="h-px flex-1 bg-white/10" />
-            {t("orDivider")}
-            <span className="h-px flex-1 bg-white/10" />
-          </div>
+          {(providers.google || providers.apple) && (
+            <>
+              <div className="space-y-2">
+                {providers.google && (
+                  <ProviderButton onClick={() => void run(() => signInWithProvider("google"))} icon={<IconGoogle />}>
+                    {t("continueGoogle")}
+                  </ProviderButton>
+                )}
+                {providers.apple && (
+                  <ProviderButton onClick={() => void run(() => signInWithProvider("apple"))} icon={<IconApple />} dark>
+                    {t("continueApple")}
+                  </ProviderButton>
+                )}
+              </div>
+              <div className="flex items-center gap-3 text-xs text-mist-400">
+                <span className="h-px flex-1 bg-white/10" />
+                {t("orDivider")}
+                <span className="h-px flex-1 bg-white/10" />
+              </div>
+            </>
+          )}
         </>
       )}
 

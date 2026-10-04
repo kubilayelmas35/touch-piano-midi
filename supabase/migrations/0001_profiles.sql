@@ -16,6 +16,7 @@ alter table public.profiles enable row level security;
 
 revoke all on public.profiles from anon, authenticated;
 grant select on public.profiles to authenticated;
+grant all on public.profiles to service_role;
 
 drop policy if exists "profiles: read own" on public.profiles;
 create policy "profiles: read own" on public.profiles
