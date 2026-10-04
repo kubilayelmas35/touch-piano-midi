@@ -246,6 +246,21 @@ describe("engine", () => {
     expect(engine.status).toBe("playing");
   });
 
+  it("reports each loop pass and keeps hit offsets and stray presses", async () => {
+    const engine = await startEngine({ loop: { a: 1, b: 3, enabled: true } });
+    const passes: { hit: number; miss: number; wrong: number }[] = [];
+    engine.onLoopPass = (p) => void passes.push(p);
+    advance(-engine.startTime + 1.05, engine);
+    engine.press("k", 62);
+    engine.release("k");
+    expect(engine.notes[1].offsetMs).toBeGreaterThan(0);
+    engine.press("x", 71);
+    engine.release("x");
+    expect(engine.wrongTimes).toHaveLength(1);
+    advance(2, engine);
+    expect(passes[0]).toEqual({ hit: 1, miss: 1, wrong: 1 });
+  });
+
   it("completes and reports results", async () => {
     const engine = await startEngine();
     const done = vi.fn();

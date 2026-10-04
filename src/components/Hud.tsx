@@ -5,6 +5,7 @@ import { useApp } from "../state/store";
 import { IconHeadphones, IconPlay, IconWait } from "../ui/icons";
 import { cx } from "../ui/primitives";
 import { CoachCard, CoachChip } from "./CoachUI";
+import { DrillChip } from "./InsightsCard";
 
 export function Hud() {
   const t = useT();
@@ -50,7 +51,8 @@ export function Hud() {
         </div>
       )}
 
-      <div className="pointer-events-none absolute inset-x-0 top-3 flex justify-center px-24">
+      <div className="pointer-events-none absolute inset-x-0 top-3 flex flex-col items-center gap-2 px-24">
+        <DrillChip />
         {waiting && (
           <div className="flex items-center gap-2 rounded-full border border-amber-300/30 bg-amber-400/15 px-3.5 py-1.5 text-sm font-semibold text-amber-100 shadow-lg backdrop-blur animate-pop">
             <IconWait size={16} /> {t("waiting")}

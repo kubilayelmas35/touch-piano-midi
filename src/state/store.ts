@@ -29,6 +29,17 @@ export interface Results {
   achievements: string[];
   /** Set when the run was a learning-path step. */
   coach?: CoachOutcome;
+  /** Where the run went wrong, for the coach notes. */
+  insights?: import("../coach/insights").RunInsights;
+}
+
+/** Drilling a hard stretch: it loops, a notch faster after each clean pass, until it is clean at `target` speed. */
+export interface Drill {
+  from: number;
+  to: number;
+  measureFrom: number;
+  measureTo: number;
+  target: number;
 }
 
 /** A learning-path step being played. */
@@ -142,6 +153,7 @@ export interface AppState {
   recording: { startedAt: number; notes: number } | null;
   take: Take | null;
   coach: CoachRun | null;
+  drill: Drill | null;
 }
 
 export const DEFAULT_SESSION: Session = {
@@ -204,6 +216,7 @@ export const useApp = create<AppState>(() => ({
   recording: null,
   take: null,
   coach: null,
+  drill: null,
 }));
 
 let toastId = 1;

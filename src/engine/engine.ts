@@ -97,6 +97,13 @@ export interface RunResult {
 
 type Listener = () => void;
 
+/** How one pass through the loop went: notes inside it hit / missed, stray presses during the pass. */
+export interface LoopPass {
+  hit: number;
+  miss: number;
+  wrong: number;
+}
+
 /** What the player did, for recording: note on/off (`ring` = left to decay), damping a string, the sustain pedal. */
 export type PlayerInput =
   | { type: "on"; key: string; midi: number; velocity: number }
@@ -124,6 +131,11 @@ export class Engine {
   readonly held = new Map<string, HeldNote>();
   onComplete: ((r: RunResult) => void) | null = null;
   onInput: ((e: PlayerInput) => void) | null = null;
+  /** A pass through the A–B loop just ended (called before jumping back). */
+  onLoopPass: ((p: LoopPass) => void) | null = null;
+  /** Song times of presses that matched no note, this run. */
+  wrongTimes: number[] = [];
+  private loopWrongBase = 0;
 
   private anchorPerf = 0;
   private anchorSong = 0;
@@ -299,6 +311,7 @@ export class Engine {
           held: 0,
           holding: false,
           rejoined: false,
+          offsetMs: null,
         });
       });
     });
@@ -354,6 +367,8 @@ export class Engine {
     if (this.status === "complete") this.resetRun();
     if (this.isRunStart) {
       this.stats = emptyStats(this.notes.length);
+      this.wrongTimes = [];
+      this.loopWrongBase = 0;
       this.runDirty = false;
       this.countInActive = this.config.countIn;
     }
@@ -397,6 +412,7 @@ export class Engine {
     const target = Math.max(this.startTime, Math.min(this.endTime, t));
     if (this.notes.some((n) => n.state === NoteState.Hit || n.state === NoteState.Missed)) this.runDirty = true;
     this.countInActive = false;
+    this.loopWrongBase = this.stats.wrong;
     this.seekInternal(target);
     if (this.status === "complete") this.status = "paused";
     this.emit();
@@ -408,6 +424,7 @@ export class Engine {
     n.held = 0;
     n.holding = false;
     n.rejoined = false;
+    n.offsetMs = null;
   }
 
   private seekInternal(t: number): void {
@@ -442,6 +459,8 @@ export class Engine {
     this.preHolds = [];
     this.holdScore = 0;
     this.stats = emptyStats(this.notes.length);
+    this.wrongTimes = [];
+    this.loopWrongBase = 0;
     this.runDirty = false;
     this.fx = [];
     this.pendingIdx = 0;
@@ -562,6 +581,17 @@ export class Engine {
 
     const loop = cfg.loop;
     if (loop.enabled && loop.b - loop.a > 0.25 && t >= loop.b) {
+      if (this.onLoopPass) {
+        if (!cfg.waitMode && !cfg.autoPlay) this.scanMisses(t);
+        const pass: LoopPass = { hit: 0, miss: 0, wrong: this.stats.wrong - this.loopWrongBase };
+        for (const n of this.notes) {
+          if (n.time < loop.a || n.time >= loop.b) continue;
+          if (n.state === NoteState.Hit) pass.hit++;
+          else if (n.state === NoteState.Missed) pass.miss++;
+        }
+        this.onLoopPass(pass);
+      }
+      this.loopWrongBase = this.stats.wrong;
       this.runDirty = true;
       this.countInActive = false;
       const pre = Math.min(this.song.firstBeatSec, 1);
@@ -666,6 +696,7 @@ export class Engine {
       if (sounding) this.hitNote(n, p.src, this.config.waitMode ? "perfect" : "good", this.config.waitMode ? null : "early");
       else {
         this.stats = { ...this.stats, wrong: this.stats.wrong + 1 };
+        this.wrongTimes.push(t);
         this.pushFx({ midi: n.midi, string: p.pos?.string ?? -1, fret: p.pos?.fret ?? -1 }, "wrong");
       }
       changed = true;
@@ -971,6 +1002,7 @@ export class Engine {
         return;
       }
       this.stats = { ...this.stats, wrong: this.stats.wrong + 1 };
+      this.wrongTimes.push(t);
       this.pushFx({ midi, string: pos?.string ?? -1, fret: pos?.fret ?? -1 }, "wrong");
       this.emit();
       return;
@@ -979,14 +1011,15 @@ export class Engine {
     // Wait mode is about playing the right notes, not timing; wrong presses still cost accuracy.
     const j: Judgement = cfg.waitMode ? "perfect" : (judge(deltaMs, cfg.timingWindowMs) ?? "good");
     const timing = cfg.waitMode || j === "perfect" ? null : deltaMs < 0 ? "early" : "late";
-    this.hitNote(best, sourceKey, j, timing);
+    this.hitNote(best, sourceKey, j, timing, cfg.waitMode ? null : deltaMs);
   }
 
-  private hitNote(n: PlayNote, sourceKey: string, j: Judgement, timing: Fx["timing"]): void {
+  private hitNote(n: PlayNote, sourceKey: string, j: Judgement, timing: Fx["timing"], offsetMs: number | null = null): void {
     const t = this.time;
     n.state = NoteState.Hit;
     n.judgement = j;
     n.resolvedAt = performance.now();
+    n.offsetMs = offsetMs;
     if (holdWeight(n.duration) > 0) {
       n.holdSrc = sourceKey;
       n.holdStart = Math.max(n.time, Math.min(t, n.time + n.duration));

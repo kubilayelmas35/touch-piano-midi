@@ -29,6 +29,9 @@ import { initSettingsSync, pushSettings } from "../auth/settingsSync";
 import { OVERLAY_EVENT } from "../ui/primitives";
 import { initProgress, recordRun } from "../progress/tracker";
 import { coachAfterRun } from "../coach/coach";
+import { drillAfterPass } from "../coach/drill";
+import { analyzeRun, type Hand } from "../coach/insights";
+import { HAND_SPLIT } from "../midi/song";
 
 const LAST_SONG = "staveflow-last-song";
 
@@ -92,7 +95,10 @@ export async function initApp(): Promise<void> {
   // Leaving the path mid-song: the song plays to its end again.
   useApp.subscribe((s, prev) => {
     if (!s.coach && prev.coach && s.session.segmentEnd) updateSession({ segmentEnd: 0 });
+    // Turning the loop off or changing songs ends a drill.
+    if (s.drill && (!s.session.loop.enabled || s.currentId !== prev.currentId || s.song !== prev.song)) useApp.setState({ drill: null });
   });
+  engine.onLoopPass = drillAfterPass;
   window.addEventListener(OVERLAY_EVENT, () => engine.pause());
   initSettingsSync(applyRemoteSettings);
   initProgress();
@@ -386,6 +392,7 @@ function handleComplete(r: { stats: import("../engine/types").Stats; dirty: bool
   });
   // Skipping around or looping doesn't say how the whole step went.
   const coach = r.dirty || r.config.loop.enabled ? undefined : coachAfterRun({ accuracy, stars, speed: r.config.speed, wait: r.config.waitMode });
+  const insights = runInsights(r.config);
   useApp.setState({
     results: {
       stats: r.stats,
@@ -396,6 +403,7 @@ function handleComplete(r: { stats: import("../engine/types").Stats; dirty: bool
       bestScore: newBest ? r.stats.score : prev?.score ?? null,
       achievements,
       coach,
+      insights,
     },
   });
   if (newBest && currentId) {
@@ -405,6 +413,26 @@ function handleComplete(r: { stats: import("../engine/types").Stats; dirty: bool
     };
     void patchPrefs(currentId, { best }).then((p) => useApp.setState((s) => ({ prefs: { ...s.prefs, [p.id]: p } })));
   }
+}
+
+/** Which hand a note belongs to: the hand tracks when the song has them, else either side of middle C. */
+function handOf(cfg: EngineConfig, song: Song): (n: { track: number; midi: number }) => Hand | null {
+  if (cfg.instrument !== "piano") return () => null;
+  const ht = handTracks(song);
+  if (ht) return (n) => (n.track === ht.right ? "right" : n.track === ht.left ? "left" : null);
+  if (cfg.hand !== "both") return () => null;
+  return (n) => (n.midi < HAND_SPLIT ? "left" : "right");
+}
+
+function runInsights(cfg: EngineConfig) {
+  const song = engine.song;
+  if (!song) return undefined;
+  const hand = handOf(cfg, song);
+  return analyzeRun(
+    engine.notes.map((n) => ({ time: n.time, state: n.state, judgement: n.judgement, offsetMs: n.offsetMs, hand: hand(n) })),
+    engine.wrongTimes,
+    song.beats
+  );
 }
 
 export function closeResults(): void {

@@ -31,6 +31,8 @@ export interface PlayNote extends SongNote {
   holding: boolean;
   /** Missed at the head but caught later in its tail; earns hold credit from then on. */
   rejoined: boolean;
+  /** How far off the hit was in real milliseconds (> 0 late); null when not timed (wait mode, early hold). */
+  offsetMs: number | null;
 }
 
 export type Status = "empty" | "loading" | "ready" | "playing" | "paused" | "complete";
