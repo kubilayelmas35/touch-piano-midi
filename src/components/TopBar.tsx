@@ -3,6 +3,7 @@ import { engine } from "../engine/engine";
 import type { InstrumentKind } from "../engine/types";
 import { useT } from "../i18n";
 import { micSupported, toggleMic } from "../input/mic";
+import { pendingCount } from "../social/social";
 import { formatTime } from "../lib/notes";
 import { dayKey, streak } from "../progress/progress";
 import { cycleLoop, NO_LOOP, openFreePlay, updateSession, updateSettings } from "../state/actions";
@@ -30,6 +31,7 @@ import {
   IconSliders,
   IconSparkles,
   IconUser,
+  IconUsers,
   IconViolin,
   IconWait,
 } from "../ui/icons";
@@ -281,6 +283,21 @@ function InstrumentSwitch({ compact }: { compact?: boolean }) {
   );
 }
 
+function FriendsButton() {
+  const t = useT();
+  const on = useApp((s) => s.account.status !== "disabled");
+  const waiting = useApp((s) => pendingCount(s.social));
+  if (!on) return null;
+  return (
+    <IconButton label={t("friends")} onClick={() => setPanel("friends")} className="shrink-0">
+      <IconUsers size={19} />
+      {waiting > 0 && (
+        <span className="absolute -top-0.5 -right-0.5 min-w-4 rounded-full bg-rose-500 px-1 text-[10px] leading-4 font-extrabold text-white">{waiting}</span>
+      )}
+    </IconButton>
+  );
+}
+
 function AccountButton() {
   const t = useT();
   const account = useApp((s) => s.account);
@@ -305,6 +322,7 @@ function MoreMenu() {
   const t = useT();
   const freePlay = useApp((s) => !!s.song && s.song.notes.length === 0);
   const accountOn = useApp((s) => s.account.status !== "disabled");
+  const waiting = useApp((s) => pendingCount(s.social));
   const p = useApp((s) => s.progress);
   const n = streak(p);
   const items: { label: string; icon: ReactNode; onClick: () => void; active?: boolean; extra?: ReactNode }[] = [
@@ -316,7 +334,17 @@ function MoreMenu() {
       onClick: () => setPanel("progress"),
       extra: <span className="text-xs font-bold text-orange-200 tabular-nums">{t("streakDays", { n })}</span>,
     },
-    ...(accountOn ? [{ label: t("account"), icon: <IconUser size={18} />, onClick: () => setPanel("account") }] : []),
+    ...(accountOn
+      ? [
+          {
+            label: t("friends"),
+            icon: <IconUsers size={18} />,
+            onClick: () => setPanel("friends"),
+            extra: waiting > 0 ? <span className="rounded-full bg-rose-500 px-1.5 text-xs font-bold text-white">{waiting}</span> : undefined,
+          },
+          { label: t("account"), icon: <IconUser size={18} />, onClick: () => setPanel("account") },
+        ]
+      : []),
     { label: t("settings"), icon: <IconSettings size={18} />, onClick: () => setPanel("settings") },
   ];
   return (
@@ -486,6 +514,7 @@ export function TopBar() {
         </div>
         <div className="hidden shrink-0 items-center gap-1 lg:flex">
           <StreakButton />
+          <FriendsButton />
           <AccountButton />
           <IconButton label={t("settings")} onClick={() => setPanel("settings")} className="shrink-0">
             <IconSettings size={19} />

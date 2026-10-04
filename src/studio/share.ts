@@ -50,6 +50,33 @@ export async function shareFile(data: ArrayBuffer, fileName: string, mime: strin
   return "saved";
 }
 
+/** Shares a link with a message: the share sheet where there is one, else the clipboard ("copied"). */
+export async function shareLink(title: string, text: string, url: string): Promise<ShareResult | "copied" | "failed"> {
+  if (isNativeApp) {
+    const { Share } = await import("@capacitor/share");
+    try {
+      await Share.share({ title, text, url, dialogTitle: title });
+      return "shared";
+    } catch {
+      return "cancelled";
+    }
+  }
+  if (navigator.share) {
+    try {
+      await navigator.share({ title, text, url });
+      return "shared";
+    } catch (e) {
+      if ((e as Error).name === "AbortError") return "cancelled";
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(`${text} ${url}`);
+    return "copied";
+  } catch {
+    return "failed";
+  }
+}
+
 export function shareMidi(data: ArrayBuffer, fileName: string, title: string): Promise<ShareResult> {
   return shareFile(data, fileName, "audio/midi", title);
 }

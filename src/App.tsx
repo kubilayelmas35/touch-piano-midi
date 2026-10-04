@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect } from "react";
 import { initAuth } from "./auth/account";
 import { AccountDialog, ProDialog } from "./components/AccountDialog";
 import { FeedbackDialog } from "./components/FeedbackDialog";
+import { FriendsDialog } from "./components/FriendsDialog";
 import { PathDialog } from "./components/CoachUI";
 import { GameView } from "./components/GameView";
 import { LibraryPanel } from "./components/LibraryPanel";
@@ -88,6 +89,7 @@ export function App() {
       <SettingsDialog />
       <ResultsDialog />
       <ProgressDialog />
+      <FriendsDialog />
       <WelcomeDialog />
       <PathDialog />
       <AccountDialog />

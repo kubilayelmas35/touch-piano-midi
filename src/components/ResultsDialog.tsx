@@ -10,6 +10,7 @@ import { Button, Dialog } from "../ui/primitives";
 import { CoachResult, CoachResultActions } from "./CoachUI";
 import { SignInNudge } from "./SignInNudge";
 import { InsightsCard } from "./InsightsCard";
+import { ResultsSocial } from "./ResultsSocial";
 import { startCoach } from "../coach/coach";
 import { SPEEDS } from "../coach/path";
 import { MASTERY_STARS } from "../progress/progress";
@@ -187,6 +188,7 @@ export function ResultsDialog() {
           </p>
         )}
         <ShareButton />
+        <ResultsSocial />
         {dirty && <p className="mt-3 rounded-xl bg-white/[0.04] px-3 py-2 text-xs text-mist-400">{t("practiceRun")}</p>}
         <InsightsCard insights={results.insights} />
         {results.achievements.length > 0 && (

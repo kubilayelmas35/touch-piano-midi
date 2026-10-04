@@ -7,6 +7,7 @@ import { cx } from "../ui/primitives";
 import { CoachCard, CoachChip } from "./CoachUI";
 import { DrillChip } from "./InsightsCard";
 import { MicChip } from "./MicChip";
+import { DuelChip } from "./ResultsSocial";
 
 export function Hud() {
   const t = useT();
@@ -54,6 +55,7 @@ export function Hud() {
 
       <div className="pointer-events-none absolute inset-x-0 top-3 flex flex-col items-center gap-2 px-24">
         <DrillChip />
+        <DuelChip />
         <MicChip />
         {waiting && (
           <div className="flex items-center gap-2 rounded-full border border-amber-300/30 bg-amber-400/15 px-3.5 py-1.5 text-sm font-semibold text-amber-100 shadow-lg backdrop-blur animate-pop">

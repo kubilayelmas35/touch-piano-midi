@@ -33,6 +33,12 @@ export interface Results {
   insights?: import("../coach/insights").RunInsights;
   /** This run completed today's daily song. */
   daily?: boolean;
+  /** A full, fair run of a built-in song: it counts for friends and can be sent as a challenge. */
+  social?: boolean;
+  /** Friends' best on this song this week (arrives after the results open). */
+  friendScores?: import("../social/social").SongScore[];
+  /** This run answered a friend's challenge. */
+  duel?: { friend: string | null; mine: number; theirs: number };
 }
 
 /** Drilling a hard stretch: it loops, a notch faster after each clean pass, until it is clean at `target` speed. */
@@ -80,6 +86,7 @@ export type Panel =
   | "editor"
   | "feedback"
   | "path"
+  | "friends"
   | null;
 
 export type VideoKind = "tutorial" | "promo";
@@ -143,6 +150,12 @@ export interface AppState {
   midiDevices: MidiDevice[];
   /** Listening to a real instrument through the microphone. */
   mic: "off" | "starting" | "on" | "denied";
+  social: import("../social/social").SocialOverview | null;
+  socialLoading: boolean;
+  /** A friend's challenge being played: the next full run of its song answers it. */
+  activeDuel: import("../social/social").Duel | null;
+  /** Username from an invite link, waiting to be sent as a friend request. */
+  friendInvite: string | null;
   dragOver: boolean;
   audioLocked: boolean;
   account: Account;
@@ -200,6 +213,10 @@ export const useApp = create<AppState>(() => ({
   midiAccess: "idle",
   midiDevices: [],
   mic: "off",
+  social: null,
+  socialLoading: false,
+  activeDuel: null,
+  friendInvite: null,
   dragOver: false,
   audioLocked: false,
   account: {

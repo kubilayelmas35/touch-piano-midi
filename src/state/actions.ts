@@ -30,6 +30,7 @@ import { OVERLAY_EVENT } from "../ui/primitives";
 import { initProgress, recordDaily, recordRun } from "../progress/tracker";
 import { DAILY_STARS, dailySong } from "../progress/daily";
 import { initReminders } from "../lib/reminders";
+import { initSocial, reportRun, scoreable } from "../social/social";
 import { coachAfterRun } from "../coach/coach";
 import { drillAfterPass } from "../coach/drill";
 import { analyzeRun, type Hand } from "../coach/insights";
@@ -101,12 +102,14 @@ export async function initApp(): Promise<void> {
     if (!s.coach && prev.coach && s.session.segmentEnd) updateSession({ segmentEnd: 0 });
     // Turning the loop off or changing songs ends a drill.
     if (s.drill && (!s.session.loop.enabled || s.currentId !== prev.currentId || s.song !== prev.song)) useApp.setState({ drill: null });
+    if (s.activeDuel && s.currentId !== s.activeDuel.song_id) useApp.setState({ activeDuel: null });
   });
   engine.onLoopPass = drillAfterPass;
   window.addEventListener(OVERLAY_EVENT, () => engine.pause());
   initSettingsSync(applyRemoteSettings);
   initProgress();
   initReminders();
+  initSocial();
 
   const migrated = await migrateLegacyLibrary();
   await refreshLibrary();
@@ -394,6 +397,8 @@ function handleComplete(r: { stats: import("../engine/types").Stats; dirty: bool
   const insights = runInsights(r.config);
   const daily =
     !practice && !partial && stars >= DAILY_STARS && currentId === dailySong(useApp.getState().settings.skill) && recordDaily(currentId);
+  // Wait mode can't be missed, so it doesn't compete.
+  const social = !practice && !partial && !r.config.waitMode && r.stats.score > 0 && scoreable(currentId);
   useApp.setState({
     results: {
       stats: r.stats,
@@ -406,8 +411,10 @@ function handleComplete(r: { stats: import("../engine/types").Stats; dirty: bool
       coach,
       insights,
       daily,
+      social,
     },
   });
+  if (social) void reportRun({ songId: currentId, instrument: r.config.instrument, score: r.stats.score, accuracy, stars });
   if (newBest && currentId) {
     const best = {
       ...(prefs[currentId]?.best ?? {}),
