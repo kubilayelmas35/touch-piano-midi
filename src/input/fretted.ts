@@ -13,8 +13,8 @@ const strKey = (s: number) => `str:${s}`;
  * the strike zone or vibrato on the neck) and dies away once it is left still; violin gets louder with bow speed.
  */
 class FrettedController {
-  /** Fingers on the neck. */
-  private neck = new Map<Source, { string: number; fret: number }>();
+  /** Fingers on the neck: the string under the fingertip, the strings it frets and the strings it has touched. */
+  private neck = new Map<Source, { string: number; fret: number; strings: Set<number>; touched: Set<number> }>();
   /** Fret keys held on the computer keyboard; they fret every string (like a barre). */
   private kbFrets = new Map<string, number>();
   /** Strings each source is currently striking. */
@@ -32,6 +32,10 @@ class FrettedController {
   private lastTick = 0;
   autoFret = false;
   tapToPlay = false;
+  /** A finger frets (and with tap-to-play, sounds) every string it covers or slides across. */
+  multiNote = false;
+  /** A finger frets its whole fret column (barre); tap-to-play sounds the notes due in that column. */
+  columnPress = false;
 
   private get spec() {
     return engine.fretSpec;
@@ -44,7 +48,7 @@ class FrettedController {
   /** Fret the left hand holds on a string (0 = open). */
   fretOf(string: number): number {
     let f = -1;
-    for (const p of this.neck.values()) if (p.string === string) f = Math.max(f, p.fret);
+    for (const p of this.neck.values()) if (p.strings.has(string)) f = Math.max(f, p.fret);
     for (const k of this.kbFrets.values()) f = Math.max(f, k);
     if (f < 0 && this.autoFret) {
       const auto = this.autoFretFor(string);
@@ -88,6 +92,28 @@ class FrettedController {
       }
     }
     return null;
+  }
+
+  /** Strings with a note due right now at `fret` (all strings of a chord in that column). */
+  private dueAtFret(fret: number): number[] {
+    const out = new Set<number>();
+    const t = engine.time;
+    const win = Math.max(0.2, (engine.config.timingWindowMs / 1000) * engine.config.speed * 1.5);
+    const [i0, i1] = engine.visibleRange(t - win, t + win);
+    for (let i = i0; i < i1; i++) {
+      const n = engine.notes[i];
+      if (n.state === NoteState.Pending && n.string >= 0 && n.fret === fret) out.add(n.string);
+    }
+    if (!out.size && engine.waiting) {
+      let group: number | null = null;
+      for (const n of engine.notes) {
+        if (n.state !== NoteState.Pending) continue;
+        group ??= n.group;
+        if (n.group !== group) break;
+        if (n.string >= 0 && n.fret === fret) out.add(n.string);
+      }
+    }
+    return [...out];
   }
 
   /**
@@ -136,10 +162,12 @@ class FrettedController {
     for (const s of set) this.feed[s] = Math.max(this.feed[s] ?? 0, amount);
   }
 
-  /** Vibrato on a neck finger keeps its string alive (speed in px/ms). */
+  /** Vibrato on a neck finger keeps its strings alive (speed in px/ms). */
   vibrate(source: Source, speed: number): void {
     const p = this.neck.get(source);
-    if (p) this.feed[p.string] = Math.max(this.feed[p.string] ?? 0, Math.min(1, speed * 1.4));
+    if (!p) return;
+    const amount = Math.min(1, speed * 1.4);
+    for (const s of p.touched) this.feed[s] = Math.max(this.feed[s] ?? 0, amount);
   }
 
   /** Per-frame string physics: decay, bow pressure and the loudness that follows. */
@@ -245,26 +273,52 @@ class FrettedController {
     }
   }
 
-  neckDown(source: Source, string: number, fret: number): void {
-    this.neck.set(source, { string, fret });
-    this.refresh();
-    if (this.tapToPlay && !engine.isHeld(strKey(string))) {
-      this.strikeSync(`tap:${source}`, [string], 0.75);
-    }
+  private fretsFor(touched: Set<number>): Set<number> {
+    const count = this.spec?.tuning.length ?? 0;
+    return this.columnPress ? new Set(Array.from({ length: count }, (_, i) => i)) : new Set(touched);
   }
 
-  neckMove(source: Source, string: number, fret: number): void {
+  /** Tap-to-play: sound what the finger plays, without re-striking strings another finger is holding. */
+  private tapStrike(source: Source, velocity: number): void {
     const p = this.neck.get(source);
-    if (!p || (p.string === string && p.fret === fret)) return;
-    if (this.tapToPlay && p.string !== string) {
-      this.strikeEnd(`tap:${source}`);
-      this.neck.set(source, { string, fret });
-      this.refresh();
-      this.strikeSync(`tap:${source}`, [string], 0.6);
-      return;
-    }
-    this.neck.set(source, { string, fret });
+    if (!p || !this.tapToPlay) return;
+    let targets: number[];
+    if (this.columnPress) {
+      const due = this.dueAtFret(p.fret);
+      targets = due.length ? due : [p.string];
+    } else targets = [...p.touched];
+    const key = `tap:${source}`;
+    const own = this.striking.get(key);
+    this.strikeSync(key, targets.filter((s) => own?.has(s) || !engine.isHeld(strKey(s))), velocity);
+  }
+
+  /** `under`: every string beneath the fingertip (several with multi-note play), `string` the one at its centre. */
+  neckDown(source: Source, string: number, fret: number, under: number[] = [string]): void {
+    const touched = new Set(this.multiNote ? [string, ...under] : [string]);
+    this.neck.set(source, { string, fret, strings: this.fretsFor(touched), touched });
     this.refresh();
+    this.tapStrike(source, 0.75);
+  }
+
+  /** Slide along the neck to another fret. */
+  neckMove(source: Source, fret: number): void {
+    const p = this.neck.get(source);
+    if (!p || p.fret === fret) return;
+    p.fret = fret;
+    this.refresh();
+    if (this.columnPress) this.tapStrike(source, 0.6);
+  }
+
+  /** Multi-note play: the finger slid onto more strings; they join (a strum across the neck with tap-to-play). */
+  neckTouch(source: Source, under: number[]): void {
+    const p = this.neck.get(source);
+    if (!p || !this.multiNote) return;
+    const before = p.touched.size;
+    for (const s of under) p.touched.add(s);
+    if (p.touched.size === before) return;
+    p.strings = this.fretsFor(p.touched);
+    this.refresh();
+    if (!this.columnPress) this.tapStrike(source, 0.65);
   }
 
   /** Vibrato / bend on the string under a neck finger. */

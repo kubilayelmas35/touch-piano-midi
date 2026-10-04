@@ -382,6 +382,8 @@ export function SettingsDialog() {
           <Section title={t("frettedPlay")}>
             <Switch label={t("autoFret")} hint={t("autoFretHint")} checked={s.autoFret} onChange={(v) => updateSettings({ autoFret: v })} />
             <Switch label={t("tapToPlay")} hint={t("tapToPlayHint")} checked={s.tapToPlay} onChange={(v) => updateSettings({ tapToPlay: v })} />
+            <Switch label={t("multiNote")} hint={t("multiNoteHint")} checked={s.multiNote} onChange={(v) => updateSettings({ multiNote: v })} />
+            <Switch label={t("columnPress")} hint={t("columnPressHint")} checked={s.columnPress} onChange={(v) => updateSettings({ columnPress: v })} />
           </Section>
         )}
 

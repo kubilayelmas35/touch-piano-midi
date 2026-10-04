@@ -62,6 +62,10 @@ export interface Settings {
   autoFret: boolean;
   /** Guitar/violin: touching the neck also sounds the note (one-handed play). */
   tapToPlay: boolean;
+  /** Guitar/violin touch: a finger presses every string it covers or slides across on the neck. */
+  multiNote: boolean;
+  /** Guitar/violin touch: a finger presses its whole fret column (barre). */
+  columnPress: boolean;
   midiInput: string;
   /** Instrument panel height as a fraction of the game area. */
   instrumentHeight: number;
@@ -117,6 +121,8 @@ export function defaultSettings(): Settings {
     fretKeyMode: "strings",
     autoFret: false,
     tapToPlay: false,
+    multiNote: false,
+    columnPress: false,
     midiInput: "all",
     instrumentHeight: 0.3,
     keyZoom: 1,
@@ -185,6 +191,8 @@ function sanitize(s: Settings): Settings {
     fretKeyMode: s.fretKeyMode === "chromatic" ? "chromatic" : "strings",
     autoFret: s.autoFret === true,
     tapToPlay: s.tapToPlay === true,
+    multiNote: s.multiNote === true,
+    columnPress: s.columnPress === true,
     instrumentHeight: num(s.instrumentHeight, ...INSTRUMENT_HEIGHT_RANGE, d.instrumentHeight),
     keyZoom: num(s.keyZoom, 1, KEY_ZOOM_MAX, d.keyZoom),
     compactKeys: s.compactKeys === true,

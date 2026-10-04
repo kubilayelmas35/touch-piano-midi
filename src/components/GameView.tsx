@@ -194,6 +194,8 @@ export function GameView() {
       } else if (v.layout.fret) {
         fretted.autoFret = s.autoFret;
         fretted.tapToPlay = s.tapToPlay;
+        fretted.multiNote = s.multiNote;
+        fretted.columnPress = s.columnPress;
         fretted.tick(now);
         const km = s.instrument === "violin" ? s.keymaps.violin : s.keymaps.guitar;
         if (!fretLabels || fretLabels.src !== km || fretLabels.rev !== rev) {
@@ -266,7 +268,7 @@ export function GameView() {
       } else {
         const string = renderers.current.fb.stringAt(y, count);
         const fret = L.fretAt(x);
-        fretted.neckDown(e.pointerId, string, fret);
+        fretted.neckDown(e.pointerId, string, fret, stringsAt(y, e, count));
         pointers.current.set(e.pointerId, { ...base, string, fret, zone: "neck" });
       }
     }
@@ -301,11 +303,16 @@ export function GameView() {
         fretted.stroke(e.pointerId, speed);
       } else {
         const fret = Math.min(L.fretAt(x), L.lastFret);
+        if (fretted.multiNote) fretted.neckTouch(e.pointerId, stringsAt(y, e, count));
         if (fret !== p.fret) {
           // Slide to another fret on the same string.
-          fretted.neckMove(e.pointerId, p.string, fret);
+          fretted.neckMove(e.pointerId, fret);
           p.fret = fret;
           p.y0 = y;
+        } else if (fretted.multiNote) {
+          // Sliding across strings plays them instead of bending.
+          const dt = Math.max(1, e.timeStamp - p.lastT);
+          fretted.vibrate(e.pointerId, Math.hypot(x - p.lastX, y - p.lastY) / dt);
         } else {
           const rowH = v.instH / count;
           const dy = Math.abs(y - p.y0);
