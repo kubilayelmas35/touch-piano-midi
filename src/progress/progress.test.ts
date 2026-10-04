@@ -72,10 +72,32 @@ describe("addPractice / addRun", () => {
   it("records best stars, plays and instruments for finished runs", () => {
     let p = addRun(emptyProgress(), run({ stars: 4 }));
     p = addRun(p, run({ stars: 2, instrument: "guitar", maxCombo: 80 }));
-    expect(p.songs.ode).toEqual({ stars: 4, plays: 2, instruments: ["piano", "guitar"] });
+    expect(p.songs.ode).toMatchObject({ stars: 4, plays: 2, instruments: ["piano", "guitar"], acc: 0.8 });
     expect(p.runs).toBe(2);
     expect(p.notes).toBe(80);
     expect(p.bestCombo).toBe(80);
+    expect(p.recent.map((r) => r.instrument)).toEqual(["guitar", "piano"]);
+  });
+
+  it("masters a song only at full speed, without Wait for me, with 4+ stars", () => {
+    let p = addRun(emptyProgress(), run({ stars: 5, speed: 0.8 }), 1);
+    p = addRun(p, run({ stars: 5, waitMode: true }), 2);
+    p = addRun(p, run({ stars: 3 }), 3);
+    expect(p.songs.ode.mastered).toBe(0);
+    expect(p.songs.ode.speed).toBe(0.8);
+    p = addRun(p, run({ stars: 4 }), 4);
+    p = addRun(p, run({ stars: 5 }), 5);
+    expect(p.songs.ode.mastered).toBe(4);
+    expect(p.songs.ode.speed).toBe(1);
+    expect(p.songs.ode.last).toBe(5);
+  });
+
+  it("splits practice time per instrument", () => {
+    let p = addPractice(emptyProgress(), 30, at("2026-05-05"), "piano");
+    p = addPractice(p, 20, at("2026-05-05"), "guitar");
+    p = addPractice(p, 5, at("2026-05-05"));
+    expect(p.inst).toEqual({ piano: 30, guitar: 20 });
+    expect(p.seconds).toBe(55);
   });
 
   it("counts notes but not completion for practice runs", () => {
@@ -98,6 +120,7 @@ describe("mergeProgress", () => {
     expect(m.songs.ode.stars).toBe(5);
     expect(m.songs.ode.instruments.sort()).toEqual(["piano", "violin"]);
     expect(m.unlocked).toEqual({ first_song: 100, combo_50: 50 });
+    expect(m.songs.ode.mastered).toBeGreaterThan(0);
     expect(mergeProgress(m, m)).toEqual(m);
   });
 });
@@ -107,7 +130,7 @@ describe("sanitizeProgress", () => {
     const p = sanitizeProgress({ seconds: -5, days: { bad: 3, "2026-01-01": 50 }, songs: { x: { stars: 9, plays: 1, instruments: [1, "piano"] } } });
     expect(p.seconds).toBe(0);
     expect(p.days).toEqual({ "2026-01-01": 50 });
-    expect(p.songs.x).toEqual({ stars: 5, plays: 1, instruments: ["piano"] });
+    expect(p.songs.x).toEqual({ stars: 5, plays: 1, instruments: ["piano"], acc: 0, speed: 0, mastered: 0, last: 0 });
     expect(sanitizeProgress(null)).toEqual(emptyProgress());
   });
 });

@@ -8,6 +8,7 @@ import { Button, Dialog } from "../ui/primitives";
 import { CoachResult, CoachResultActions } from "./CoachUI";
 import { startCoach } from "../coach/coach";
 import { SPEEDS } from "../coach/path";
+import { MASTERY_STARS } from "../progress/progress";
 import { BUILTIN_BY_DIFFICULTY, builtinTitle } from "../midi/builtin";
 
 /** A well played run outside the path: below full speed suggest the next notch, at full speed the next harder song. */
@@ -104,7 +105,7 @@ export function ResultsDialog() {
         )
       }
     >
-      {results.coach ? <CoachResult outcome={results.coach} /> : !dirty && stars >= 4 && <NextUp />}
+      {results.coach ? <CoachResult outcome={results.coach} /> : !dirty && stars >= MASTERY_STARS && <NextUp />}
       <div className="text-center">
         <p className="truncate text-sm text-mist-400">{title}</p>
         <div className="mt-3 flex justify-center gap-1.5" role="img" aria-label={t("starsOf", { n: stars })}>

@@ -24,7 +24,7 @@ export function usePath() {
   }, [instrument, skill, rev]);
 }
 
-function useStageText() {
+export function useStageText() {
   const t = useT();
   const piano = useApp((s) => s.settings.instrument === "piano");
   const lang = useApp((s) => s.settings.language);

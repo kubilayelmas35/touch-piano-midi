@@ -310,13 +310,9 @@ export const BUILTIN_SONGS: BuiltinInfo[] = [
   })),
 ];
 
-/** One number for sorting: note density, plus a step per level so a calm "medium" piece can still beat a busy etude. */
-export function difficultyOf(s: Pick<BuiltinInfo, "level" | "nps">): number {
-  return s.nps + 2.5 * (s.level - 1);
-}
-
+/** Easy → medium → hard as labelled, calmer pieces (fewer notes a second) first within a level. */
 export function byDifficulty(a: BuiltinInfo, b: BuiltinInfo): number {
-  return difficultyOf(a) - difficultyOf(b) || a.level - b.level;
+  return a.level - b.level || a.nps - b.nps;
 }
 
 /** Songs arranged in-app (melody in the right hand, simple left hand): the learning path's material. */

@@ -59,7 +59,7 @@ function tick(): void {
   const before = st.progress;
   const goal = st.settings.dailyGoalMin * 60;
   const today = before.days[dayKey()] ?? 0;
-  const next = addPractice(before, 1);
+  const next = addPractice(before, 1, new Date(), st.settings.instrument);
   pending++;
   // Save every few seconds; check achievements right away when today's goal is reached.
   if (pending >= 10 || (today < goal && today + 1 >= goal)) {
