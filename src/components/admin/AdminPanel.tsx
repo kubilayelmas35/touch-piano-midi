@@ -137,6 +137,8 @@ function describe(t: TFn, e: AuditEntry): string {
       return t("admActDeleteUser");
     case "self_delete":
       return t("admActSelfDelete");
+    case "pro_purchase":
+      return t("admActProPurchase", { store: sourceLabel(t, String(d.store ?? "")) });
     case "delete_file":
       return t("admActDeleteFile", { title: String(d.title ?? "") });
     default:

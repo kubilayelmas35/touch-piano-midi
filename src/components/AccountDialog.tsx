@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import {
   STORE_LINKS,
   USERNAME_RE,
@@ -14,6 +14,7 @@ import {
   type AuthResult,
 } from "../auth/account";
 import { PRO_CLOUD_SONGS } from "../auth/cloud";
+import { buyPro, canBuyInApp, proPrice, restorePro } from "../auth/purchase";
 import { useT, type TFn } from "../i18n";
 import { setPanel, toast, useApp } from "../state/store";
 import { IconApple, IconCheck, IconCloud, IconCrown, IconGoogle, IconShield, IconUser } from "../ui/icons";
@@ -378,6 +379,37 @@ function StoreButton({ href, label, soon }: { href: string; label: string; soon:
   );
 }
 
+function PlayPurchase() {
+  const t = useT();
+  const [price, setPrice] = useState<string | null>(null);
+  const [busy, setBusy] = useState<"buy" | "restore" | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void proPrice().then((p) => alive && setPrice(p));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const run = (kind: "buy" | "restore") => {
+    setBusy(kind);
+    void (kind === "buy" ? buyPro() : restorePro()).then((ok) => {
+      setBusy(null);
+      if (ok) setPanel(null);
+    });
+  };
+  return (
+    <div className="space-y-2">
+      <Button variant="primary" className="w-full" disabled={busy !== null} onClick={() => run("buy")}>
+        <IconCrown size={16} /> {price ? t("proBuyNow", { price }) : t("proBuyPlain")}
+      </Button>
+      <p className="text-center text-xs leading-relaxed text-mist-400">{t("proPlayHowTo")}</p>
+      <Button variant="ghost" className="w-full" disabled={busy !== null} onClick={() => run("restore")}>
+        {t("proRestore")}
+      </Button>
+    </div>
+  );
+}
+
 export function ProDialog() {
   const t = useT();
   const open = useApp((s) => s.panel === "pro");
@@ -410,6 +442,8 @@ export function ProDialog() {
             <IconUser size={16} /> {t("signIn")} / {t("signUp")}
           </Button>
         </div>
+      ) : canBuyInApp ? (
+        <PlayPurchase />
       ) : (
         <div className="space-y-2">
           <div className="grid gap-2 sm:grid-cols-2">

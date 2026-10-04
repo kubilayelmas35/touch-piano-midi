@@ -364,6 +364,16 @@ export const en = {
   proStillLocked: "Pro isn't showing yet. Make sure you used the same account in the store.",
   getPro: "Get Pro",
   proUnlocked: "Pro unlocked!",
+  proBuyNow: "Get Pro · {price}",
+  proBuyPlain: "Get Pro",
+  proRestore: "Restore purchase",
+  proPlayHowTo: "One-time payment through Google Play. Pro is linked to your Sonatrio account and unlocks on web and desktop too.",
+  proPending: "Payment pending. Tap “Restore purchase” once it completes.",
+  proBuyFailed: "The purchase couldn't be completed. Please try again.",
+  proVerifyFailed: "Payment received but it couldn't be verified yet. Tap “Restore purchase” in a moment.",
+  proOtherAccount: "This purchase is linked to another Sonatrio account.",
+  proNothingToRestore: "No Pro purchase found on this Google account.",
+  proBillingUnavailable: "Google Play billing isn't available on this device.",
 
   // Cloud
   cloudOn: "Cloud sync is on",
@@ -499,6 +509,7 @@ export const en = {
   admActUnban: "Ban lifted",
   admActDeleteUser: "Account deleted",
   admActSelfDelete: "User deleted their own account",
+  admActProPurchase: "Bought Pro ({store})",
   admActDeleteFile: "File deleted: {title}",
 
   progress: "Progress",
