@@ -69,6 +69,8 @@ export interface Settings {
   midiInput: string;
   /** Instrument panel height as a fraction of the game area. */
   instrumentHeight: number;
+  /** Hides the drag handle so the panel can't be resized by accident while playing. */
+  lockHeight: boolean;
   /** Piano width as a multiple of the screen (1–3); wider keys, the rest scrolls off screen. */
   keyZoom: number;
   /** Piano shows only the keys the song uses. */
@@ -125,6 +127,7 @@ export function defaultSettings(): Settings {
     columnPress: false,
     midiInput: "all",
     instrumentHeight: 0.3,
+    lockHeight: false,
     keyZoom: 1,
     compactKeys: false,
     dailyGoalMin: 10,
@@ -194,6 +197,7 @@ function sanitize(s: Settings): Settings {
     multiNote: s.multiNote === true,
     columnPress: s.columnPress === true,
     instrumentHeight: num(s.instrumentHeight, ...INSTRUMENT_HEIGHT_RANGE, d.instrumentHeight),
+    lockHeight: s.lockHeight === true,
     keyZoom: num(s.keyZoom, 1, KEY_ZOOM_MAX, d.keyZoom),
     compactKeys: s.compactKeys === true,
     dailyGoalMin: Math.round(num(s.dailyGoalMin, 5, 60, d.dailyGoalMin)),

@@ -201,3 +201,13 @@ export async function updatePassword(password: string): Promise<AuthResult> {
 export async function signOut(): Promise<void> {
   await supabase?.auth.signOut();
 }
+
+/** Permanently deletes the signed-in account and everything stored with it (cloud MIDIs, settings, progress). */
+export async function deleteOwnAccount(): Promise<AuthResult> {
+  if (!supabase) return { ok: false, error: "disabled" };
+  const { data, error } = await supabase.functions.invoke("delete-account", { body: { confirm: true } });
+  if (error) return fail(error);
+  if (data?.error) return fail(data.error);
+  await supabase.auth.signOut({ scope: "local" });
+  return { ok: true };
+}

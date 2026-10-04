@@ -2,6 +2,7 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import {
   STORE_LINKS,
   USERNAME_RE,
+  deleteOwnAccount,
   refreshAccount,
   sendPasswordReset,
   signInWithPassword,
@@ -16,6 +17,7 @@ import { useT, type TFn } from "../i18n";
 import { setPanel, toast, useApp } from "../state/store";
 import { IconApple, IconCheck, IconCloud, IconCrown, IconGoogle, IconShield, IconUser } from "../ui/icons";
 import { Button, Dialog, Segmented, cx } from "../ui/primitives";
+import { LegalLinks } from "./LegalLinks";
 
 function errorText(t: TFn, r: AuthResult): string {
   if (r.ok) return "";
@@ -174,6 +176,12 @@ function SignedOut() {
         <Button type="submit" variant="primary" size="lg" className="w-full" disabled={busy}>
           {mode === "signin" ? t("signIn") : mode === "signup" ? t("signUp") : t("sendResetLink")}
         </Button>
+        {mode !== "reset" && (
+          <div className="space-y-1 text-center">
+            <p className="text-[11px] leading-relaxed text-mist-400">{t("agreeNotice")}</p>
+            <LegalLinks className="justify-center" />
+          </div>
+        )}
         <div className="text-center">
           {mode === "signin" ? (
             <button type="button" className="text-xs font-semibold text-brand-300 hover:text-brand-200" onClick={() => setMode("reset")}>
@@ -267,7 +275,67 @@ function SignedIn() {
       >
         {t("signOut")}
       </Button>
+      <DeleteAccount />
+      <LegalLinks className="justify-center" />
     </div>
+  );
+}
+
+/** "sil", "SIL" and "SİL" all match. */
+const norm = (s: string) => s.trim().toLocaleUpperCase("tr").replace(/İ/g, "I");
+
+function DeleteAccount() {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  const [typed, setTyped] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const word = t("deleteConfirmWord");
+  const confirmed = norm(typed) === norm(word);
+  if (!open) {
+    return (
+      <div className="text-center">
+        <button type="button" className="text-xs font-semibold text-rose-300/80 hover:text-rose-200" onClick={() => setOpen(true)}>
+          {t("deleteAccount")}
+        </button>
+      </div>
+    );
+  }
+  return (
+    <form
+      className="space-y-3 rounded-2xl border border-rose-400/25 bg-rose-500/[0.07] p-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!confirmed) return;
+        setBusy(true);
+        setError("");
+        void deleteOwnAccount().then((r) => {
+          setBusy(false);
+          if (r.ok) {
+            toast(t("accountDeleted"), "success", 5000);
+            setPanel(null);
+          } else setError(errorText(t, r));
+        });
+      }}
+    >
+      <p className="text-sm font-bold text-rose-100">{t("deleteAccount")}</p>
+      <p className="text-xs leading-relaxed text-rose-100/80">{t("deleteAccountBody")}</p>
+      <Field label={t("deleteConfirmLabel", { word })} value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" required />
+      {error && <p className="rounded-xl bg-rose-500/15 px-3 py-2 text-sm text-rose-200">{error}</p>}
+      <div className="flex gap-2">
+        <Button type="button" variant="ghost" className="flex-1" onClick={() => setOpen(false)} disabled={busy}>
+          {t("cancel")}
+        </Button>
+        <Button
+          type="submit"
+          variant="danger"
+          className="flex-1"
+          disabled={busy || !confirmed}
+        >
+          {busy ? "…" : t("deleteForever")}
+        </Button>
+      </div>
+    </form>
   );
 }
 

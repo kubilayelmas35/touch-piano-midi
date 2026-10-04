@@ -135,6 +135,8 @@ function describe(t: TFn, e: AuditEntry): string {
       return t("admActUnban");
     case "delete_user":
       return t("admActDeleteUser");
+    case "self_delete":
+      return t("admActSelfDelete");
     case "delete_file":
       return t("admActDeleteFile", { title: String(d.title ?? "") });
     default:

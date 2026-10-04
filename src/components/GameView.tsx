@@ -48,6 +48,7 @@ export function GameView() {
   const t = useT();
   const instrument = useApp((s) => s.settings.instrument);
   const instrumentHeight = useApp((s) => s.settings.instrumentHeight);
+  const lockHeight = useApp((s) => s.settings.lockHeight);
   const hasSong = useApp((s) => !!s.song);
   const keyZoom = useApp((s) => s.settings.keyZoom);
   const compactKeys = useApp((s) => s.settings.compactKeys);
@@ -363,19 +364,21 @@ export function GameView() {
         <canvas ref={hwRef} className="block h-full w-full" aria-hidden="true" />
         {hasSong ? <Hud /> : <EmptyState />}
       </div>
-      <div
-        role="separator"
-        aria-orientation="horizontal"
-        aria-label={t("instrumentHeight")}
-        className="group absolute inset-x-0 z-10 flex h-3 -translate-y-1/2 cursor-row-resize items-center justify-center touch-none"
-        style={{ top: hwH }}
-        onPointerDown={onHandleDown}
-        onPointerMove={onHandleMove}
-        onPointerUp={onHandleUp}
-        onPointerCancel={onHandleUp}
-      >
-        <div className="h-1 w-12 rounded-full bg-white/15 transition-colors group-hover:bg-brand-400/70" />
-      </div>
+      {!lockHeight && (
+        <div
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label={t("instrumentHeight")}
+          className="group absolute inset-x-0 z-10 flex h-3 -translate-y-1/2 cursor-row-resize items-center justify-center touch-none"
+          style={{ top: hwH }}
+          onPointerDown={onHandleDown}
+          onPointerMove={onHandleMove}
+          onPointerUp={onHandleUp}
+          onPointerCancel={onHandleUp}
+        >
+          <div className="h-1 w-12 rounded-full bg-white/15 transition-colors group-hover:bg-brand-400/70" />
+        </div>
+      )}
       {showStrip && layout?.piano && (
         <div className="absolute inset-x-0" style={{ top: hwH, height: stripH }}>
           <KeyStrip piano={layout.piano} used={used} />

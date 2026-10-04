@@ -25,6 +25,33 @@ const canonBass = "D3:2 A2:2 | B2:2 F#2:2 | G2:2 D2:2 | G2:2 A2:2";
 
 const moon = (a: string, b: string, c: string) => rep(`${a}:1/3 ${b}:1/3 ${c}:1/3`, 2);
 
+const cancan = `G4:2 A4:0.5 C5:0.5 B4:0.5 A4:0.5 | D5:1 D5:1 D5:0.5 E5:0.5 B4:0.5 C5:0.5 | A4:1 A4:1 A4:0.5 C5:0.5 B4:0.5 A4:0.5
+  G4:0.5 G5:0.5 F#5:0.5 E5:0.5 D5:0.5 C5:0.5 B4:0.5 A4:0.5 | G4:2 A4:0.5 C5:0.5 B4:0.5 A4:0.5 | D5:1 D5:1 D5:0.5 E5:0.5 B4:0.5 C5:0.5
+  A4:1 A4:1 A4:0.5 C5:0.5 B4:0.5 A4:0.5`;
+const cancanLeft = `${pump("G2", "B2+D3")} | ${pump("D2", "F#2+C3")} | ${pump("D2", "F#2+C3")}
+  G2:0.5 B2+D3:0.5 G2:0.5 B2+D3:0.5 D2:0.5 F#2+C3:0.5 D2:0.5 F#2+C3:0.5 | ${pump("G2", "B2+D3")} | ${pump("D2", "F#2+C3")}
+  ${pump("D2", "F#2+C3")}`;
+
+const farmer = `F4:1 F4:0.5 F4:1 F4:0.5 | F4:2.5 G4:0.5 | A4:1 A4:0.5 A4:1 A4:0.5 | A4:2.5 C5:0.5
+  C5:1 D5:0.5 C5:1 A4:0.5 | F4:2.5 G4:0.5 | A4:1 A4:0.5 G4:1 G4:0.5`;
+const farmerLeft = `F2+C3:3 | F2+C3:3 | F2+C3:3 | F2+C3:3
+  F2+C3:3 | F2+C3:3 | F2+C3:1.5 C3+Bb3:1.5`;
+
+const camptown = `G4:0.5 G4:0.5 E4:0.5 G4:0.5 A4:0.5 G4:0.5 E4:1 | E4:0.5 D4:1.5 E4:0.5 D4:1.5
+  G4:0.5 G4:0.5 E4:0.5 G4:0.5 A4:0.5 G4:0.5 E4:1 | D4:1 E4:0.5 D4:0.5 C4:2`;
+const camptownLeft = `C3+G3:4 | C3+G3:2 G2+D3:2
+  C3+G3:4 | G2+D3:2 C3+E3:2`;
+
+const michael = `C4:1 E4:1 G4:1.5 E4:0.5 | G4:1 A4:1 G4:2 | E4:1 G4:1 A4:2 | G4:4
+  E4:1 G4:1 G4:1.5 E4:0.5 | F4:1 E4:1 D4:2 | C4:1 D4:1 E4:1.5 D4:0.5 | C4:4`;
+const michaelLeft = `C3+G3:4 | C3+G3:4 | C3+G3:2 F2+C3:2 | C3+G3:4
+  C3+E3:4 | D3+A3:2 G2+D3:2 | C3+G3:2 G2+D3:2 | C3+E3:4`;
+
+const clementine = `F4:1 C4:1 A4:0.75 A4:0.25 | A4:1 F4:1 F4:0.75 A4:0.25 | C5:1 C5:1 Bb4:0.75 A4:0.25 | G4:2 G4:0.75 A4:0.25
+  Bb4:1 Bb4:1 A4:0.75 G4:0.25 | A4:1 F4:1 F4:0.75 A4:0.25 | G4:1 C4:1 E4:0.75 G4:0.25`;
+const clementineLeft = `F2+C3:3 | F2+C3:3 | F2+C3:3 | C3+Bb3:3
+  C3+Bb3:3 | F2+C3:3 | C3+Bb3:3`;
+
 export const SONGBOOK: BuiltinSpec[] = [
   // ---------------------------------------------------------------- kids
   {
@@ -544,7 +571,7 @@ export const SONGBOOK: BuiltinSpec[] = [
   },
   {
     id: "korobeiniki",
-    title: "Korobeiniki (Tetris theme)",
+    title: "Korobeiniki",
     composer: "Traditional",
     level: 2,
     category: "folk",
@@ -554,5 +581,133 @@ export const SONGBOOK: BuiltinSpec[] = [
       ${korobeiniki}`,
     left: `${korobeinikiLeft}
       ${korobeinikiLeft}`,
+  },
+  {
+    id: "michael-row",
+    title: "Michael, Row the Boat Ashore",
+    composer: "Traditional",
+    level: 1,
+    category: "folk",
+    bpm: 100,
+    meter: [4, 1],
+    right: `${michael}
+      ${michael}`,
+    left: `${michaelLeft}
+      ${michaelLeft}`,
+  },
+  {
+    id: "clementine",
+    title: "Oh My Darling, Clementine",
+    composer: "Traditional",
+    level: 1,
+    category: "folk",
+    bpm: 104,
+    meter: [3, 1],
+    pickup: 1,
+    right: `F4:0.75 F4:0.25
+      ${clementine} | F4:2 F4:0.75 F4:0.25
+      ${clementine} | F4:3`,
+    left: `${clementineLeft} | F2+C3:3
+      ${clementineLeft} | F2+C3+A3:3`,
+  },
+  {
+    id: "camptown-races",
+    title: "Camptown Races",
+    composer: "S. Foster",
+    level: 1,
+    category: "folk",
+    bpm: 112,
+    meter: [4, 1],
+    right: `${camptown}
+      ${camptown}`,
+    left: `${camptownLeft}
+      ${camptownLeft}`,
+  },
+
+  // ---------------------------------------------------------------- more kids, holiday & classical
+  {
+    id: "farmer-in-the-dell",
+    title: "The Farmer in the Dell",
+    composer: "Traditional",
+    level: 1,
+    category: "kids",
+    bpm: 100,
+    meter: [2, 1.5],
+    pickup: 0.5,
+    right: `C4:0.5
+      ${farmer} | F4:2.5 C4:0.5
+      ${farmer} | F4:3`,
+    left: `${farmerLeft} | F2+C3:3
+      ${farmerLeft} | F2+C3+A3:3`,
+  },
+  {
+    id: "good-king-wenceslas",
+    title: "Good King Wenceslas",
+    composer: "Traditional (Piae Cantiones)",
+    level: 1,
+    category: "holiday",
+    bpm: 104,
+    meter: [4, 1],
+    right: `G4:1 G4:1 G4:1 A4:1 | G4:1 G4:1 D4:2 | E4:1 D4:1 E4:1 F#4:1 | G4:2 G4:2
+      G4:1 G4:1 G4:1 A4:1 | G4:1 G4:1 D4:2 | E4:1 D4:1 E4:1 F#4:1 | G4:2 G4:2
+      D5:1 C5:1 B4:1 A4:1 | B4:1 A4:1 G4:2 | E4:1 D4:1 E4:1 F#4:1 | G4:2 G4:2
+      D4:1 D4:1 E4:1 F#4:1 | G4:1 G4:1 A4:2 | D5:1 C5:1 B4:1 A4:1 | G4:2 C5:2 | G4:4`,
+    left: `G2+D3:4 | G2+D3:2 B2+D3:2 | C3+G3:2 D3+A3:2 | G2+D3:4
+      G2+D3:4 | G2+D3:2 B2+D3:2 | C3+G3:2 D3+A3:2 | G2+D3:4
+      G2+D3:2 D3+F#3:2 | G2+D3:4 | C3+G3:2 D3+A3:2 | G2+D3:4
+      B2+D3:2 C3+E3:2 | G2+D3:2 D3+F#3:2 | G2+D3:2 D3+F#3:2 | G2+D3:2 C3+E3:2 | G2+D3+G3:4`,
+  },
+  {
+    id: "hark-herald",
+    title: "Hark! The Herald Angels Sing",
+    composer: "F. Mendelssohn",
+    level: 2,
+    category: "holiday",
+    bpm: 96,
+    meter: [4, 1],
+    right: `D4:1 G4:1 G4:1.5 F#4:0.5 | G4:1 B4:1 B4:1 A4:1 | D5:1 D5:1 D5:1.5 C5:0.5 | B4:1 A4:1 B4:2
+      D4:1 G4:1 G4:1.5 F#4:0.5 | G4:1 B4:1 B4:1 A4:1 | D5:1 A4:1 A4:1.5 F#4:0.5 | F#4:1 E4:1 D4:2
+      D5:1 D5:1 D5:1 G4:1 | C5:1 B4:1 B4:1 A4:1 | D5:1 D5:1 D5:1 G4:1 | C5:1 B4:1 B4:1 A4:1
+      E5:1 E5:1 E5:1 D5:1 | C5:1 B4:1 C5:2 | A4:1 B4:0.5 C5:0.5 D5:1.5 G4:0.5 | G4:1 A4:1 B4:2
+      E5:1.5 E5:0.5 E5:1 D5:1 | C5:1 B4:1 C5:2 | A4:1 B4:0.5 C5:0.5 D5:1.5 G4:0.5 | G4:1 A4:1 G4:2`,
+    left: `G2+D3:4 | G2+D3:2 D3+F#3:2 | G2+D3:2 D3+F#3:2 | G2+D3:4
+      G2+D3:4 | G2+D3:2 D3+F#3:2 | D3+F#3:4 | A2+E3:2 D3+F#3:2
+      G2+D3:4 | C3+E3:2 D3+F#3:2 | G2+D3:4 | C3+E3:2 D3+F#3:2
+      C3+G3:2 G2+D3:2 | A2+E3:2 C3+G3:2 | D3+F#3:4 | G2+D3:4
+      C3+G3:4 | C3+E3:4 | D3+F#3:4 | D3+F#3:2 G2+D3:2`,
+  },
+  {
+    id: "mozart-40",
+    title: "Symphony No. 40 (theme)",
+    titleTr: "40. Senfoni (tema)",
+    composer: "W. A. Mozart",
+    level: 2,
+    category: "classical",
+    bpm: 132,
+    meter: [4, 1],
+    pickup: 1,
+    right: `Eb5:0.5 D5:0.5
+      D5:1 Eb5:0.5 D5:0.5 D5:1 Eb5:0.5 D5:0.5 | D5:1 Bb5:2 Bb5:0.5 A5:0.5 | G5:1 G5:0.5 F5:0.5 Eb5:1 Eb5:0.5 D5:0.5 | C5:1 C5:2 D5:0.5 C5:0.5
+      C5:1 D5:0.5 C5:0.5 C5:1 D5:0.5 C5:0.5 | C5:1 A5:2 A5:0.5 G5:0.5 | F#5:1 F#5:0.5 Eb5:0.5 D5:1 D5:0.5 C5:0.5 | Bb4:1 A4:1 G4:2`,
+    left: `G2+D3:4 | G2+D3:4 | C3+G3:4 | D3+A3:4
+      D3+A3:4 | D3+A3:4 | D3+A3:2 G2+D3:2 | G2+D3:1 D2+A2:1 G2+D3:2`,
+  },
+  {
+    id: "can-can",
+    title: "Can-Can (Galop infernal)",
+    titleTr: "Kankan",
+    composer: "J. Offenbach",
+    level: 2,
+    category: "classical",
+    bpm: 144,
+    meter: [4, 1],
+    right: `${cancan}
+      G4:0.5 G5:0.5 F#5:0.5 E5:0.5 D5:0.5 C5:0.5 B4:0.5 A4:0.5
+      ${cancan}
+      G4:0.5 D5:0.5 A4:0.5 B4:0.5 G4:2`,
+    left: `${cancanLeft}
+      G2:0.5 B2+D3:0.5 G2:0.5 B2+D3:0.5 D2:0.5 F#2+C3:0.5 D2:0.5 F#2+C3:0.5
+      ${cancanLeft}
+      G2:0.5 B2+D3:0.5 D2:0.5 F#2+C3:0.5 G2+D3+G3:2`,
   },
 ];

@@ -7,6 +7,7 @@ import { INSTRUMENT_HEIGHT_RANGE, KEY_ZOOM_MAX, defaultSettings } from "../state
 import { setPanel, useApp } from "../state/store";
 import { IconPlug } from "../ui/icons";
 import { KeyBindings } from "./KeyBindings";
+import { LegalLinks } from "./LegalLinks";
 import { ApproachSwatch, BackgroundSwatch, ChoiceCards, ColorPicker, ColorSwatch, DustSwatch, EffectSwatch, NoteSwatch } from "./AppearancePicker";
 import {
   APPROACH_STYLES,
@@ -209,7 +210,16 @@ export function SettingsDialog() {
               {fs.supported && <Switch label={t("fullscreen")} hint="F11" checked={fs.full} onChange={fs.toggle} />}
             </Section>
             <Section title={t("about")}>
-              <p className="py-2 text-xs leading-relaxed text-mist-400">{t("aboutBody")}</p>
+              <div className="space-y-1.5 py-2 text-xs leading-relaxed text-mist-400">
+                <p className="font-semibold text-mist-300">{t("aboutBody")}</p>
+                <ul className="list-disc space-y-1 pl-4">
+                  <li>{t("creditPiano")}</li>
+                  <li>{t("creditStrings")}</li>
+                  <li>{t("creditBach")}</li>
+                  <li>{t("creditSongs")}</li>
+                </ul>
+                <LegalLinks className="pt-1" />
+              </div>
               <div className="pb-2">
                 <Button
                   size="sm"
@@ -361,6 +371,7 @@ export function SettingsDialog() {
               onChange={(v) => updateSettings({ instrumentHeight: v })}
               format={pct}
             />
+            <Switch label={t("lockHeight")} hint={t("lockHeightHint")} checked={s.lockHeight} onChange={(v) => updateSettings({ lockHeight: v })} />
           </Section>
         )}
         {tab === "gameplay" && (
