@@ -57,6 +57,7 @@ export const en = {
   catHoliday: "Holidays & celebrations",
   traditional: "Traditional",
   builtInNote: "All built-in songs are public domain — free to play, share and record.",
+  songOfDay: "Song of the day",
   mySongs: "My songs",
   importMidi: "Import MIDI",
   dropHint: "Drop .mid files anywhere to add them",

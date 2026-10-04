@@ -54,6 +54,7 @@ export const tr: Dict = {
   catHoliday: "Kutlama & yılbaşı",
   traditional: "Geleneksel",
   builtInNote: "Hazır şarkıların hepsi telifsizdir (kamu malı) — özgürce çal, paylaş, kaydet.",
+  songOfDay: "Günün şarkısı",
   mySongs: "Şarkılarım",
   importMidi: "MIDI ekle",
   dropHint: ".mid dosyalarını eklemek için herhangi bir yere bırak",

@@ -8,7 +8,8 @@ import { formatBytes } from "../lib/format";
 import { importFiles, openSong, removeSong, renameUserSong } from "../state/actions";
 import { setPanel, useApp } from "../state/store";
 import { bestKey, type SongPrefs } from "../storage/db";
-import { IconCheck, IconCloud, IconEdit, IconSearch, IconStar, IconSync, IconTrash, IconUpload } from "../ui/icons";
+import { dayKey } from "../progress/progress";
+import { IconCheck, IconCloud, IconEdit, IconPlay, IconSearch, IconStar, IconSync, IconTrash, IconUpload } from "../ui/icons";
 import { Button, Dialog, IconButton, cx } from "../ui/primitives";
 
 function Stars({ n, size = 12 }: { n: number; size?: number }) {
@@ -25,6 +26,14 @@ function bestStars(prefs: SongPrefs | undefined, instrument: string): number {
   const b = prefs?.best;
   if (!b) return 0;
   return Math.max(b[bestKey(instrument, false)]?.stars ?? 0, b[bestKey(instrument, true)]?.stars ?? 0);
+}
+
+/** Same built-in song for everyone on a given day. */
+function songOfTheDay(d = new Date()) {
+  const key = dayKey(d);
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  return BUILTIN_SONGS[h % BUILTIN_SONGS.length];
 }
 
 function normalize(s: string): string {
@@ -71,6 +80,7 @@ export function LibraryPanel() {
   const catLabel = (c: BuiltinCategory | "all") =>
     c === "all" ? t("catAll") : c === "kids" ? t("catKids") : c === "classical" ? t("catClassical") : c === "folk" ? t("catFolk") : t("catHoliday");
   const mine = useMemo(() => userSongs.filter((s) => !q || normalize(s.title).includes(q)), [userSongs, q]);
+  const daily = songOfTheDay();
 
   const choose = async (id: string) => {
     if (editing) return;
@@ -141,6 +151,28 @@ export function LibraryPanel() {
           </div>
         )}
       </div>
+
+      {!q && (
+        <button
+          type="button"
+          onClick={() => void choose(daily.id)}
+          className="group relative mb-5 flex w-full items-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-br from-brand-500/30 via-fuchsia-500/15 to-sky-400/10 px-4 py-3.5 text-left ring-1 ring-brand-300/25 transition-transform active:scale-[0.99]"
+        >
+          <div className="min-w-0 flex-1">
+            <div className="text-[11px] font-bold tracking-[0.12em] text-brand-200 uppercase">{t("songOfDay")}</div>
+            <div className="mt-0.5 truncate text-base font-bold">{lang === "tr" && daily.titleTr ? daily.titleTr : daily.title}</div>
+            <div className="mt-0.5 flex items-center gap-2 text-xs text-mist-300">
+              <span className="truncate">
+                {composerLabel(daily.composer)} · {levelLabel(daily.level)}
+              </span>
+              <Stars n={bestStars(prefs[daily.id], instrument)} />
+            </div>
+          </div>
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-brand-400 to-brand-600 text-white shadow-lg transition-transform group-hover:scale-105">
+            <IconPlay size={18} className="translate-x-px" />
+          </span>
+        </button>
+      )}
 
       <section aria-labelledby="lib-mine">
         <h3 id="lib-mine" className="mt-1 mb-2 text-xs font-bold tracking-[0.12em] text-mist-400 uppercase">
