@@ -19,7 +19,8 @@ import {
 } from "../storage/db";
 import { migrateLegacyLibrary } from "../storage/migrate";
 import { saveSettings, type Settings } from "./settings";
-import { DEFAULT_SESSION, toast, useApp, type Session } from "./store";
+import { DEFAULT_SESSION, setPanel, toast, useApp, type Session } from "./store";
+import { canImport } from "../auth/account";
 
 const LAST_SONG = "staveflow-last-song";
 
@@ -186,7 +187,12 @@ export async function openSong(id: string, opts: { quiet?: boolean } = {}): Prom
   }
 }
 
-export async function importFiles(files: File[]): Promise<void> {
+/** Imports MIDI files into the local library; returns false when Pro is required first. */
+export async function importFiles(files: File[]): Promise<boolean> {
+  if (!canImport()) {
+    setPanel("pro");
+    return false;
+  }
   const midiFiles = files.filter((f) => /\.(mid|midi|kar)$/i.test(f.name) || f.type.includes("midi"));
   let firstId: string | null = null;
   let count = 0;
@@ -218,6 +224,7 @@ export async function importFiles(files: File[]): Promise<void> {
     toast(tNow("imported", { n: count }), "success");
     if (firstId) await openSong(firstId);
   }
+  return true;
 }
 
 export async function removeSong(id: string): Promise<void> {

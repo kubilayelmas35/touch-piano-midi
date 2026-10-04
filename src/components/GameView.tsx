@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { engine } from "../engine/engine";
-import { FretLayout, PianoLayout, visibleFrets } from "../engine/layout";
-import { midiAt } from "../engine/fretting";
-import { keyLabelMap } from "../input/keyboard";
+import { FretLayout, PianoLayout, pluckWidth, visibleFrets } from "../engine/layout";
+import { fretted } from "../input/fretted";
+import { keyLabel, keyLabelMap, keyLabelRevision } from "../input/keyboard";
+import { INSTRUMENT_HEIGHT_RANGE } from "../state/settings";
 import { niceKeyboardRange } from "../lib/notes";
 import { Highway } from "../render/highway";
 import { BLACK_KEY_RATIO, FretboardRenderer, KeyboardRenderer } from "../render/instrument";
@@ -83,22 +84,23 @@ export function GameView() {
       return { piano: new PianoLayout(lo, hi, size.w), fret: null };
     }
     const spec = engine.fretSpec!;
+    const pw = pluckWidth(size.w);
     let highest = 0;
     for (const n of engine.notes) if (n.fret > highest) highest = n.fret;
-    return { piano: null, fret: new FretLayout(spec, size.w, visibleFrets(spec, size.w, highest)) };
+    return { piano: null, fret: new FretLayout(spec, size.w, visibleFrets(spec, size.w - pw, highest), pw) };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [size.w, instrument, notesRev, fretSpec]);
+
+  useEffect(() => {
+    fretted.reset();
+  }, [instrument]);
 
   const instH = useMemo(() => {
     if (!size.h) return 0;
     const want = size.h * instrumentHeight;
-    if (instrument === "piano") {
-      const ww = layout?.piano?.whiteW ?? 30;
-      return Math.round(Math.max(96, Math.min(want, ww * 5, 230, size.h * 0.5)));
-    }
-    const strings = instrument === "guitar" ? 6 : 4;
-    return Math.round(Math.max(strings * 22, Math.min(want, strings * 52, size.h * 0.45)));
-  }, [size.h, instrumentHeight, instrument, layout]);
+    const minH = instrument === "piano" ? 96 : (instrument === "guitar" ? 6 : 4) * 22;
+    return Math.round(Math.max(minH, Math.min(want, size.h * INSTRUMENT_HEIGHT_RANGE[1])));
+  }, [size.h, instrumentHeight, instrument]);
   const hwH = Math.max(0, size.h - instH);
 
   // Renderers live for the component lifetime; the frame loop reads the latest view through a ref.
@@ -116,6 +118,8 @@ export function GameView() {
     let raf = 0;
     let lastStore = 0;
     const labels: Record<string, string> = {};
+    let pianoLabels: { src: unknown; base: number; rev: number; map: Map<number, string> } | null = null;
+    let fretLabels: { src: unknown; rev: number; strings: string[]; frets: string[] } | null = null;
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
       const r = renderers.current;
@@ -139,18 +143,38 @@ export function GameView() {
         effects: s.effects,
         labels,
       });
+      const rev = keyLabelRevision();
       if (v.layout.piano) {
+        const base = (s.keyboardOctave + 1) * 12;
+        if (!pianoLabels || pianoLabels.src !== s.keymaps.piano || pianoLabels.base !== base || pianoLabels.rev !== rev) {
+          pianoLabels = { src: s.keymaps.piano, base, rev, map: keyLabelMap(s.keymaps.piano, base) };
+        }
         r.kb.resize(v.w, v.instH);
         r.kb.draw({
           layout: v.layout.piano,
           t: time,
           naming: s.noteNaming,
           showAllNames: false,
-          keyLabels: s.showKeyLabels ? keyLabelMap((s.keyboardOctave + 1) * 12) : null,
+          keyLabels: s.showKeyLabels ? pianoLabels.map : null,
         });
       } else if (v.layout.fret) {
+        fretted.autoFret = s.autoFret;
+        fretted.tapToPlay = s.tapToPlay;
+        const km = s.instrument === "violin" ? s.keymaps.violin : s.keymaps.guitar;
+        if (!fretLabels || fretLabels.src !== km || fretLabels.rev !== rev) {
+          fretLabels = { src: km, rev, strings: km.strings.map(keyLabel), frets: km.frets.map(keyLabel) };
+        }
         r.fb.resize(v.w, v.instH);
-        r.fb.draw({ layout: v.layout.fret, t: time, naming: s.noteNaming, violin: s.instrument === "violin" });
+        r.fb.draw({
+          layout: v.layout.fret,
+          t: time,
+          naming: s.noteNaming,
+          violin: s.instrument === "violin",
+          fingers: fretted.heldFrets(),
+          struckAt: fretted.struckAt,
+          isStruck: (str) => fretted.isStruck(str),
+          keyLabels: s.showKeyLabels && s.fretKeyMode === "strings" ? fretLabels : null,
+        });
       }
       if (engine.status === "playing" && now - lastStore > 90) {
         lastStore = now;
@@ -162,7 +186,23 @@ export function GameView() {
   }, [t]);
 
   // ----------------------------------------------------------- touch input
-  const pointers = useRef(new Map<number, { key: string; midi: number; x0: number; y0: number; string: number; fret: number }>());
+  const pointers = useRef(
+    new Map<
+      number,
+      { key: string; midi: number; x0: number; y0: number; string: number; fret: number; zone: "keys" | "neck" | "pluck"; lastX: number; lastY: number; lastT: number }
+    >()
+  );
+
+  /** Strings under a touch in the strike zone; a fingertip near a boundary catches both strings. */
+  const stringsAt = (y: number, e: React.PointerEvent, count: number): number[] => {
+    const rowH = viewRef.current.instH / count;
+    const r = e.pointerType === "touch" ? Math.min(rowH * 0.4, Math.max(6, (e.height || 0) * 0.3)) : 0;
+    const out: number[] = [];
+    for (let row = 0; row < count; row++) {
+      if (y + r >= row * rowH && y - r < (row + 1) * rowH) out.push(count - 1 - row);
+    }
+    return out;
+  };
 
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const v = viewRef.current;
@@ -178,14 +218,21 @@ export function GameView() {
       if (midi == null) return;
       const vel = e.pressure && e.pressure !== 0.5 ? e.pressure : 0.55 + 0.4 * Math.min(1, y / v.instH);
       engine.press(key, midi, vel);
-      pointers.current.set(e.pointerId, { key, midi, x0: x, y0: y, string: -1, fret: -1 });
+      pointers.current.set(e.pointerId, { key, midi, x0: x, y0: y, string: -1, fret: -1, zone: "keys", lastX: x, lastY: y, lastT: e.timeStamp });
     } else if (v.layout.fret && renderers.current) {
-      const spec = v.layout.fret.spec;
-      const string = renderers.current.fb.stringAt(y, spec.tuning.length);
-      const fret = v.layout.fret.fretAt(x);
-      const midi = midiAt(spec, string, fret);
-      engine.press(key, midi, 0.85, { string, fret });
-      pointers.current.set(e.pointerId, { key, midi, x0: x, y0: y, string, fret });
+      const L = v.layout.fret;
+      const count = L.spec.tuning.length;
+      const base = { key, midi: -1, x0: x, y0: y, lastX: x, lastY: y, lastT: e.timeStamp };
+      if (L.inPluckZone(x)) {
+        const vel = e.pressure && e.pressure !== 0.5 ? 0.4 + e.pressure * 0.6 : 0.82;
+        fretted.strikeSync(e.pointerId, stringsAt(y, e, count), vel);
+        pointers.current.set(e.pointerId, { ...base, string: -1, fret: -1, zone: "pluck" });
+      } else {
+        const string = renderers.current.fb.stringAt(y, count);
+        const fret = L.fretAt(x);
+        fretted.neckDown(e.pointerId, string, fret);
+        pointers.current.set(e.pointerId, { ...base, string, fret, zone: "neck" });
+      }
     }
   };
 
@@ -204,21 +251,29 @@ export function GameView() {
         p.midi = midi;
       }
     } else if (v.layout.fret) {
-      const fret = v.layout.fret.fretAt(x);
-      const spec = v.layout.fret.spec;
-      if (fret !== p.fret) {
-        // Slide to another fret on the same string.
-        const midi = midiAt(spec, p.string, fret);
-        engine.release(p.key);
-        engine.press(p.key, midi, 0.7, { string: p.string, fret });
-        p.fret = fret;
-        p.midi = midi;
-        p.y0 = y;
+      const L = v.layout.fret;
+      const count = L.spec.tuning.length;
+      if (p.zone === "pluck") {
+        // Faster strums hit harder.
+        const dt = Math.max(1, e.timeStamp - p.lastT);
+        const speed = Math.hypot(x - p.lastX, y - p.lastY) / dt;
+        p.lastX = x;
+        p.lastY = y;
+        p.lastT = e.timeStamp;
+        fretted.strikeSync(e.pointerId, stringsAt(y, e, count), Math.max(0.45, Math.min(1, 0.5 + speed * 0.35)));
       } else {
-        const rowH = v.instH / spec.tuning.length;
-        const dy = Math.abs(y - p.y0);
-        const cents = instrument === "violin" ? Math.max(-45, Math.min(45, (p.y0 - y) * 2.2)) : Math.min(200, (dy / rowH) * 200);
-        engine.bend(p.key, cents);
+        const fret = Math.min(L.fretAt(x), L.lastFret);
+        if (fret !== p.fret) {
+          // Slide to another fret on the same string.
+          fretted.neckMove(e.pointerId, p.string, fret);
+          p.fret = fret;
+          p.y0 = y;
+        } else {
+          const rowH = v.instH / count;
+          const dy = Math.abs(y - p.y0);
+          const cents = instrument === "violin" ? Math.max(-45, Math.min(45, (p.y0 - y) * 2.2)) : Math.min(200, (dy / rowH) * 200);
+          fretted.neckBend(e.pointerId, cents);
+        }
       }
     }
   };
@@ -227,7 +282,9 @@ export function GameView() {
     const p = pointers.current.get(e.pointerId);
     if (!p) return;
     pointers.current.delete(e.pointerId);
-    engine.release(p.key);
+    if (p.zone === "pluck") fretted.strikeEnd(e.pointerId);
+    else if (p.zone === "neck") fretted.neckUp(e.pointerId);
+    else engine.release(p.key);
   };
 
   // Resize handle between the highway and the instrument.
@@ -240,7 +297,7 @@ export function GameView() {
     const d = dragRef.current;
     if (!d || !size.h) return;
     const next = (d.h0 + (d.y0 - e.clientY)) / size.h;
-    useApp.setState((s) => ({ settings: { ...s.settings, instrumentHeight: Math.max(0.16, Math.min(0.5, next)) } }));
+    useApp.setState((s) => ({ settings: { ...s.settings, instrumentHeight: Math.max(INSTRUMENT_HEIGHT_RANGE[0], Math.min(INSTRUMENT_HEIGHT_RANGE[1], next)) } }));
   };
   const onHandleUp = () => {
     if (!dragRef.current) return;

@@ -45,6 +45,15 @@ export function withAlpha(hex: string, a: number): string {
   return `rgba(${r},${g},${b},${a})`;
 }
 
+/** Lightens (amount > 0, towards white) or darkens (amount < 0, towards black) a hex colour. */
+export function shade(hex: string, amount: number, a = 1): string {
+  const h = hex.replace("#", "");
+  const target = amount > 0 ? 255 : 0;
+  const k = Math.min(1, Math.abs(amount));
+  const ch = (i: number) => Math.round(parseInt(h.slice(i, i + 2), 16) * (1 - k) + target * k);
+  return `rgba(${ch(0)},${ch(2)},${ch(4)},${a})`;
+}
+
 const spriteCache = new Map<string, HTMLCanvasElement>();
 
 /** Soft radial glow sprite, cached per colour. */

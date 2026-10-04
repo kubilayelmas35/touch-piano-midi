@@ -1,6 +1,7 @@
 import type { NoteNaming } from "../lib/notes";
 import type { GuitarTone, InstrumentKind } from "../engine/types";
 import { readLegacySettings } from "../storage/migrate";
+import { defaultKeymaps, sanitizeKeymaps, type FretKeyMode, type Keymaps } from "../input/keyboard";
 
 export type Language = "tr" | "en";
 
@@ -22,11 +23,20 @@ export interface Settings {
   effects: boolean;
   /** Octave of the computer-keyboard "A" key (C of that octave). */
   keyboardOctave: number;
+  keymaps: Keymaps;
+  /** Guitar/violin on the computer keyboard: string + fret keys, or piano-style chromatic keys. */
+  fretKeyMode: FretKeyMode;
+  /** Guitar/violin: frets the next song note automatically, so only the strings need to be struck. */
+  autoFret: boolean;
+  /** Guitar/violin: touching the neck also sounds the note (one-handed play). */
+  tapToPlay: boolean;
   midiInput: string;
   /** Instrument panel height as a fraction of the game area. */
   instrumentHeight: number;
   onboarded: boolean;
 }
+
+export const INSTRUMENT_HEIGHT_RANGE: [number, number] = [0.16, 0.65];
 
 const KEY = "staveflow-settings-v2";
 
@@ -53,6 +63,10 @@ export function defaultSettings(): Settings {
     showKeyLabels: true,
     effects: true,
     keyboardOctave: 4,
+    keymaps: defaultKeymaps(),
+    fretKeyMode: "strings",
+    autoFret: false,
+    tapToPlay: false,
     midiInput: "all",
     instrumentHeight: 0.3,
     onboarded: false,
@@ -96,7 +110,11 @@ function sanitize(s: Settings): Settings {
     timingWindowMs: num(s.timingWindowMs, 60, 300, d.timingWindowMs),
     fallSeconds: num(s.fallSeconds, 1, 8, d.fallSeconds),
     keyboardOctave: Math.round(num(s.keyboardOctave, 1, 7, d.keyboardOctave)),
-    instrumentHeight: num(s.instrumentHeight, 0.16, 0.5, d.instrumentHeight),
+    keymaps: sanitizeKeymaps(s.keymaps),
+    fretKeyMode: s.fretKeyMode === "chromatic" ? "chromatic" : "strings",
+    autoFret: s.autoFret === true,
+    tapToPlay: s.tapToPlay === true,
+    instrumentHeight: num(s.instrumentHeight, ...INSTRUMENT_HEIGHT_RANGE, d.instrumentHeight),
   };
 }
 

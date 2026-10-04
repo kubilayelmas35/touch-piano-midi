@@ -2,9 +2,10 @@ import { useState, type ReactNode } from "react";
 import { useT } from "../i18n";
 import { startMidi } from "../input/midi";
 import { updateSettings } from "../state/actions";
-import { defaultSettings } from "../state/settings";
+import { INSTRUMENT_HEIGHT_RANGE, defaultSettings } from "../state/settings";
 import { setPanel, useApp } from "../state/store";
 import { IconPlug } from "../ui/icons";
+import { KeyBindings } from "./KeyBindings";
 import { Button, Dialog, Segmented, Slider, Switch, cx } from "../ui/primitives";
 
 type Tab = "general" | "sound" | "gameplay" | "input";
@@ -135,7 +136,7 @@ export function SettingsDialog() {
         {tab === "sound" && (
           <Section>
             <Slider label={t("volume")} value={s.volume} min={0} max={1} step={0.05} onChange={(v) => updateSettings({ volume: v })} format={pct} />
-            <Slider label={t("accompVolume")} value={s.accompVolume} min={0} max={1.2} step={0.05} onChange={(v) => updateSettings({ accompVolume: v })} format={pct} />
+            <Slider label={t("accompVolume")} value={s.accompVolume} min={0} max={1} step={0.05} onChange={(v) => updateSettings({ accompVolume: v })} format={pct} />
             <Slider label={t("reverb")} value={s.reverb} min={0} max={0.6} step={0.02} onChange={(v) => updateSettings({ reverb: v })} format={(v) => pct(v / 0.6)} />
             <Slider label={t("clickVolume")} value={s.clickVolume} min={0} max={1} step={0.05} onChange={(v) => updateSettings({ clickVolume: v })} format={pct} />
             <Row label={t("guitarTone")}>
@@ -178,12 +179,18 @@ export function SettingsDialog() {
             <Slider
               label={t("instrumentHeight")}
               value={s.instrumentHeight}
-              min={0.16}
-              max={0.5}
+              min={INSTRUMENT_HEIGHT_RANGE[0]}
+              max={INSTRUMENT_HEIGHT_RANGE[1]}
               step={0.01}
               onChange={(v) => updateSettings({ instrumentHeight: v })}
               format={pct}
             />
+          </Section>
+        )}
+        {tab === "gameplay" && (
+          <Section title={t("frettedPlay")}>
+            <Switch label={t("autoFret")} hint={t("autoFretHint")} checked={s.autoFret} onChange={(v) => updateSettings({ autoFret: v })} />
+            <Switch label={t("tapToPlay")} hint={t("tapToPlayHint")} checked={s.tapToPlay} onChange={(v) => updateSettings({ tapToPlay: v })} />
           </Section>
         )}
 
@@ -240,6 +247,9 @@ export function SettingsDialog() {
                 format={(v) => `C${v}`}
               />
               <p className="pb-2 text-xs leading-relaxed text-mist-400">{t("keyboardHint")}</p>
+            </Section>
+            <Section title={t("keyBindings")}>
+              <KeyBindings />
             </Section>
             <Section title={t("shortcuts")}>
               <dl className="divide-y divide-white/[0.05]">

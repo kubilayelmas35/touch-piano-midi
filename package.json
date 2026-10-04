@@ -13,6 +13,7 @@
     "samples": "node tools/fetch-samples.mjs"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.117.2",
     "@tonejs/midi": "^2.0.28",
     "idb": "^8.0.3",
     "react": "^19.3.0",

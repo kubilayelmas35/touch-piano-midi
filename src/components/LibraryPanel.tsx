@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { useT } from "../i18n";
 import { formatTime } from "../lib/notes";
 import { BUILTIN_SONGS } from "../midi/builtin";
+import { canImport } from "../auth/account";
 import { importFiles, openSong, removeSong, renameUserSong } from "../state/actions";
 import { setPanel, useApp } from "../state/store";
 import { bestKey, type SongPrefs } from "../storage/db";
@@ -39,6 +40,8 @@ export function LibraryPanel() {
   const prefs = useApp((s) => s.prefs);
   const currentId = useApp((s) => s.currentId);
   const instrument = useApp((s) => s.settings.instrument);
+  const pro = useApp((s) => s.account.pro);
+  const accountOn = useApp((s) => s.account.status !== "disabled");
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
@@ -77,9 +80,12 @@ export function LibraryPanel() {
               className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-mist-400"
             />
           </label>
-          <Button variant="primary" onClick={() => fileRef.current?.click()}>
+          <Button variant="primary" onClick={() => (canImport() ? fileRef.current?.click() : setPanel("pro"))}>
             <IconUpload size={16} />
             <span className="max-[380px]:hidden">{t("importMidi")}</span>
+            {!pro && accountOn && (
+              <span className="rounded-md bg-amber-300 px-1.5 text-[10px] leading-4 font-extrabold text-ink-950">PRO</span>
+            )}
           </Button>
           <input
             ref={fileRef}
@@ -90,7 +96,7 @@ export function LibraryPanel() {
             onChange={(e) => {
               const files = Array.from(e.target.files ?? []);
               e.target.value = "";
-              if (files.length) void importFiles(files).then(close);
+              if (files.length) void importFiles(files).then((ok) => ok && close());
             }}
           />
         </div>

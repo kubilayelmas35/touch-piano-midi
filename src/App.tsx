@@ -1,4 +1,6 @@
 import { useEffect } from "react";
+import { initAuth } from "./auth/account";
+import { AccountDialog, ProDialog } from "./components/AccountDialog";
 import { GameView } from "./components/GameView";
 import { LibraryPanel } from "./components/LibraryPanel";
 import { ResultsDialog } from "./components/ResultsDialog";
@@ -44,6 +46,7 @@ export function App() {
 
   useEffect(() => {
     void initApp();
+    void initAuth();
     void detectKeyLabels();
     void startMidiIfGranted();
   }, []);
@@ -63,6 +66,8 @@ export function App() {
       <SettingsDialog />
       <ResultsDialog />
       <WelcomeDialog />
+      <AccountDialog />
+      <ProDialog />
       <Toasts />
       <DropOverlay />
     </div>

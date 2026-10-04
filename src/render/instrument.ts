@@ -217,7 +217,16 @@ export interface FretboardView {
   t: number;
   naming: NoteNaming;
   violin: boolean;
+  /** string → fret held by the left hand. */
+  fingers: Map<number, number>;
+  /** performance.now() of the last strike per string. */
+  struckAt: number[];
+  isStruck: (string: number) => boolean;
+  /** Computer-keyboard labels per string and per fret (from fret 1), when string mode is on. */
+  keyLabels: { strings: string[]; frets: string[] } | null;
 }
+
+const GUITAR_RING_S = 1.8;
 
 export class FretboardRenderer extends CanvasSurface {
   /** Row index (0 = top) for a string (0 = lowest pitch). Highest string is drawn on top. */
@@ -230,6 +239,14 @@ export class FretboardRenderer extends CanvasSurface {
     return count - 1 - row;
   }
 
+  /** 0..1 vibration of a string, for drawing. */
+  private energy(view: FretboardView, s: number, now: number): number {
+    const age = (now - (view.struckAt[s] ?? -1e9)) / 1000;
+    if (view.violin) return view.isStruck(s) ? 0.55 : Math.max(0, 0.5 - age * 3);
+    const decay = Math.max(0, 1 - age / GUITAR_RING_S);
+    return view.isStruck(s) ? Math.max(0.35, decay) : decay * decay;
+  }
+
   draw(view: FretboardView): void {
     const { ctx, w, h } = this;
     if (!w || !h) return;
@@ -237,13 +254,15 @@ export class FretboardRenderer extends CanvasSurface {
     const spec = L.spec;
     const count = spec.tuning.length;
     const rowH = h / count;
+    const neckW = L.width;
     const marks = collectMarks(this.engine, view.t);
     const colors = view.violin ? VIOLIN_STRING_COLORS : GUITAR_STRING_COLORS;
     const now = performance.now();
     const pulse = 0.5 + 0.5 * Math.sin(now / 160);
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    ctx.textAlign = "center";
 
-    // Wood.
+    // Neck wood.
     const wood = ctx.createLinearGradient(0, 0, 0, h);
     if (view.violin) {
       wood.addColorStop(0, "#15110f");
@@ -255,8 +274,7 @@ export class FretboardRenderer extends CanvasSurface {
       wood.addColorStop(1, "#24160f");
     }
     ctx.fillStyle = wood;
-    ctx.fillRect(0, 0, w, h);
-    // Open-string area.
+    ctx.fillRect(0, 0, neckW, h);
     ctx.fillStyle = "rgba(0,0,0,0.35)";
     ctx.fillRect(0, 0, L.colW, h);
 
@@ -284,7 +302,7 @@ export class FretboardRenderer extends CanvasSurface {
     }
 
     // Frets + nut.
-    for (let f = 1; f < L.columns + 1; f++) {
+    for (let f = 1; f <= L.columns; f++) {
       const x = Math.round(f * L.colW);
       if (f === 1) {
         ctx.fillStyle = "#e8e0cc";
@@ -298,39 +316,148 @@ export class FretboardRenderer extends CanvasSurface {
       }
     }
 
-    // Fret numbers.
-    ctx.font = "600 9px system-ui, sans-serif";
-    ctx.textAlign = "center";
+    // Fret numbers, plus the fret key when it differs from the number.
     ctx.textBaseline = "top";
-    ctx.fillStyle = "rgba(255,255,255,0.35)";
     for (let f = 1; f < L.columns; f++) {
       if (L.colW < 22 && f % 2 === 0 && f !== 12) continue;
-      ctx.fillText(String(f), f * L.colW + L.colW / 2, 2);
+      const cx = f * L.colW + L.colW / 2;
+      ctx.font = "600 9px system-ui, sans-serif";
+      ctx.fillStyle = "rgba(255,255,255,0.35)";
+      ctx.fillText(String(f), cx, 2);
+      const key = view.keyLabels?.frets[f - 1];
+      if (key && key !== String(f)) {
+        ctx.font = "700 9px system-ui, sans-serif";
+        ctx.fillStyle = "rgba(196,181,253,0.8)";
+        ctx.fillText(key, cx, 12);
+      }
     }
 
-    // Strings.
+    // Strike zone (pick area for guitar, bow area for violin).
+    const px = L.pluckX;
+    const pw = L.pluckW;
+    if (pw > 0) {
+      const zone = ctx.createLinearGradient(px, 0, px + pw, 0);
+      if (view.violin) {
+        zone.addColorStop(0, "#3a2414");
+        zone.addColorStop(0.12, "#24170e");
+        zone.addColorStop(1, "#140d08");
+      } else {
+        zone.addColorStop(0, "#161a2c");
+        zone.addColorStop(1, "#0b0d18");
+      }
+      ctx.fillStyle = zone;
+      ctx.fillRect(px, 0, pw, h);
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(px, 0, pw, h);
+      ctx.clip();
+      if (view.violin) {
+        // Bridge.
+        ctx.fillStyle = "rgba(222,190,140,0.55)";
+        ctx.fillRect(px + 6, 0, 5, h);
+      } else {
+        // Sound hole with rosette.
+        const cx = px + pw * 0.62;
+        const r = Math.min(pw * 0.42, h * 0.42);
+        ctx.fillStyle = "rgba(0,0,0,0.45)";
+        ctx.beginPath();
+        ctx.arc(cx, h / 2, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(196,181,253,0.18)";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(cx, h / 2, r + 5, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+      ctx.fillStyle = "rgba(255,255,255,0.12)";
+      ctx.fillRect(px, 0, 2, h);
+
+      // Strings to strike now, and strings just struck.
+      const targetStrings = new Map<number, string>();
+      for (const [pos, c] of marks.targetPos) targetStrings.set(Number(pos.split(":")[0]), c);
+      for (let s = 0; s < count; s++) {
+        const top = this.rowOf(s, count) * rowH;
+        const e = this.energy(view, s, now);
+        const target = targetStrings.get(s);
+        if (target) {
+          ctx.fillStyle = withAlpha(target, 0.14 + 0.2 * pulse);
+          roundRect(ctx, px + 4, top + 3, pw - 8, rowH - 6, 8);
+          ctx.fill();
+          ctx.lineWidth = 1.5;
+          ctx.strokeStyle = withAlpha(target, 0.5 + 0.4 * pulse);
+          ctx.stroke();
+        }
+        if (e > 0.03) {
+          ctx.fillStyle = withAlpha(colors[s], 0.22 * e);
+          roundRect(ctx, px + 4, top + 3, pw - 8, rowH - 6, 8);
+          ctx.fill();
+        }
+      }
+    }
+
+    // Strings; the part between the finger and the bridge vibrates after a strike.
     for (let s = 0; s < count; s++) {
-      const row = this.rowOf(s, count);
-      const y = row * rowH + rowH / 2;
+      const y = this.rowOf(s, count) * rowH + rowH / 2;
       const thick = view.violin ? 1.2 + (count - 1 - s) * 0.45 : 1 + (count - 1 - s) * 0.5;
-      const ring = [...marks.pressedPos].some((p) => p.startsWith(`${s}:`));
-      ctx.fillStyle = ring ? withAlpha(colors[s], 0.95) : "rgba(225,225,235,0.75)";
-      const wobble = ring ? Math.sin(now / 18) * 0.8 : 0;
-      ctx.fillRect(L.colW, y - thick / 2 + wobble, w - L.colW, thick);
-      // Open-string label.
-      ctx.font = `800 ${Math.max(10, Math.min(15, rowH * 0.5))}px system-ui, sans-serif`;
+      const e = this.energy(view, s, now);
+      const finger = view.fingers.get(s) ?? 0;
+      const xv = finger > 0 ? Math.min(neckW, (finger + 1) * L.colW) : L.colW;
+      const color = e > 0.03 ? colors[s] : "rgba(225,225,235,0.75)";
+      ctx.fillStyle = "rgba(225,225,235,0.75)";
+      if (xv > L.colW) ctx.fillRect(L.colW, y - thick / 2, xv - L.colW, thick);
+      if (e > 0.03) {
+        const amp = e * rowH * 0.16;
+        const phase = Math.sin(now * (view.violin ? 0.11 : 0.09) + s * 1.7);
+        const span = w - xv;
+        ctx.beginPath();
+        for (let x = xv; x <= w; x += 4) {
+          const yy = y + Math.sin((Math.PI * (x - xv)) / span) * amp * phase;
+          if (x === xv) ctx.moveTo(x, yy);
+          else ctx.lineTo(x, yy);
+        }
+        ctx.lineCap = "round";
+        ctx.strokeStyle = withAlpha(colors[s], 0.3 * e);
+        ctx.lineWidth = thick + 6;
+        ctx.stroke();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = thick + 0.5;
+        ctx.stroke();
+      } else {
+        ctx.fillRect(xv, y - thick / 2, w - xv, thick);
+      }
+
+      // Labels: open-string name at the nut; name + key in the strike zone.
       ctx.textBaseline = "middle";
+      const name = view.naming === "solfege" ? noteName(spec.tuning[s], "solfege") : spec.labels[s];
+      ctx.font = `800 ${Math.max(10, Math.min(15, rowH * 0.5))}px system-ui, sans-serif`;
       ctx.fillStyle = colors[s];
-      const label = view.naming === "solfege" ? noteName(spec.tuning[s], "solfege") : spec.labels[s];
-      ctx.fillText(label, L.colW / 2, y);
+      ctx.fillText(name, L.colW / 2, y);
+      if (pw > 0) {
+        const key = view.keyLabels?.strings[s];
+        if (key && rowH >= 18) {
+          const fs = Math.max(10, Math.min(13, rowH * 0.42));
+          const kw = Math.max(fs * 1.7, ctx.measureText(key).width + 10);
+          const kx = px + pw - kw / 2 - 8;
+          ctx.fillStyle = "rgba(10,12,30,0.75)";
+          roundRect(ctx, kx - kw / 2, y - fs * 0.85, kw, fs * 1.7, 6);
+          ctx.fill();
+          ctx.strokeStyle = withAlpha(colors[s], 0.6);
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          ctx.font = `800 ${fs}px system-ui, sans-serif`;
+          ctx.fillStyle = "#eef0ff";
+          ctx.fillText(key, kx, y + 0.5);
+        }
+      }
     }
 
     // Markers.
     const radius = Math.max(7, Math.min(rowH * 0.36, L.colW * 0.34));
-    const drawDot = (s: number, f: number, fill: string, ring: string | null, glow: boolean) => {
-      const row = this.rowOf(s, count);
+    const drawDot = (s: number, f: number, fill: string, ring: string | null, glow: boolean, text: string) => {
+      if (f >= L.columns) return;
       const cx = f * L.colW + L.colW / 2;
-      const cy = row * rowH + rowH / 2;
+      const cy = this.rowOf(s, count) * rowH + rowH / 2;
       if (glow) {
         ctx.globalCompositeOperation = "lighter";
         ctx.drawImage(glowSprite(fill, 64), cx - radius * 2.2, cy - radius * 2.2, radius * 4.4, radius * 4.4);
@@ -348,22 +475,23 @@ export class FretboardRenderer extends CanvasSurface {
       ctx.font = `800 ${Math.max(9, radius * 0.95)}px system-ui, sans-serif`;
       ctx.textBaseline = "middle";
       ctx.fillStyle = "rgba(10,12,30,0.9)";
-      ctx.fillText(String(f), cx, cy + 0.5);
+      ctx.fillText(text, cx, cy + 0.5);
     };
 
     for (const [pos, c] of marks.targetPos) {
       const [s, f] = pos.split(":").map(Number);
       ctx.globalAlpha = 0.45 + 0.4 * pulse;
-      drawDot(s, f, withAlpha(c, 0.55), "rgba(255,255,255,0.9)", false);
+      drawDot(s, f, withAlpha(c, 0.55), "rgba(255,255,255,0.9)", false, String(f));
       ctx.globalAlpha = 1;
     }
+    for (const [s, f] of view.fingers) drawDot(s, f, withAlpha(colors[s], 0.92), "rgba(255,255,255,0.85)", false, String(f));
     for (const [pos, c] of marks.soundingPos) {
       const [s, f] = pos.split(":").map(Number);
-      drawDot(s, f, c, null, true);
+      drawDot(s, f, c, null, true, String(f));
     }
     for (const pos of marks.pressedPos) {
       const [s, f] = pos.split(":").map(Number);
-      drawDot(s, f, "#ffffff", colors[s], true);
+      drawDot(s, f, "#ffffff", colors[s], true, String(f));
     }
 
     const shade = ctx.createLinearGradient(0, 0, 0, 10);

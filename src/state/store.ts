@@ -29,7 +29,17 @@ export interface Toast {
   kind: "info" | "success" | "error";
 }
 
-export type Panel = "library" | "settings" | "setup" | null;
+export type Panel = "library" | "settings" | "setup" | "account" | "pro" | null;
+
+export interface Account {
+  /** "disabled" when no Supabase project is configured. */
+  status: "disabled" | "loading" | "signedOut" | "signedIn";
+  email: string | null;
+  username: string | null;
+  pro: boolean;
+  /** Arrived from a password-reset e-mail; asks for a new password. */
+  recovery: boolean;
+}
 
 export interface MidiDevice {
   id: string;
@@ -64,6 +74,7 @@ export interface AppState {
   midiDevices: MidiDevice[];
   dragOver: boolean;
   audioLocked: boolean;
+  account: Account;
 }
 
 export const DEFAULT_SESSION: Session = {
@@ -105,6 +116,7 @@ export const useApp = create<AppState>(() => ({
   midiDevices: [],
   dragOver: false,
   audioLocked: false,
+  account: { status: "disabled", email: null, username: null, pro: false, recovery: false },
 }));
 
 let toastId = 1;

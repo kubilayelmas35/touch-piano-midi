@@ -6,6 +6,7 @@ import { cycleLoop, NO_LOOP, updateSession, updateSettings } from "../state/acti
 import { setPanel, useApp } from "../state/store";
 import {
   IconChevronDown,
+  IconCrown,
   IconGauge,
   IconGuitar,
   IconHeadphones,
@@ -18,6 +19,7 @@ import {
   IconRestart,
   IconSettings,
   IconSliders,
+  IconUser,
   IconViolin,
   IconWait,
 } from "../ui/icons";
@@ -237,6 +239,25 @@ function InstrumentSwitch({ compact }: { compact?: boolean }) {
   );
 }
 
+function AccountButton() {
+  const t = useT();
+  const account = useApp((s) => s.account);
+  if (account.status === "disabled") return null;
+  const initial = (account.username ?? account.email ?? "").slice(0, 1).toUpperCase();
+  return (
+    <IconButton label={t("account")} onClick={() => setPanel("account")} className="shrink-0">
+      {account.status === "signedIn" && initial ? (
+        <span className="relative flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-sky-400 to-brand-600 text-[13px] font-extrabold text-white">
+          {initial}
+          {account.pro && <IconCrown size={11} className="absolute -top-1.5 -right-1.5 text-amber-300" />}
+        </span>
+      ) : (
+        <IconUser size={19} />
+      )}
+    </IconButton>
+  );
+}
+
 export function TopBar() {
   const t = useT();
   const status = useApp((s) => s.status);
@@ -307,6 +328,7 @@ export function TopBar() {
         <div className="hidden shrink-0 sm:block">
           <InstrumentSwitch />
         </div>
+        <AccountButton />
         <IconButton label={t("settings")} onClick={() => setPanel("settings")} className="shrink-0">
           <IconSettings size={19} />
         </IconButton>

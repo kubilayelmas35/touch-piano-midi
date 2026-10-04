@@ -112,6 +112,8 @@ export class Engine {
   private scheduled: Voice[] = [];
   private pendingIdx = 0;
   private voices = new Map<string, Voice>();
+  /** Released strings that keep ringing until re-plucked or muted. */
+  private ringing = new Map<string, Voice>();
   private sustain = false;
   private sustained: Voice[] = [];
   private beats: GridBeat[] = [];
@@ -622,6 +624,7 @@ export class Engine {
   press(sourceKey: string, midi: number, velocity = 0.8, pos?: PressPos): void {
     const prev = this.voices.get(sourceKey);
     if (prev) prev.stop();
+    this.mute(sourceKey, 0.04);
     const voice = playNote(this.instrumentId, midi, velocity, { volume: this.config.playerVolume });
     if (voice) this.voices.set(sourceKey, voice);
     const spec = this.fretSpec;
@@ -634,18 +637,39 @@ export class Engine {
     this.judgePress(midi, place);
   }
 
-  release(sourceKey: string): void {
+  /** Lets go of a note; with `ring` the voice decays naturally (a plucked string) instead of stopping. */
+  release(sourceKey: string, ring = false): void {
     this.held.delete(sourceKey);
     const v = this.voices.get(sourceKey);
     if (!v) return;
     this.voices.delete(sourceKey);
-    if (this.sustain) this.sustained.push(v);
+    if (ring) {
+      this.mute(sourceKey, 0.04);
+      this.ringing.set(sourceKey, v);
+    } else if (this.sustain) this.sustained.push(v);
     else v.stop();
+  }
+
+  /** Damps a ringing string. */
+  mute(sourceKey: string, release = 0.12): void {
+    const v = this.ringing.get(sourceKey);
+    if (!v) return;
+    this.ringing.delete(sourceKey);
+    v.stop(release);
+  }
+
+  isHeld(sourceKey: string): boolean {
+    return this.voices.has(sourceKey);
+  }
+
+  isRinging(sourceKey: string): boolean {
+    const v = this.ringing.get(sourceKey);
+    return !!v && !v.done;
   }
 
   /** Vibrato / slide for a held note, in cents. */
   bend(sourceKey: string, cents: number): void {
-    this.voices.get(sourceKey)?.bend(cents);
+    (this.voices.get(sourceKey) ?? this.ringing.get(sourceKey))?.bend(cents);
   }
 
   setSustain(on: boolean): void {
@@ -658,6 +682,7 @@ export class Engine {
 
   releaseAll(): void {
     for (const key of [...this.voices.keys()]) this.release(key);
+    for (const key of [...this.ringing.keys()]) this.mute(key);
     this.held.clear();
   }
 

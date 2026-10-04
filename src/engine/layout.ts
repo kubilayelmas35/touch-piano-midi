@@ -61,21 +61,36 @@ export class PianoLayout {
   }
 }
 
-/** Fretboard geometry: one uniform column per fret (fret 0 = open string at the nut). */
+/**
+ * Fretboard geometry: the neck (one uniform column per fret, fret 0 = open string at the nut) on the left
+ * and the strike zone (where strings are plucked or bowed) on the right.
+ */
 export class FretLayout {
   readonly columns: number;
   readonly colW: number;
   /** Highest fret shown; narrow screens show only the frets a song needs. */
   readonly lastFret: number;
+  /** Width of the neck; the strike zone spans neckW..totalW. */
+  readonly width: number;
+  readonly pluckX: number;
+  readonly pluckW: number;
 
   constructor(
     readonly spec: FrettedSpec,
-    readonly width: number,
-    lastFret = spec.maxFret
+    readonly totalW: number,
+    lastFret = spec.maxFret,
+    pluckW = 0
   ) {
+    this.pluckW = Math.max(0, Math.min(totalW * 0.5, pluckW));
+    this.width = totalW - this.pluckW;
+    this.pluckX = this.width;
     this.lastFret = Math.max(1, Math.min(spec.maxFret, Math.round(lastFret)));
     this.columns = this.lastFret + 1;
-    this.colW = width / this.columns;
+    this.colW = this.width / this.columns;
+  }
+
+  inPluckZone(x: number): boolean {
+    return this.pluckW > 0 && x >= this.pluckX;
   }
 
   column(fret: number): Lane {
@@ -85,6 +100,11 @@ export class FretLayout {
   fretAt(x: number): number {
     return Math.max(0, Math.min(this.lastFret, Math.floor(x / this.colW)));
   }
+}
+
+/** Strike-zone width: wide enough for a thumb, never more than about a quarter of the board. */
+export function pluckWidth(totalW: number): number {
+  return Math.round(Math.max(92, Math.min(240, totalW * 0.24)));
 }
 
 /** Frets to show: everything the song uses, padded to fill the width with comfortably wide columns. */

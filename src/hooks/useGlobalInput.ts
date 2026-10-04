@@ -2,18 +2,35 @@ import { useEffect } from "react";
 import { unlockAudio } from "../audio/context";
 import { engine } from "../engine/engine";
 import { tNow } from "../i18n";
-import { NOTE_KEYS, isEditableTarget } from "../input/keyboard";
+import { fretted } from "../input/fretted";
+import { isEditableTarget } from "../input/keyboard";
 import { cycleLoop, importFiles, updateSession, updateSettings } from "../state/actions";
 import { setPanel, toast, useApp } from "../state/store";
 
 /** Keyboard shortcuts, computer-keyboard notes, drag & drop import and background auto-pause. */
 export function useGlobalInput(): void {
   useEffect(() => {
-    const down = new Set<string>();
+    /** Keys held down and what they do. */
+    const down = new Map<string, "note" | "fret" | "string">();
 
     const anyDialogOpen = () => {
       const s = useApp.getState();
       return !!(s.panel || s.results || s.welcomeOpen);
+    };
+
+    /** Which instrument action a key triggers under the current settings. */
+    const actionFor = (code: string): { kind: "note"; offset: number } | { kind: "fret" | "string"; index: number } | null => {
+      const s = useApp.getState().settings;
+      if (s.instrument !== "piano" && s.fretKeyMode === "strings") {
+        const km = s.instrument === "violin" ? s.keymaps.violin : s.keymaps.guitar;
+        const si = km.strings.indexOf(code);
+        if (si >= 0) return { kind: "string", index: si };
+        const fi = km.frets.indexOf(code);
+        if (fi >= 0) return { kind: "fret", index: fi + 1 };
+        return null;
+      }
+      const offset = s.keymaps.piano[code];
+      return offset === undefined ? null : { kind: "note", offset };
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
@@ -23,14 +40,15 @@ export function useGlobalInput(): void {
 
       if (anyDialogOpen()) return;
 
-      const offset = NOTE_KEYS[e.code];
-      if (offset !== undefined) {
+      const action = actionFor(e.code);
+      if (action) {
         e.preventDefault();
         if (e.repeat || down.has(e.code)) return;
-        down.add(e.code);
+        down.set(e.code, action.kind);
         void unlockAudio();
-        const base = (st.settings.keyboardOctave + 1) * 12;
-        engine.press(`key:${e.code}`, base + offset, 0.8);
+        if (action.kind === "note") engine.press(`key:${e.code}`, (st.settings.keyboardOctave + 1) * 12 + action.offset, 0.8);
+        else if (action.kind === "string") fretted.stringKeyDown(e.code, action.index);
+        else fretted.fretKeyDown(e.code, action.index);
         return;
       }
       if (e.repeat && e.code !== "ArrowLeft" && e.code !== "ArrowRight") return;
@@ -91,20 +109,26 @@ export function useGlobalInput(): void {
       }
     };
 
+    const releaseKey = (code: string) => {
+      const kind = down.get(code);
+      down.delete(code);
+      if (kind === "note") engine.release(`key:${code}`);
+      else if (kind === "string") fretted.stringKeyUp(code);
+      else if (kind === "fret") fretted.fretKeyUp(code);
+    };
+
     const onKeyUp = (e: KeyboardEvent) => {
-      if (!down.has(e.code)) return;
-      down.delete(e.code);
-      engine.release(`key:${e.code}`);
+      if (down.has(e.code)) releaseKey(e.code);
     };
 
     const releaseKeys = () => {
-      for (const code of down) engine.release(`key:${code}`);
-      down.clear();
+      for (const code of [...down.keys()]) releaseKey(code);
     };
 
     const onVisibility = () => {
       if (document.hidden) {
         releaseKeys();
+        fretted.reset();
         engine.releaseAll();
         if (engine.status === "playing") {
           engine.pause();
@@ -142,7 +166,7 @@ export function useGlobalInput(): void {
       dragDepth = 0;
       useApp.setState({ dragOver: false });
       const files = Array.from(e.dataTransfer?.files ?? []);
-      if (files.length) void importFiles(files).then(() => setPanel(null));
+      if (files.length) void importFiles(files).then((ok) => ok && setPanel(null));
     };
 
     window.addEventListener("keydown", onKeyDown);

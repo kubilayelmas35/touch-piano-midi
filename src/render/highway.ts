@@ -11,6 +11,7 @@ import {
   VIOLIN_STRING_COLORS,
   glowSprite,
   roundRect,
+  shade,
   withAlpha,
 } from "./theme";
 
@@ -84,7 +85,7 @@ export class Highway {
 
   private ensureBackground(view: HighwayView): void {
     const key = `${this.w}x${this.h}@${this.dpr}|${view.piano ? `p${view.piano.low}-${view.piano.high}` : ""}|${
-      view.fret ? `f${view.fret.columns}` : ""
+      view.fret ? `f${view.fret.columns}:${view.fret.pluckW}:${view.fret.spec.tuning.length}:${view.naming}` : ""
     }`;
     if (key === this.bgKey && this.bg) return;
     this.bgKey = key;
@@ -131,8 +132,38 @@ export class Highway {
         g.fillStyle = COLORS.lane;
         g.fillRect(fret * f.colW, 0, f.colW, this.h);
       }
+      // Above the strike zone: one thin lane per string, showing which strings to strike.
+      if (f.pluckW > 0) {
+        const count = f.spec.tuning.length;
+        const colors = count === 4 ? VIOLIN_STRING_COLORS : GUITAR_STRING_COLORS;
+        g.fillStyle = "rgba(0,0,0,0.28)";
+        g.fillRect(f.pluckX, 0, f.pluckW, this.h);
+        g.fillStyle = "rgba(255,255,255,0.1)";
+        g.fillRect(f.pluckX, 0, 2, this.h);
+        const sw = f.pluckW / count;
+        g.textAlign = "center";
+        g.textBaseline = "bottom";
+        g.font = "800 11px system-ui, sans-serif";
+        for (let s = 0; s < count; s++) {
+          const x = f.pluckX + s * sw;
+          g.fillStyle = withAlpha(colors[s], 0.05);
+          g.fillRect(x + 1, 0, sw - 2, this.h);
+          g.fillStyle = withAlpha(colors[s], 0.7);
+          const name = view.naming === "solfege" ? noteName(f.spec.tuning[s], "solfege") : f.spec.labels[s];
+          g.fillText(name, x + sw / 2, this.h - 8);
+        }
+      }
     }
     this.bg = c;
+  }
+
+  /** Thin lane above the strike zone for a note's string. */
+  private stringLaneOf(n: PlayNote, view: HighwayView): { x: number; w: number } | null {
+    const f = view.fret;
+    if (!f || f.pluckW <= 0 || n.string < 0) return null;
+    const sw = f.pluckW / f.spec.tuning.length;
+    const pad = Math.max(2, sw * 0.18);
+    return { x: f.pluckX + n.string * sw + pad, w: sw - pad * 2 };
   }
 
   private noteColor(n: PlayNote): string {
@@ -247,22 +278,71 @@ export class Highway {
       } else if (n.state === NoteState.Hit && !sounding) {
         alpha = Math.max(0.15, 1 - (now - n.resolvedAt) / 500);
       }
-      const r = Math.min(7, lane.w * 0.3);
+      const r = Math.min(10, lane.w * 0.42);
       ctx.globalAlpha = alpha;
+      const live = n.state === NoteState.Pending || (n.state === NoteState.Hit && sounding);
+      const glowing = n.state === NoteState.Hit && sounding;
 
-      if (n.state === NoteState.Hit && sounding) {
+      // Neon halo.
+      if (view.effects && live) {
         ctx.globalCompositeOperation = "lighter";
-        const s = glowSprite(color, 64);
-        ctx.drawImage(s, lane.x - lane.w * 0.4, yTop - 10, lane.w * 1.8, height + 20);
+        ctx.globalAlpha = alpha * (glowing ? 0.9 : 0.32);
+        const spread = glowing ? 0.5 : 0.32;
+        ctx.drawImage(glowSprite(color, 64), lane.x - lane.w * spread, yTop - 8, lane.w * (1 + spread * 2), height + 16);
         ctx.globalCompositeOperation = "source-over";
+        ctx.globalAlpha = alpha;
       }
 
+      // Body: bright top fading into a deep base.
       const grad = ctx.createLinearGradient(0, yTop, 0, yBottom);
-      grad.addColorStop(0, withAlpha(fill, 0.78));
-      grad.addColorStop(1, fill);
+      if (n.state === NoteState.Missed) {
+        grad.addColorStop(0, "rgba(120,124,150,0.7)");
+        grad.addColorStop(1, fill);
+      } else {
+        grad.addColorStop(0, shade(fill, glowing ? 0.7 : 0.5, 0.95));
+        grad.addColorStop(0.35, shade(fill, glowing ? 0.35 : 0.12));
+        grad.addColorStop(0.75, glowing ? shade(fill, 0.15) : fill);
+        grad.addColorStop(1, shade(fill, glowing ? 0 : -0.28));
+      }
       ctx.fillStyle = grad;
       roundRect(ctx, lane.x, yTop, lane.w, height, r);
       ctx.fill();
+
+      if (live && lane.w >= 8) {
+        // Glossy highlight on the upper left.
+        const shineH = Math.min(height * 0.3, 20);
+        const shine = ctx.createLinearGradient(lane.x, yTop, lane.x + lane.w * 0.4, yTop + shineH);
+        shine.addColorStop(0, "rgba(255,255,255,0.42)");
+        shine.addColorStop(1, "rgba(255,255,255,0)");
+        ctx.fillStyle = shine;
+        roundRect(ctx, lane.x + lane.w * 0.1, yTop + 1.5, lane.w * 0.32, shineH, r * 0.5);
+        ctx.fill();
+        // Hot cap where the note meets the keys.
+        if (view.effects && height >= 12) {
+          const cx = lane.x + lane.w / 2;
+          const cap = ctx.createRadialGradient(cx, yBottom, 0, cx, yBottom, lane.w * 0.7);
+          cap.addColorStop(0, "rgba(255,255,255,0.7)");
+          cap.addColorStop(0.4, withAlpha(color, 0.75));
+          cap.addColorStop(1, withAlpha(color, 0));
+          ctx.fillStyle = cap;
+          ctx.beginPath();
+          ctx.ellipse(cx, yBottom - 1, lane.w * 0.5, Math.min(7, height * 0.12), 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        roundRect(ctx, lane.x, yTop, lane.w, height, r);
+      }
+
+      // Matching marker in the string lane above the strike zone.
+      const sl = this.stringLaneOf(n, view);
+      if (sl) {
+        const sg = ctx.createLinearGradient(0, yTop, 0, yBottom);
+        sg.addColorStop(0, shade(fill, 0.4, 0.85));
+        sg.addColorStop(1, fill);
+        ctx.fillStyle = sg;
+        roundRect(ctx, sl.x, yTop, sl.w, height, Math.min(6, sl.w * 0.45));
+        ctx.fill();
+        roundRect(ctx, lane.x, yTop, lane.w, height, r);
+      }
 
       const isTarget =
         n.state === NoteState.Pending && (n.group === waitGroup || Math.abs(n.time - t) <= win);
@@ -299,6 +379,8 @@ export class Highway {
     ctx.globalAlpha = 1;
     ctx.restore();
 
+    if (view.effects) this.drawAuroras(view, hitY, now, i0, i1);
+
     // Hit line.
     const lineGrad = ctx.createLinearGradient(0, hitY - 14, 0, hitY + 2);
     lineGrad.addColorStop(0, "rgba(167,139,250,0)");
@@ -310,6 +392,44 @@ export class Highway {
 
     this.consumeFx(view, hitY);
     this.drawEffects(dt, now, hitY);
+  }
+
+  /** Light pillars rising from keys/frets that are sounding. */
+  private drawAuroras(view: HighwayView, hitY: number, now: number, i0: number, i1: number): void {
+    const { ctx, engine } = this;
+    const pillars = new Map<number, { x: number; w: number; color: string }>();
+    const add = (lane: { x: number; w: number } | null, color: string) => {
+      if (lane) pillars.set(Math.round(lane.x), { ...lane, color });
+    };
+    const t = view.t;
+    for (let i = i0; i < i1; i++) {
+      const n = engine.notes[i];
+      if (n.state === NoteState.Hit && n.time <= t && t < n.time + n.duration) add(this.laneOf(n, view), this.noteColor(n));
+    }
+    for (const h of engine.held.values()) {
+      const fake = { midi: h.midi, string: h.string, fret: h.fret } as PlayNote;
+      if (view.fret && h.fret < 0) continue;
+      add(this.laneOf(fake, view), h.string >= 0 ? this.noteColor({ ...fake, track: 0 } as PlayNote) : "#a78bfa");
+    }
+    if (!pillars.size) return;
+    const height = Math.min(150, hitY * 0.4);
+    ctx.globalCompositeOperation = "lighter";
+    for (const p of pillars.values()) {
+      const g = ctx.createLinearGradient(0, hitY, 0, hitY - height);
+      g.addColorStop(0, withAlpha(p.color, 0.42));
+      g.addColorStop(0.5, withAlpha(p.color, 0.14));
+      g.addColorStop(1, withAlpha(p.color, 0));
+      ctx.fillStyle = g;
+      ctx.fillRect(p.x - p.w * 0.15, hitY - height, p.w * 1.3, height);
+      // Drifting sparks.
+      for (let k = 0; k < 5; k++) {
+        const sx = p.x + p.w / 2 + Math.sin(now / 300 + k * 1.9 + p.x) * p.w * 0.35;
+        const sy = hitY - 12 - ((now / 9 + k * 37) % (height * 0.8));
+        ctx.fillStyle = `rgba(255,255,255,${0.5 * (1 - (hitY - sy) / height)})`;
+        ctx.fillRect(sx, sy, 2, 2);
+      }
+    }
+    ctx.globalCompositeOperation = "source-over";
   }
 
   private fxX(fx: { midi: number; string: number; fret: number }, view: HighwayView): number | null {
