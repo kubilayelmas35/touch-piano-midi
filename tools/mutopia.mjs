@@ -44,6 +44,7 @@ for (const p of list) {
     const m = new Midi(readFileSync(file));
     const tracks = m.tracks.filter((t) => t.notes.length);
     const notes = tracks.reduce((n, t) => n + t.notes.length, 0);
+    p.seconds = Math.round(Math.max(...tracks.flatMap((t) => t.notes.map((n) => n.time + n.duration))));
     console.log(`${p.id.padEnd(26)} ${String(Math.round(m.duration)).padStart(4)}s ${String(notes).padStart(5)} notes ${tracks.length} tr  ${license}`);
     lines.push(
       [
@@ -76,5 +77,6 @@ The Mutopia Project and its volunteers provide this material "as is", without wa
 
 `;
 writeFileSync(join(root, "public/licenses/sheet-music.txt"), header + lines.join("\n\n") + "\n");
+writeFileSync(join(root, "src/midi/mutopia.json"), `[\n${list.map((p) => `  ${JSON.stringify(p)}`).join(",\n")}\n]\n`);
 console.log(`\n${lines.length} pieces written${failed ? `, ${failed} failed` : ""}.`);
 if (failed) process.exitCode = 1;

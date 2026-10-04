@@ -256,6 +256,41 @@ export const IconDownload = (p: IconProps) => (
     <path d="M5 20h14" />
   </Svg>
 );
+export const IconRecord = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="7" fill="currentColor" stroke="none" />
+  </Svg>
+);
+export const IconStop = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" stroke="none" />
+  </Svg>
+);
+export const IconSparkles = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z" />
+    <path d="M19 15l.7 1.8 1.8.7-1.8.7L19 20l-.7-1.8-1.8-.7 1.8-.7z" />
+  </Svg>
+);
+export const IconShare = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 3v12" />
+    <path d="M8 7l4-4 4 4" />
+    <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7" />
+  </Svg>
+);
+export const IconWave = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M3 12h2M7 8v8M11 4v16M15 7v10M19 10v4M21 12h0" />
+  </Svg>
+);
+export const IconNote = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M9 18V6l10-2v12" />
+    <circle cx="6.5" cy="18" r="2.5" fill="currentColor" />
+    <circle cx="16.5" cy="16" r="2.5" fill="currentColor" />
+  </Svg>
+);
 export const IconBan = (p: IconProps) => (
   <Svg {...p}>
     <circle cx="12" cy="12" r="9" />

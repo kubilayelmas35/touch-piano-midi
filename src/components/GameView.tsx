@@ -11,6 +11,7 @@ import { useApp } from "../state/store";
 import { updateSettings } from "../state/actions";
 import { useT } from "../i18n";
 import { Hud } from "./Hud";
+import { RecordingBar } from "./RecordingUI";
 import { EmptyState } from "./EmptyState";
 import { KEY_STRIP_H, KeyStrip } from "./KeyStrip";
 
@@ -363,6 +364,7 @@ export function GameView() {
       <div className="absolute inset-x-0 top-0" style={{ height: hwH }}>
         <canvas ref={hwRef} className="block h-full w-full" aria-hidden="true" />
         {hasSong ? <Hud /> : <EmptyState />}
+        <RecordingBar />
       </div>
       {!lockHeight && (
         <div

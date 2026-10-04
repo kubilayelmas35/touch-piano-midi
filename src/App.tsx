@@ -7,6 +7,8 @@ import { ProgressDialog } from "./components/ProgressDialog";
 import { ResultsDialog } from "./components/ResultsDialog";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { SongSetupDialog } from "./components/SongSetupDialog";
+import { StudioDialog } from "./components/StudioDialog";
+import { TakeDialog } from "./components/RecordingUI";
 import { Toasts } from "./components/Toasts";
 import { TopBar } from "./components/TopBar";
 import { WelcomeDialog } from "./components/WelcomeDialog";
@@ -84,6 +86,8 @@ export function App() {
       <WelcomeDialog />
       <AccountDialog />
       <ProDialog />
+      <StudioDialog />
+      <TakeDialog />
       <AdminGate />
       <Toasts />
       <DropOverlay />

@@ -99,7 +99,26 @@
   body {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    touch-action: manipulation;
+    /* Scrolling only: no pinch zoom, double-tap zoom or swipe navigation while several fingers are on the keys. */
+    touch-action: pan-x pan-y;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  input,
+  textarea,
+  [contenteditable="true"] {
+    user-select: text;
+    -webkit-user-select: text;
+  }
+
+  [class*="overflow-"] {
+    overscroll-behavior: contain;
+  }
+
+  img {
+    -webkit-user-drag: none;
   }
 
   button {

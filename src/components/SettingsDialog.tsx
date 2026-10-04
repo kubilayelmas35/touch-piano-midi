@@ -218,6 +218,7 @@ export function SettingsDialog() {
                   <li>{t("creditBach")}</li>
                   <li>{t("creditMutopia")}</li>
                   <li>{t("creditSongs")}</li>
+                  <li>{t("creditBasicPitch")}</li>
                 </ul>
                 <LegalLinks className="pt-1" />
               </div>

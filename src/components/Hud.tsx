@@ -19,6 +19,7 @@ export function Hud() {
   const acc = accuracyOf(stats);
   const mult = comboMultiplier(stats.combo);
   const idle = status === "ready" || status === "paused";
+  const freePlay = useApp((s) => !!s.song && s.song.notes.length === 0);
 
   return (
     <>
@@ -85,7 +86,14 @@ export function Hud() {
         </div>
       )}
 
-      {idle && !audioLoading && !songLoading && (
+      {freePlay && !audioLoading && !songLoading && (
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 px-6 text-center">
+          <div className="text-2xl font-extrabold tracking-tight text-white/80">{t("freePlay")}</div>
+          <div className="text-sm text-mist-400">{t("freePlayHint")}</div>
+        </div>
+      )}
+
+      {idle && !freePlay && !audioLoading && !songLoading && (
         <div className="absolute inset-0 flex items-center justify-center">
           <button
             type="button"

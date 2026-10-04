@@ -33,7 +33,15 @@ export interface Toast {
   kind: "info" | "success" | "error";
 }
 
-export type Panel = "library" | "settings" | "setup" | "account" | "pro" | "admin" | "progress" | null;
+export type Panel = "library" | "settings" | "setup" | "account" | "pro" | "admin" | "progress" | "studio" | null;
+
+/** A finished recording waiting to be named and saved. */
+export interface Take {
+  notes: import("../studio/midiFile").RawNote[];
+  instrument: import("../engine/types").InstrumentKind;
+  program: number;
+  seconds: number;
+}
 
 export interface Account {
   /** "disabled" when no Supabase project is configured. */
@@ -92,6 +100,9 @@ export interface AppState {
   /** Which part of a zoomed piano is on screen (0 left … 1 right). */
   keyPan: number;
   progress: Progress;
+  /** Live recording of the player's notes (Pro). */
+  recording: { startedAt: number; notes: number } | null;
+  take: Take | null;
 }
 
 export const DEFAULT_SESSION: Session = {
@@ -149,6 +160,8 @@ export const useApp = create<AppState>(() => ({
   cloudBusy: false,
   keyPan: 0.5,
   progress: loadProgress(),
+  recording: null,
+  take: null,
 }));
 
 let toastId = 1;

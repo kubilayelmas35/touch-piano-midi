@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { BUILTIN_CATEGORIES, BUILTIN_SONGS, __test } from "./builtin";
 import { defaultPlayTracks, parseMidi } from "./song";
 
-const { voice, pitchToMidi, build, duration, verseCount, nameHands, SPECS, MUTOPIA } = __test;
+const { voice, pitchToMidi, build, duration, verseCount, nameHands, specSeconds, SPECS, MUTOPIA } = __test;
 
 const tokens = (src: string) => src.trim().split(/\s+/).filter((t) => t && t !== "|");
 const beats = (src: string) => tokens(src).reduce((sum, t) => sum + duration(t.split(":")[1]), 0);
@@ -56,6 +56,7 @@ describe("builtin notation", () => {
       expect(song.notes.length).toBeGreaterThan(10);
       expect(song.beats.length).toBeGreaterThan(4);
       expect(song.duration).toBeGreaterThan(5);
+      expect(Math.abs(specSeconds(spec) - song.duration)).toBeLessThan(1);
     });
 
     it(`${spec.id}: repeats verses to last about a minute, each starting on a downbeat`, () => {
@@ -104,6 +105,7 @@ describe("Mutopia pieces", () => {
       const song = nameHands(parseMidi(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength), p.title), p.title, p.category === "guitar");
       expect(song.title).toBe(p.title);
       expect(song.duration).toBeGreaterThan(20);
+      expect(Math.abs(song.duration - p.seconds)).toBeLessThan(1);
       expect(song.notes.length).toBeGreaterThan(100);
       const play = defaultPlayTracks(song);
       expect(play.length).toBeGreaterThan(0);

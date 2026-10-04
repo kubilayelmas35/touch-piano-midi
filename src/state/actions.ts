@@ -4,7 +4,9 @@ import { engine } from "../engine/engine";
 import { accuracyOf, starsFor, type EngineConfig } from "../engine/types";
 import { tNow } from "../i18n";
 import { BUILTIN_SONGS, isBuiltin, loadBuiltin } from "../midi/builtin";
-import { defaultPlayTracks, parseMidi, type Song } from "../midi/song";
+import { defaultPlayTracks, finalizeSong, parseMidi, type Song } from "../midi/song";
+import { midiFileName } from "../studio/midiFile";
+import { shareMidi } from "../studio/share";
 import {
   bestKey,
   deleteSong,
@@ -249,6 +251,46 @@ export async function importFiles(files: File[]): Promise<boolean> {
   return true;
 }
 
+/** Stores a MIDI file made in the studio (recording, audio or notes) as a library song and opens it. */
+export async function addUserMidi(title: string, data: ArrayBuffer): Promise<string> {
+  const clean = title.trim().slice(0, 120) || "MIDI";
+  const song = parseMidi(data.slice(0), clean);
+  const id = newSongId();
+  await putSong({
+    id,
+    title: clean,
+    fileName: midiFileName(clean),
+    data,
+    addedAt: Date.now(),
+    duration: song.duration,
+    noteCount: song.notes.length,
+  });
+  await refreshLibrary();
+  void cloudAfterImport([id]);
+  await openSong(id);
+  return id;
+}
+
+/** Shares / downloads a library song as a .mid file. */
+export async function exportUserSong(id: string): Promise<void> {
+  const stored = await getSong(id);
+  if (!stored) return;
+  try {
+    const r = await shareMidi(stored.data, midiFileName(stored.title), stored.title);
+    if (r === "saved") toast(tNow("exportSaved", { name: midiFileName(stored.title) }), "success");
+  } catch (err) {
+    console.warn("[export] failed", err);
+    toast(tNow("exportFailed"), "error");
+  }
+}
+
+/** An empty stage with no falling notes, for playing (and recording) freely. */
+export function openFreePlay(): void {
+  const song = finalizeSong(tNow("freePlay"), [], [], [], 120, 4);
+  useApp.setState({ song, currentId: null, session: { ...DEFAULT_SESSION, loop: { ...NO_LOOP } }, results: null });
+  engine.load(song, engineConfig() as EngineConfig);
+}
+
 export async function removeSong(id: string): Promise<void> {
   await deleteSong(id);
   void cloudAfterDelete(id);
@@ -278,7 +320,7 @@ export function cycleLoop(): void {
 export const NO_LOOP = { a: -1, b: -1, enabled: false };
 
 function handleComplete(r: { stats: import("../engine/types").Stats; dirty: boolean; config: EngineConfig }): void {
-  if (r.config.autoPlay) return;
+  if (r.config.autoPlay || !useApp.getState().song?.notes.length) return;
   const { currentId, prefs } = useApp.getState();
   const accuracy = accuracyOf(r.stats);
   const stars = starsFor(accuracy);

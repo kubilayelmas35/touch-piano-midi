@@ -17,6 +17,10 @@ const ROOTS = [
   "@capacitor/browser",
   "@capacitor/splash-screen",
   "@capacitor/android",
+  "@capacitor/share",
+  "@capacitor/filesystem",
+  "@spotify/basic-pitch",
+  "@tensorflow/tfjs",
   "steamworks.js",
 ];
 

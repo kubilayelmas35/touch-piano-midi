@@ -21,6 +21,7 @@ import {
   IconRestart,
   IconSettings,
   IconSliders,
+  IconSparkles,
   IconUser,
   IconViolin,
   IconWait,
@@ -312,6 +313,9 @@ export function TopBar() {
         <Logo />
         <IconButton label={t("library")} onClick={() => setPanel("library")} showLabel className="shrink-0 max-sm:[&>span]:hidden">
           <IconLibrary size={19} />
+        </IconButton>
+        <IconButton label={t("studio")} onClick={() => setPanel("studio")} showLabel className="shrink-0 max-xl:[&>span]:hidden">
+          <IconSparkles size={19} />
         </IconButton>
 
         <button

@@ -12,6 +12,11 @@ const BOUNDS_FILE = path.join(app.getPath("userData"), "window.json");
 // Steam has to hook in before the app is ready (overlay needs GPU flags).
 const steam = initSteam();
 
+// Chords on a touchscreen must not zoom the page or swipe back/forward through history.
+app.commandLine.appendSwitch("disable-pinch");
+app.commandLine.appendSwitch("overscroll-history-navigation", "0");
+app.commandLine.appendSwitch("disable-features", "TouchpadOverscrollHistoryNavigation,OverscrollHistoryNavigation");
+
 protocol.registerSchemesAsPrivileged([
   { scheme: "app", privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true } },
 ]);
@@ -113,6 +118,11 @@ function createWindow() {
   if (saved?.fullscreen) win.setFullScreen(true);
   win.once("ready-to-show", () => win.show());
   win.on("close", () => saveBounds(win));
+  win.webContents.on("did-finish-load", () => {
+    void win.webContents.setVisualZoomLevelLimits(1, 1);
+    win.webContents.setZoomFactor(1);
+  });
+  win.webContents.on("zoom-changed", () => win.webContents.setZoomFactor(1));
 
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:/i.test(url)) void shell.openExternal(url);

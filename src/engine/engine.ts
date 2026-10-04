@@ -87,6 +87,13 @@ export interface RunResult {
 
 type Listener = () => void;
 
+/** What the player did, for recording: note on/off (`ring` = left to decay), damping a string, the sustain pedal. */
+export type PlayerInput =
+  | { type: "on"; key: string; midi: number; velocity: number }
+  | { type: "off"; key: string; ring: boolean }
+  | { type: "mute"; key: string }
+  | { type: "sustain"; on: boolean };
+
 export class Engine {
   song: Song | null = null;
   notes: PlayNote[] = [];
@@ -106,6 +113,7 @@ export class Engine {
   /** Held notes by input source key (for highlighting). */
   readonly held = new Map<string, HeldNote>();
   onComplete: ((r: RunResult) => void) | null = null;
+  onInput: ((e: PlayerInput) => void) | null = null;
 
   private anchorPerf = 0;
   private anchorSong = 0;
@@ -750,12 +758,13 @@ export class Engine {
       if (s >= 0 && midi - spec.tuning[s] <= spec.maxFret) place = { string: s, fret: midi - spec.tuning[s] };
     }
     this.held.set(sourceKey, { midi, string: place?.string ?? -1, fret: place?.fret ?? -1 });
+    this.onInput?.({ type: "on", key: sourceKey, midi, velocity });
     this.judgePress(sourceKey, midi, place);
   }
 
   /** Lets go of a note; with `ring` the voice decays naturally (a plucked string) instead of stopping. */
   release(sourceKey: string, ring = false): void {
-    this.held.delete(sourceKey);
+    if (this.held.delete(sourceKey)) this.onInput?.({ type: "off", key: sourceKey, ring });
     const v = this.voices.get(sourceKey);
     if (!v) return;
     this.voices.delete(sourceKey);
@@ -779,6 +788,7 @@ export class Engine {
     this.ringing.delete(sourceKey);
     this.levels.delete(sourceKey);
     v.stop(release);
+    this.onInput?.({ type: "mute", key: sourceKey });
   }
 
   /** Loudness of a held or ringing note (0–1), e.g. bow pressure or string energy. */
@@ -810,6 +820,7 @@ export class Engine {
   }
 
   setSustain(on: boolean): void {
+    if (this.sustain !== on) this.onInput?.({ type: "sustain", on });
     this.sustain = on;
     if (!on) {
       for (const v of this.sustained) v.stop(0.35);

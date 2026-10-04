@@ -271,15 +271,26 @@ export interface BuiltinInfo {
   composer: string;
   level: 1 | 2 | 3;
   category: BuiltinCategory;
+  /** Length in seconds at normal speed. */
+  seconds: number;
+}
+
+/** Song length without building it: last verse start plus the longer hand. */
+function specSeconds(spec: BuiltinSpec): number {
+  const measure = spec.meter[0] * spec.meter[1];
+  const right = length(spec.right);
+  const left = spec.left ? (spec.pickup ?? 0) + length(spec.left) : 0;
+  const verseLen = Math.ceil(right / measure - 1e-6) * measure;
+  return Math.round((((verseCount(spec) - 1) * verseLen + Math.max(right, left)) * 60) / spec.bpm);
 }
 
 /** Complete pieces shipped as unmodified Mutopia Project MIDI files (see tools/mutopia.mjs for the credits). */
 const MUTOPIA = MUTOPIA_LIST as (BuiltinInfo & { m: number })[];
 
 export const BUILTIN_SONGS: BuiltinInfo[] = [
-  ...SPECS.map(({ id, title, titleTr, composer, level, category }) => ({ id, title, titleTr, composer, level, category })),
-  { id: "bach-846", title: "Prelude in C major, BWV 846", composer: "J. S. Bach", level: 3, category: "classical" },
-  ...MUTOPIA.map(({ id, title, titleTr, composer, level, category }) => ({ id, title, titleTr, composer, level, category })),
+  ...SPECS.map((s) => ({ id: s.id, title: s.title, titleTr: s.titleTr, composer: s.composer, level: s.level, category: s.category, seconds: specSeconds(s) })),
+  { id: "bach-846", title: "Prelude in C major, BWV 846", composer: "J. S. Bach", level: 3, category: "classical", seconds: 115 },
+  ...MUTOPIA.map(({ id, title, titleTr, composer, level, category, seconds }) => ({ id, title, titleTr, composer, level, category, seconds })),
 ];
 
 export function isBuiltin(id: string): boolean {
@@ -328,4 +339,4 @@ export async function loadBuiltin(id: string): Promise<Song> {
   throw new Error(`Unknown builtin ${id}`);
 }
 
-export const __test = { voice, pitchToMidi, build, duration, verseCount, nameHands, SPECS, MUTOPIA };
+export const __test = { voice, pitchToMidi, build, duration, verseCount, nameHands, specSeconds, SPECS, MUTOPIA };

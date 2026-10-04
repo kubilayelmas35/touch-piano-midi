@@ -5,11 +5,11 @@ import { BUILTIN_CATEGORIES, BUILTIN_SONGS, type BuiltinCategory } from "../midi
 import { canImport } from "../auth/account";
 import { syncCloud } from "../auth/cloud";
 import { formatBytes } from "../lib/format";
-import { importFiles, openSong, removeSong, renameUserSong } from "../state/actions";
+import { exportUserSong, importFiles, openSong, removeSong, renameUserSong } from "../state/actions";
 import { setPanel, useApp } from "../state/store";
 import { bestKey, type SongPrefs } from "../storage/db";
 import { dayKey } from "../progress/progress";
-import { IconCheck, IconCloud, IconEdit, IconPlay, IconSearch, IconStar, IconSync, IconTrash, IconUpload } from "../ui/icons";
+import { IconCheck, IconCloud, IconEdit, IconPlay, IconSearch, IconShare, IconSparkles, IconStar, IconSync, IconTrash, IconUpload } from "../ui/icons";
 import { Button, Dialog, IconButton, cx } from "../ui/primitives";
 
 function Stars({ n, size = 12 }: { n: number; size?: number }) {
@@ -172,7 +172,7 @@ export function LibraryPanel() {
             <div className="mt-0.5 truncate text-base font-bold">{lang === "tr" && daily.titleTr ? daily.titleTr : daily.title}</div>
             <div className="mt-0.5 flex items-center gap-2 text-xs text-mist-300">
               <span className="truncate">
-                {composerLabel(daily.composer)} · {levelLabel(daily.level)}
+                {composerLabel(daily.composer)} · {formatTime(daily.seconds)} · {levelLabel(daily.level)}
               </span>
               <Stars n={bestStars(prefs[daily.id], instrument)} />
             </div>
@@ -184,9 +184,15 @@ export function LibraryPanel() {
       )}
 
       <section aria-labelledby="lib-mine">
-        <h3 id="lib-mine" className="mt-1 mb-2 text-xs font-bold tracking-[0.12em] text-mist-400 uppercase">
-          {t("mySongs")}
-        </h3>
+        <div className="mt-1 mb-2 flex items-center justify-between gap-2">
+          <h3 id="lib-mine" className="text-xs font-bold tracking-[0.12em] text-mist-400 uppercase">
+            {t("mySongs")}
+          </h3>
+          <Button size="sm" variant="ghost" onClick={() => setPanel("studio")}>
+            <IconSparkles size={14} />
+            {t("studio")}
+          </Button>
+        </div>
         {mine.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-white/10 px-4 py-5 text-center text-sm text-mist-400">
             {q ? t("noResults") : t("emptyMySongs")}
@@ -251,6 +257,9 @@ export function LibraryPanel() {
                     )}
                     {!isEditing && (
                       <div className="flex shrink-0 opacity-70 transition-opacity group-hover:opacity-100">
+                        <IconButton size="sm" label={t("exportSong")} onClick={() => void exportUserSong(s.id)}>
+                          <IconShare size={15} />
+                        </IconButton>
                         <IconButton
                           size="sm"
                           label={t("rename")}
@@ -321,6 +330,7 @@ export function LibraryPanel() {
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-semibold">{lang === "tr" && s.titleTr ? s.titleTr : s.title}</div>
                       <div className="mt-0.5 flex items-center gap-2 text-xs text-mist-400">
+                        <span className="shrink-0 tabular-nums text-mist-300">{formatTime(s.seconds)}</span>
                         <span className="truncate">
                           {composerLabel(s.composer)}
                           {lang === "tr" && s.titleTr ? ` · ${s.title}` : ""}

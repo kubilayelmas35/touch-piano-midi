@@ -52,10 +52,16 @@ Her eserin dizgicisi, lisansı ve kaynağı: <a href="sheet-music.txt">sheet-mus
 ezgileridir. Notalar ve basitleştirilmiş düzenlemeler Sonatrio tarafından elle yazılmıştır.</p>
 
 <h2>Açık kaynak yazılımlar</h2>
-<p>Sonatrio; React, Zustand, Supabase JS, @tonejs/midi, idb, Capacitor, steamworks.js ve bunların bağımlılıklarını (MIT,
-ISC, 0BSD lisansları) kullanır. Tüm paketlerin sürüm ve tam lisans metinleri:
+<p>Sonatrio; React, Zustand, Supabase JS, @tonejs/midi, idb, Capacitor, Basic Pitch, TensorFlow.js, steamworks.js ve bunların
+bağımlılıklarını (MIT, ISC, 0BSD, Apache 2.0 ve benzeri lisanslar) kullanır. Tüm paketlerin sürüm ve tam lisans metinleri:
 <a href="third-party.txt">third-party.txt</a>. Masaüstü uygulaması Electron (MIT) ve Chromium kullanır; lisans metinleri
 kurulum klasöründeki LICENSE.electron.txt ve LICENSES.chromium.html dosyalarındadır.</p>
+<div class="card">
+<p><strong>Sesten MIDI — Basic Pitch</strong><br />
+Ses dosyalarını notaya çeviren model, Spotify'ın <a href="https://github.com/spotify/basic-pitch-ts">Basic Pitch</a>
+modelidir (© 2022 Spotify AB, <a href="https://www.apache.org/licenses/LICENSE-2.0">Apache 2.0</a>) ve
+<a href="https://www.tensorflow.org/js">TensorFlow.js</a> (Apache 2.0) ile tamamen cihazında çalışır; ses dosyan hiçbir sunucuya gönderilmez.</p>
+</div>
 
 <h2>Markalar</h2>
 <p>Google Play ve Google, Google LLC'nin; Steam, Valve Corporation'ın markalarıdır. Sonatrio bu şirketlerle bağlantılı değildir.</p>
@@ -98,10 +104,16 @@ Typesetter, license and source of every piece: <a href="sheet-music.txt">sheet-m
 tunes. The notes and simplified arrangements were written by hand for Sonatrio.</p>
 
 <h2>Open-source software</h2>
-<p>Sonatrio uses React, Zustand, Supabase JS, @tonejs/midi, idb, Capacitor, steamworks.js and their dependencies (MIT,
-ISC and 0BSD licenses). Versions and full license texts of every package: <a href="third-party.txt">third-party.txt</a>.
+<p>Sonatrio uses React, Zustand, Supabase JS, @tonejs/midi, idb, Capacitor, Basic Pitch, TensorFlow.js, steamworks.js and
+their dependencies (MIT, ISC, 0BSD, Apache 2.0 and similar licenses). Versions and full license texts of every package: <a href="third-party.txt">third-party.txt</a>.
 The desktop app is built on Electron (MIT) and Chromium; their notices are in LICENSE.electron.txt and
 LICENSES.chromium.html in the install folder.</p>
+<div class="card">
+<p><strong>Audio to MIDI — Basic Pitch</strong><br />
+Audio is turned into notes with Spotify's <a href="https://github.com/spotify/basic-pitch-ts">Basic Pitch</a> model
+(© 2022 Spotify AB, <a href="https://www.apache.org/licenses/LICENSE-2.0">Apache 2.0</a>), running entirely on your device with
+<a href="https://www.tensorflow.org/js">TensorFlow.js</a> (Apache 2.0); your audio is never sent to a server.</p>
+</div>
 
 <h2>Trademarks</h2>
 <p>Google Play and Google are trademarks of Google LLC; Steam is a trademark of Valve Corporation. Sonatrio is not

@@ -6,6 +6,7 @@ import { fretted } from "../input/fretted";
 import { isEditableTarget } from "../input/keyboard";
 import { cycleLoop, importFiles, updateSession, updateSettings } from "../state/actions";
 import { setPanel, toast, useApp } from "../state/store";
+import { chooseAudio } from "../studio/studioStore";
 
 /** Keyboard shortcuts, computer-keyboard notes, drag & drop import and background auto-pause. */
 export function useGlobalInput(): void {
@@ -165,7 +166,14 @@ export function useGlobalInput(): void {
       e.preventDefault();
       dragDepth = 0;
       useApp.setState({ dragOver: false });
-      const files = Array.from(e.dataTransfer?.files ?? []);
+      const all = Array.from(e.dataTransfer?.files ?? []);
+      const audio = all.find((f) => f.type.startsWith("audio/") && !/midi/i.test(f.type));
+      const files = all.filter((f) => f !== audio);
+      if (audio && !files.length) {
+        chooseAudio(audio);
+        setPanel("studio");
+        return;
+      }
       if (files.length) void importFiles(files).then((ok) => ok && setPanel(null));
     };
 
