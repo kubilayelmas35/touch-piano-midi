@@ -240,6 +240,10 @@ function SignedIn() {
           <span className="text-xs text-mist-400">{account.cloudQuotaMb} MB</span>
         </div>
       )}
+      <p className="flex items-center gap-2 px-1 text-xs text-mist-400">
+        <IconCloud size={14} className="shrink-0 text-mist-400" />
+        {t("settingsSynced")}
+      </p>
       {!account.pro && !account.cloud && (
         <Button variant="primary" className="w-full" onClick={() => setPanel("pro")}>
           <IconCrown size={16} /> {t("getPro")}

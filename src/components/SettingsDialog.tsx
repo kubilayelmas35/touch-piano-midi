@@ -6,7 +6,7 @@ import { INSTRUMENT_HEIGHT_RANGE, defaultSettings } from "../state/settings";
 import { setPanel, useApp } from "../state/store";
 import { IconPlug } from "../ui/icons";
 import { KeyBindings } from "./KeyBindings";
-import { ApproachSwatch, BackgroundSwatch, ChoiceCards, ColorSwatch, DustSwatch, EffectSwatch, NoteSwatch } from "./AppearancePicker";
+import { ApproachSwatch, BackgroundSwatch, ChoiceCards, ColorPicker, ColorSwatch, DustSwatch, EffectSwatch, NoteSwatch } from "./AppearancePicker";
 import {
   APPROACH_STYLES,
   BACKGROUNDS,
@@ -62,16 +62,26 @@ const FX_LABEL: Record<EffectStyle, DictKey> = {
 };
 const COLOR_LABEL: Record<NoteColor, DictKey> = {
   auto: "ncAuto",
-  violet: "ncViolet",
+  solid: "ncSolid",
+  custom: "ncCustom",
   rainbow: "ncRainbow",
+  octave: "ncOctave",
   gradient: "ncGradient",
   sunset: "ncSunset",
+  ocean: "ncOcean",
+  aurora: "ncAurora",
+  candy: "ncCandy",
   ice: "ncIce",
   pastel: "ncPastel",
+  gold: "ncGold",
+  silver: "ncSilver",
 };
 const DUST_LABEL: Record<DustStyle, DictKey> = {
   off: "duOff",
   smoke: "duSmoke",
+  fountain: "duFountain",
+  plume: "duPlume",
+  rays: "duRays",
   sparkle: "duSparkle",
   nebula: "duNebula",
   fog: "duFog",
@@ -118,6 +128,7 @@ export function SettingsDialog() {
   const midiAccess = useApp((st) => st.midiAccess);
   const [tab, setTab] = useState<Tab>("general");
   const close = () => setPanel(null);
+  const choice = { solid: s.solidColor, from: s.gradFrom, to: s.gradTo };
 
   const tabs: { id: Tab; label: string }[] = [
     { id: "general", label: t("general") },
@@ -231,8 +242,17 @@ export function SettingsDialog() {
                 label={t("noteColor")}
                 value={s.noteColor}
                 onChange={(v) => updateSettings({ noteColor: v })}
-                options={NOTE_COLORS.map((c) => ({ value: c, label: t(COLOR_LABEL[c]), preview: <ColorSwatch color={c} /> }))}
+                options={NOTE_COLORS.map((c) => ({ value: c, label: t(COLOR_LABEL[c]), preview: <ColorSwatch color={c} choice={choice} /> }))}
               />
+              {s.noteColor === "solid" && (
+                <ColorPicker label={t("pickColor")} value={s.solidColor} onChange={(v) => updateSettings({ solidColor: v })} />
+              )}
+              {s.noteColor === "custom" && (
+                <>
+                  <ColorPicker label={t("gradTop")} value={s.gradFrom} onChange={(v) => updateSettings({ gradFrom: v })} />
+                  <ColorPicker label={t("gradBottom")} value={s.gradTo} onChange={(v) => updateSettings({ gradTo: v })} />
+                </>
+              )}
             </Section>
             <Section>
               <Switch label={t("effects")} checked={s.effects} onChange={(v) => updateSettings({ effects: v })} />

@@ -7,6 +7,7 @@ import {
   BACKGROUNDS,
   DUST_STYLES,
   EFFECT_STYLES,
+  HEX_RE,
   NOTE_COLORS,
   NOTE_STYLES,
   oneOf,
@@ -46,6 +47,11 @@ export interface Settings {
   approach: ApproachStyle;
   noteStyle: NoteStyle;
   noteColor: NoteColor;
+  /** The "one colour" palette's colour. */
+  solidColor: string;
+  /** The custom gradient: top of the screen → hit line. */
+  gradFrom: string;
+  gradTo: string;
   background: Background;
   /** Octave of the computer-keyboard "A" key (C of that octave). */
   keyboardOctave: number;
@@ -95,6 +101,9 @@ export function defaultSettings(): Settings {
     approach: "beam",
     noteStyle: "gem",
     noteColor: "auto",
+    solidColor: "#8b5cf6",
+    gradFrom: "#22d3ee",
+    gradTo: "#f43f5e",
     background: "night",
     keyboardOctave: 4,
     keymaps: defaultKeymaps(),
@@ -127,9 +136,16 @@ export function loadSettings(): Settings {
   return base;
 }
 
+/** Settings from an untrusted source (e.g. the account copy), filled up with defaults. */
+export function sanitizeSettings(raw: unknown): Settings {
+  const obj = raw && typeof raw === "object" ? (raw as Partial<Settings>) : {};
+  return sanitize({ ...defaultSettings(), ...obj });
+}
+
 function sanitize(s: Settings): Settings {
   const num = (v: unknown, lo: number, hi: number, d: number) =>
     typeof v === "number" && Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : d;
+  const hex = (v: unknown, d: string) => (typeof v === "string" && HEX_RE.test(v) ? v.toLowerCase() : d);
   const d = defaultSettings();
   return {
     ...s,
@@ -148,7 +164,10 @@ function sanitize(s: Settings): Settings {
     dust: oneOf(DUST_STYLES, s.dust, d.dust),
     dustLevel: num(s.dustLevel, 0.1, 1, d.dustLevel),
     approach: oneOf(APPROACH_STYLES, s.approach, d.approach),
-    noteColor: oneOf(NOTE_COLORS, s.noteColor, d.noteColor),
+    noteColor: (s.noteColor as string) === "violet" ? "solid" : oneOf(NOTE_COLORS, s.noteColor, d.noteColor),
+    solidColor: hex(s.solidColor, d.solidColor),
+    gradFrom: hex(s.gradFrom, d.gradFrom),
+    gradTo: hex(s.gradTo, d.gradTo),
     noteStyle: oneOf(NOTE_STYLES, s.noteStyle, d.noteStyle),
     background: oneOf(BACKGROUNDS, s.background, d.background),
     keyboardOctave: Math.round(num(s.keyboardOctave, 1, 7, d.keyboardOctave)),
@@ -158,6 +177,25 @@ function sanitize(s: Settings): Settings {
     tapToPlay: s.tapToPlay === true,
     instrumentHeight: num(s.instrumentHeight, ...INSTRUMENT_HEIGHT_RANGE, d.instrumentHeight),
   };
+}
+
+const AT_KEY = "staveflow-settings-at";
+
+/** When the settings were last changed on this device (ms), for picking the newer copy on sign-in. */
+export function settingsChangedAt(): number {
+  try {
+    return Number(localStorage.getItem(AT_KEY)) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+export function markSettingsChanged(at = Date.now()): void {
+  try {
+    localStorage.setItem(AT_KEY, String(at));
+  } catch {
+    /* */
+  }
 }
 
 export function saveSettings(s: Settings): void {

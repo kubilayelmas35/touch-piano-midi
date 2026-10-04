@@ -150,6 +150,7 @@ export function GameView() {
         approach: s.approach,
         noteStyle: s.noteStyle,
         noteColor: s.noteColor,
+        colors: { solid: s.solidColor, from: s.gradFrom, to: s.gradTo },
         background: s.background,
         labels,
       });

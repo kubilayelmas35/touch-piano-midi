@@ -261,7 +261,17 @@ export function TopBar() {
   const endTime = useApp((s) => s.endTime);
   const session = useApp((s) => s.session);
   const playing = status === "playing";
-  const handLabel = session.hand === "right" ? t("handRight") : session.hand === "left" ? t("handLeft") : null;
+  const fretHand = useApp((s) =>
+    s.settings.instrument === "piano"
+      ? null
+      : s.settings.autoFret && !s.settings.tapToPlay
+        ? "right"
+        : s.settings.tapToPlay && !s.settings.autoFret
+          ? "left"
+          : "both"
+  );
+  const hand = fretHand ?? session.hand;
+  const handLabel = hand === "right" ? t("handRight") : hand === "left" ? t("handLeft") : null;
   const trackCount = session.playTracks.length;
 
   return (

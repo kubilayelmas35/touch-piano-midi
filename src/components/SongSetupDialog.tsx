@@ -1,7 +1,7 @@
 import { useT } from "../i18n";
 import { noteName } from "../lib/notes";
 import type { Song } from "../midi/song";
-import { updateSession } from "../state/actions";
+import { updateSession, updateSettings } from "../state/actions";
 import { setPanel, useApp } from "../state/store";
 import { Button, Dialog, Segmented } from "../ui/primitives";
 
@@ -20,6 +20,8 @@ export function SongSetupDialog() {
   const session = useApp((s) => s.session);
   const naming = useApp((s) => s.settings.noteNaming);
   const instrument = useApp((s) => s.settings.instrument);
+  const autoFret = useApp((s) => s.settings.autoFret);
+  const tapToPlay = useApp((s) => s.settings.tapToPlay);
   const close = () => setPanel(null);
   if (!song) return null;
 
@@ -37,15 +39,20 @@ export function SongSetupDialog() {
     updateSession({ playTracks: play.sort((a, b) => a - b), mutedTracks: mute });
   };
 
-  const ht = handTracks(song);
+  const fretted = instrument !== "piano";
+  const ht = fretted ? null : handTracks(song);
   let handValue: "both" | "right" | "left" = session.hand;
-  if (ht) {
+  if (fretted) {
+    handValue = autoFret && !tapToPlay ? "right" : tapToPlay && !autoFret ? "left" : "both";
+  } else if (ht) {
     const r = session.playTracks.includes(ht.right);
     const l = session.playTracks.includes(ht.left);
     handValue = r && !l ? "right" : l && !r ? "left" : "both";
   }
   const setHand = (h: "both" | "right" | "left") => {
-    if (ht) {
+    if (fretted) {
+      updateSettings({ autoFret: h === "right", tapToPlay: h === "left" });
+    } else if (ht) {
       const others = session.playTracks.filter((x) => x !== ht.right && x !== ht.left);
       const next = h === "right" ? [ht.right] : h === "left" ? [ht.left] : [ht.right, ht.left];
       updateSession({
@@ -87,7 +94,13 @@ export function SongSetupDialog() {
             { value: "left", label: t("handLeft") },
           ]}
         />
-        {!ht && <p className="mt-1.5 text-xs text-mist-400">{t("handsHint")}</p>}
+        {fretted ? (
+          <p className="mt-1.5 text-xs text-mist-400">
+            {t(handValue === "right" ? "fretHandRightHint" : handValue === "left" ? "fretHandLeftHint" : "fretHandBothHint")}
+          </p>
+        ) : (
+          !ht && <p className="mt-1.5 text-xs text-mist-400">{t("handsHint")}</p>
+        )}
       </div>
 
       <div className="mb-2 text-sm font-semibold">{t("tracks")}</div>

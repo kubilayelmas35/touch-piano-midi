@@ -1,6 +1,15 @@
 import type { CSSProperties, ReactNode } from "react";
-import type { ApproachStyle, Background, DustStyle, EffectStyle, NoteColor, NoteStyle } from "../render/appearance";
-import { hslHex, mixHex } from "../render/theme";
+import {
+  COLOR_PRESETS,
+  paletteColor,
+  type ApproachStyle,
+  type Background,
+  type ColorChoice,
+  type DustStyle,
+  type EffectStyle,
+  type NoteColor,
+  type NoteStyle,
+} from "../render/appearance";
 import { cx } from "../ui/primitives";
 
 export interface ChoiceOption<T extends string> {
@@ -264,34 +273,56 @@ const COLUMNS: [number, number][] = [
   [74, 58],
 ];
 
-function columnColor(color: NoteColor, i: number, top: number): string {
-  const hand = i % 2 ? "#c084fc" : "#38d6ff";
-  const k = (top + 15) / 80;
-  switch (color) {
-    case "violet":
-      return "#8b5cf6";
-    case "rainbow":
-      return hslHex(i * 85, 0.85, 0.62);
-    case "gradient":
-      return mixHex("#38d6ff", "#e879f9", k);
-    case "sunset":
-      return mixHex("#facc15", "#f43f5e", k);
-    case "ice":
-      return mixHex(hand, "#e0f2fe", 0.6);
-    case "pastel":
-      return mixHex(hand, "#ffffff", 0.42);
-    default:
-      return hand;
-  }
-}
+const SAMPLE_MIDI = [60, 66, 69, 50];
 
-export function ColorSwatch({ color }: { color: NoteColor }) {
+export function ColorSwatch({ color, choice }: { color: NoteColor; choice: ColorChoice }) {
   return (
     <div className="absolute inset-0 bg-[linear-gradient(#070a1a,#121633)]">
       {COLUMNS.map(([left, top], i) => {
-        const c = columnColor(color, i, top);
+        const hand = i % 2 ? "#c084fc" : "#38d6ff";
+        const midi = color === "rainbow" ? 60 + i * 3 : color === "octave" ? 36 + i * 12 : SAMPLE_MIDI[i];
+        const c = color === "auto" ? hand : paletteColor(color, hand, midi, i === 1, (top + 15) / 80, choice);
         return <div key={i} className="absolute h-[30%] w-[16%] rounded-[4px]" style={{ left: `${left}%`, top: `${top}%`, background: c, boxShadow: `0 0 8px ${c}88` }} />;
       })}
+    </div>
+  );
+}
+
+/** Preset colour dots plus a free colour wheel (native colour input). */
+export function ColorPicker({ label, value, onChange }: { label: string; value: string; onChange: (hex: string) => void }) {
+  return (
+    <div className="py-2">
+      <div className="mb-2 flex items-center gap-2 text-sm font-medium">
+        <span className="inline-block h-3.5 w-3.5 rounded-full ring-1 ring-white/30" style={{ background: value }} />
+        {label}
+      </div>
+      <div role="radiogroup" aria-label={label} className="flex flex-wrap gap-2">
+        {COLOR_PRESETS.map((c) => (
+          <button
+            key={c}
+            type="button"
+            role="radio"
+            aria-checked={value === c}
+            aria-label={c}
+            onClick={() => onChange(c)}
+            className={cx(
+              "h-8 w-8 rounded-full transition",
+              value === c ? "ring-2 ring-white ring-offset-2 ring-offset-ink-900" : "ring-1 ring-white/15 hover:scale-110"
+            )}
+            style={{ background: c, boxShadow: `0 0 10px ${c}55` }}
+          />
+        ))}
+        <label
+          className={cx(
+            "relative h-8 w-8 cursor-pointer overflow-hidden rounded-full transition hover:scale-110",
+            !(COLOR_PRESETS as readonly string[]).includes(value) ? "ring-2 ring-white ring-offset-2 ring-offset-ink-900" : "ring-1 ring-white/15"
+          )}
+          style={{ background: "conic-gradient(#f43f5e, #facc15, #4ade80, #22d3ee, #6366f1, #e879f9, #f43f5e)" }}
+          title={label}
+        >
+          <input type="color" value={value} onChange={(e) => onChange(e.target.value)} aria-label={label} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
+        </label>
+      </div>
     </div>
   );
 }
@@ -308,6 +339,17 @@ const DUST_PREVIEW: Record<DustStyle, string> = {
   embers:
     "radial-gradient(2px 2px at 30% 60%, #fde68a 50%, transparent), radial-gradient(2px 2px at 60% 35%, #fb923c 50%, transparent), radial-gradient(2px 2px at 72% 70%, #fde68a 50%, transparent), radial-gradient(2px 2px at 42% 20%, #f97316 50%, transparent), radial-gradient(2px 2px at 20% 30%, #fb923c 50%, transparent), radial-gradient(ellipse 40% 30% at 50% 100%, rgba(251,146,60,0.35), transparent 75%)",
   stardust: "radial-gradient(ellipse 40% 60% at 50% 70%, rgba(196,181,253,0.18), transparent 75%)",
+  fountain: "radial-gradient(ellipse 35% 25% at 50% 95%, rgba(139,92,246,0.4), transparent 75%)",
+  plume:
+    "radial-gradient(ellipse 22% 26% at 46% 30%, rgba(167,139,250,0.45), transparent 75%), radial-gradient(ellipse 26% 30% at 56% 55%, rgba(139,92,246,0.4), transparent 75%), radial-gradient(ellipse 30% 25% at 50% 85%, rgba(124,58,237,0.35), transparent 75%)",
+  rays: "radial-gradient(ellipse 30% 20% at 50% 100%, rgba(196,181,253,0.35), transparent 75%)",
+};
+
+/** [angle from vertical (deg), length %, opacity] of the streaks drawn for the jet styles. */
+const JETS: Record<"fountain" | "plume" | "rays", [number, number, number][]> = {
+  fountain: [[-38, 42, 0.7], [-20, 70, 0.9], [-6, 86, 1], [10, 78, 0.9], [26, 58, 0.8], [44, 38, 0.6], [-52, 28, 0.5], [56, 26, 0.5]],
+  plume: [[-24, 64, 0.8], [-8, 80, 0.9], [14, 70, 0.8], [30, 50, 0.6]],
+  rays: [[-14, 96, 0.8], [-6, 100, 1], [2, 96, 0.9], [9, 100, 0.8], [16, 90, 0.7]],
 };
 
 export function DustSwatch({ style }: { style: DustStyle }) {
@@ -320,7 +362,29 @@ export function DustSwatch({ style }: { style: DustStyle }) {
             ✦
           </span>
         ))}
-      <div className="absolute bottom-0 left-1/2 h-[70%] w-[14%] -translate-x-1/2 rounded-t-[3px] bg-violet-500/90" />
+      {(style === "fountain" || style === "plume" || style === "rays") &&
+        JETS[style].map(([deg, len, op], i) => (
+          <span
+            key={i}
+            className="absolute bottom-[36%] left-1/2 w-[1.5px] origin-bottom rounded-full"
+            style={{
+              height: `${len * 0.6}%`,
+              opacity: op,
+              transform: `translateX(-50%) rotate(${deg}deg)`,
+              background: `linear-gradient(${i % 2 ? "#ffffff" : "#c4b5fd"}, transparent)`,
+            }}
+          />
+        ))}
+      {style === "fountain" &&
+        SCATTER.slice(0, 8).map(([left, top], i) => (
+          <span key={`d${i}`} className="absolute h-[2px] w-[2px] rounded-full bg-violet-200" style={{ left: `${left}%`, top: `${top * 0.6}%`, opacity: 0.8 }} />
+        ))}
+      <div
+        className={cx(
+          "absolute bottom-0 left-1/2 w-[14%] -translate-x-1/2 rounded-t-[3px] bg-violet-500/90",
+          style === "fountain" || style === "plume" || style === "rays" ? "h-[38%]" : "h-[70%]"
+        )}
+      />
     </div>
   );
 }

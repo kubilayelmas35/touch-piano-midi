@@ -3,7 +3,7 @@ import type { FretLayout, PianoLayout } from "../engine/layout";
 import { NoteState, type PlayNote } from "../engine/types";
 import { HAND_SPLIT } from "../midi/song";
 import { isBlack, noteName, type NoteNaming } from "../lib/notes";
-import type { ApproachStyle, Background, DustStyle, EffectStyle, NoteColor, NoteStyle } from "./appearance";
+import { paletteColor, type ApproachStyle, type Background, type ColorChoice, type DustStyle, type EffectStyle, type NoteColor, type NoteStyle } from "./appearance";
 import { BackdropAnimator, paintBackdrop } from "./backgrounds";
 import { drawNote, labelHeight, lightInk } from "./noteStyles";
 import {
@@ -13,7 +13,6 @@ import {
   TRACK_COLORS,
   VIOLIN_STRING_COLORS,
   glowSprite,
-  hslHex,
   mixHex,
   softSprite,
   withAlpha,
@@ -36,6 +35,7 @@ export interface HighwayView {
   approach: ApproachStyle;
   noteStyle: NoteStyle;
   noteColor: NoteColor;
+  colors: ColorChoice;
   background: Background;
   labels: Record<string, string>;
 }
@@ -51,6 +51,7 @@ type ParticleKind =
   | "puff"
   | "ember"
   | "twinkle"
+  | "jet"
   | "glyph"
   | "confetti"
   | "bubble"
@@ -59,7 +60,7 @@ type ParticleKind =
   | "pixel";
 
 /** Drawn behind the notes: the dust clouds that linger after hits. */
-const BACK_KINDS: ReadonlySet<ParticleKind> = new Set<ParticleKind>(["mote", "haze", "puff", "ember", "twinkle"]);
+const BACK_KINDS: ReadonlySet<ParticleKind> = new Set<ParticleKind>(["mote", "haze", "puff", "ember", "twinkle", "jet"]);
 /** Opaque-looking kinds that would wash out with additive blending. */
 const SOLID_KINDS: ReadonlySet<ParticleKind> = new Set<ParticleKind>(["confetti", "petal", "pixel"]);
 
@@ -86,6 +87,8 @@ interface Particle {
   squash?: number;
   /** Peak opacity for clouds. */
   peak?: number;
+  /** Streak length per unit of speed (seconds of motion shown) for jets. */
+  trail?: number;
   text?: string;
 }
 
@@ -147,6 +150,10 @@ export class Highway {
   private lastFxAt = 0;
   private lastFrame = 0;
   private palette: NoteColor = "auto";
+  private colors: ColorChoice = { solid: "#8b5cf6", from: "#22d3ee", to: "#f43f5e" };
+  /** Size / lifetime multipliers for hit effects, from the effect intensity. */
+  private fxSize = 1;
+  private fxLife = 1;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -273,23 +280,9 @@ export class Highway {
 
   /** Note colour in the chosen palette; gradient palettes depend on the height `y` (default: at the hit line). */
   private noteColor(n: PlayNote, y = this.h): string {
+    if (this.palette === "auto") return this.baseColor(n);
     const k = Math.max(0, Math.min(1, y / Math.max(1, this.h)));
-    switch (this.palette) {
-      case "violet":
-        return isBlack(n.midi) ? "#7c3aed" : "#8b5cf6";
-      case "rainbow":
-        return hslHex((n.midi % 12) * 30, 0.85, 0.62);
-      case "gradient":
-        return mixHex("#38d6ff", "#e879f9", k);
-      case "sunset":
-        return mixHex("#facc15", "#f43f5e", k);
-      case "ice":
-        return mixHex(this.baseColor(n), "#e0f2fe", 0.6);
-      case "pastel":
-        return mixHex(this.baseColor(n), "#ffffff", 0.42);
-      default:
-        return this.baseColor(n);
-    }
+    return paletteColor(this.palette, this.baseColor(n), n.midi, n.string < 0 && isBlack(n.midi), k, this.colors);
   }
 
   /**
@@ -353,6 +346,7 @@ export class Highway {
     this.lastFrame = now;
     this.ensureBackground(view);
     this.palette = view.noteColor;
+    this.colors = view.colors;
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.drawImage(this.backdrop!, 0, 0);
@@ -671,6 +665,18 @@ export class Highway {
     if (this.particles.length < MAX_PARTICLES) this.particles.push({ ...p, life: 0 });
   }
 
+  /** Hit-effect particle, grown and lengthened by the effect intensity. */
+  private emitFx(p: Omit<Particle, "life">): void {
+    this.emit({ ...p, size: p.size * this.fxSize, max: p.max * this.fxLife });
+  }
+
+  /** Effect intensity 0.1–1 → particle count multiplier and launch power; also sets size / lifetime. */
+  private amp(level: number): { count: number; power: number } {
+    this.fxSize = 0.55 + 0.9 * level;
+    this.fxLife = 0.65 + 0.7 * level;
+    return { count: 0.12 + 1.9 * level * level, power: 0.6 + 0.75 * level };
+  }
+
   /**
    * About `n` pieces of a dust cloud rising behind the notes from a lane, spread between the hit
    * line `y0` and `y1` above it (held notes fill their whole column).
@@ -692,6 +698,11 @@ export class Highway {
         for (let k = 0; k < 3; k++) {
           this.emit({ kind: "mote", x: cx + (r() - 0.5) * lane.w * 2, y: yAt(), vx: (r() - 0.5) * 14, vy: -(6 + r() * 26), g: -3, drag: 0.6, wander: 30, max: 2 + r() * 2.5, size: 0.8 + r() * 1.2, color: r() < 0.4 ? light : color });
         }
+        for (let k = 0; k < 2; k++) {
+          const a = -Math.PI / 2 + (r() - 0.5) * 1.2;
+          const sp = 220 + r() * 260;
+          this.emit({ kind: "jet", x: lane.x + r() * lane.w, y: y0 - 4 - r() * 8, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, g: -8, drag: 2.2, wander: 40, max: 2 + r() * 1.8, size: 0.7 + r() * 0.8, trail: 0.05, peak: 0.75, color: r() < 0.5 ? light : color });
+        }
       } else if (style === "nebula") {
         const tint = r() < 0.4 ? color : NEBULA[Math.floor(r() * NEBULA.length)];
         this.emit({ kind: "puff", x: cx + (r() - 0.5) * lane.w * 2, y: yAt(), vx: (r() - 0.5) * 12, vy: -(5 + r() * 12), g: 0, drag: 0.2, wander: 10, max: 3.2 + r() * 2, size: Math.max(80, lane.w * (2.8 + r() * 2.2)), squash: 1, peak: 0.3, color: tint });
@@ -700,6 +711,26 @@ export class Highway {
         this.emit({ kind: "puff", x: cx + (r() - 0.5) * lane.w, y: y0 - 6 - r() * 26, vx: (r() - 0.5) * 70, vy: -(2 + r() * 7), g: 0, drag: 0.5, max: 3 + r() * 1.6, size: Math.max(90, lane.w * (3.5 + r() * 2)), squash: 0.32, peak: 0.24, color: mixHex(color, "#c7d2fe", 0.5) });
       } else if (style === "embers") {
         this.emit({ kind: "ember", x: lane.x + r() * lane.w, y: y0 - 4 - r() * Math.min(40, y0 - y1 + 12), vx: (r() - 0.5) * 30, vy: -(30 + r() * 60), g: -8, drag: 0.4, wander: 70, max: 1.5 + r() * 1.6, size: 1.4 + r() * 1.8, color: r() < 0.3 ? color : EMBERS[Math.floor(r() * EMBERS.length)] });
+      } else if (style === "fountain") {
+        // Jets shoot up out of the key, slow down and scatter into lingering dust.
+        const wide = r() < 0.25;
+        const a = -Math.PI / 2 + (r() - 0.5) * (wide ? 1.7 : 0.8);
+        const sp = 280 + r() * 360;
+        this.emit({ kind: "jet", x: lane.x + r() * lane.w, y: y0 - 4 - r() * 10, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, g: -12, drag: 2.4, wander: 45, max: 2.2 + r() * 1.8, size: 0.9 + r() * 1.4, trail: 0.06, color: r() < 0.4 ? light : color });
+        if (r() < 0.15) this.emit({ kind: "puff", x: cx + (r() - 0.5) * lane.w, y: y0 - 10, vx: (r() - 0.5) * 30, vy: -(30 + r() * 40), g: 0, drag: 0.8, wander: 12, max: 2 + r() * 1.5, size: Math.max(50, lane.w * 2), squash: 1.2, peak: 0.22, color });
+      } else if (style === "plume") {
+        // Billows of smoke thrown upwards, with fine streaks shooting ahead of them.
+        this.emit({ kind: "puff", x: cx + (r() - 0.5) * lane.w * 0.6, y: y0 - 6, vx: (r() - 0.5) * 40, vy: -(140 + r() * 160), g: 0, drag: 1.6, wander: 25, max: 2.2 + r() * 1.6, size: Math.max(40, lane.w * (1.4 + r())), squash: 1.2, peak: 0.3, color });
+        for (let k = 0; k < 2; k++) {
+          const a = -Math.PI / 2 + (r() - 0.5) * 1.1;
+          const sp = 200 + r() * 220;
+          this.emit({ kind: "jet", x: lane.x + r() * lane.w, y: y0 - 4, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, g: -10, drag: 2, wander: 40, max: 1.8 + r() * 1.6, size: 0.8 + r() * 0.8, trail: 0.05, color: r() < 0.5 ? light : color });
+        }
+      } else if (style === "rays") {
+        // Long thin rays fanning upwards that shrink into specks as they slow.
+        const a = -Math.PI / 2 + (r() - 0.5) * 0.45;
+        const sp = 420 + r() * 420;
+        this.emit({ kind: "jet", x: lane.x + r() * lane.w, y: y0 - 4 - r() * 6, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, g: -5, drag: 1.5, wander: 15, max: 1.2 + r(), size: 0.7 + r() * 0.9, trail: 0.16, peak: 0.7, color: r() < 0.5 ? light : color });
       } else if (style === "stardust") {
         this.emit({ kind: "twinkle", x: cx + (r() - 0.5) * lane.w * 1.8, y: yAt(), vx: (r() - 0.5) * 16, vy: -(5 + r() * 18), g: 0, drag: 0.3, wander: 8, max: 2 + r() * 1.8, size: 1.6 + r() * 2.8, color: r() < 0.5 ? "#ffffff" : light });
       }
@@ -708,7 +739,7 @@ export class Highway {
 
   /** Clouds keep gathering around held notes, from the hit line up their column. */
   private dustHold(lanes: SprayLane[], hitY: number, dt: number, style: DustStyle, level: number): void {
-    const rate: Record<DustStyle, number> = { off: 0, smoke: 7, sparkle: 16, nebula: 3, fog: 3, embers: 18, stardust: 10 };
+    const rate: Record<DustStyle, number> = { off: 0, smoke: 7, fountain: 22, plume: 6, rays: 12, sparkle: 16, nebula: 3, fog: 3, embers: 18, stardust: 10 };
     for (const l of lanes) this.cloud(l, l.color, hitY, Math.max(l.top, hitY - 260), rate[style] * level * dt, style);
   }
 
@@ -720,7 +751,7 @@ export class Highway {
         const a = 1.1 + r() * 0.9;
         const sp = (90 + r() * 160) * power;
         const side = r() < 0.5 ? -1 : 1;
-        this.emit({ kind: "glyph", x: lane.x + r() * lane.w, y: hitY - 6, vx: side * Math.cos(a) * sp, vy: -Math.sin(a) * sp, g: 60, drag: 1.2, wander: 30, max: 1 + r() * 0.8, size: 12 + r() * 10, rot: (r() - 0.5) * 0.6, vr: (r() - 0.5) * 2, text: NOTE_GLYPHS[Math.floor(r() * NOTE_GLYPHS.length)], color: r() < 0.35 ? "#ffffff" : color });
+        this.emitFx({ kind: "glyph", x: lane.x + r() * lane.w, y: hitY - 6, vx: side * Math.cos(a) * sp, vy: -Math.sin(a) * sp, g: 60, drag: 1.2, wander: 30, max: 1 + r() * 0.8, size: 12 + r() * 10, rot: (r() - 0.5) * 0.6, vr: (r() - 0.5) * 2, text: NOTE_GLYPHS[Math.floor(r() * NOTE_GLYPHS.length)], color: r() < 0.35 ? "#ffffff" : color });
       }
       return;
     }
@@ -728,7 +759,7 @@ export class Highway {
       const bolts = Math.max(1, Math.round(count / 12));
       for (let i = 0; i < bolts; i++) {
         const side = r() < 0.5 ? -1 : 1;
-        this.emit({ kind: "bolt", x: lane.x + lane.w / 2 + side * lane.w * 0.3, y: hitY - 2, vx: 0, vy: 0, g: 0, max: 0.16 + r() * 0.1, size: (50 + r() * 90) * power, rot: -Math.PI / 2 + side * (0.2 + r() * 0.6), color: r() < 0.5 ? "#ffffff" : color });
+        this.emitFx({ kind: "bolt", x: lane.x + lane.w / 2 + side * lane.w * 0.3, y: hitY - 2, vx: 0, vy: 0, g: 0, max: 0.16 + r() * 0.1, size: (50 + r() * 90) * power, rot: -Math.PI / 2 + side * (0.2 + r() * 0.6), color: r() < 0.5 ? "#ffffff" : color });
       }
       count = Math.round(count / 3);
     }
@@ -739,27 +770,27 @@ export class Highway {
       if (style === "sparks" || style === "lightning") {
         const a = 0.3 + r() * 1.0;
         const sp = (170 + r() * 300) * power;
-        this.emit({ kind: "streak", x: edgeX, y: hitY - 2 - r() * 10, vx: side * Math.cos(a) * sp, vy: -Math.sin(a) * sp, g: 260, max: 0.3 + r() * 0.45, size: 1.8 + r() * 2.2, color: r() < 0.45 ? "#ffffff" : color });
+        this.emitFx({ kind: "streak", x: edgeX, y: hitY - 2 - r() * 10, vx: side * Math.cos(a) * sp, vy: -Math.sin(a) * sp, g: 260, max: 0.3 + r() * 0.45, size: 1.8 + r() * 2.2, color: r() < 0.45 ? "#ffffff" : color });
       } else if (style === "stars") {
         const a = 0.6 + r() * 0.9;
         const sp = (60 + r() * 130) * power;
-        this.emit({ kind: "star", x: edgeX, y: hitY - 4 - r() * 12, vx: side * Math.cos(a) * sp, vy: -Math.sin(a) * sp, g: -30, max: 0.7 + r() * 0.8, size: 4 + r() * 6, color: r() < 0.5 ? "#ffffff" : color });
+        this.emitFx({ kind: "star", x: edgeX, y: hitY - 4 - r() * 12, vx: side * Math.cos(a) * sp, vy: -Math.sin(a) * sp, g: -30, max: 0.7 + r() * 0.8, size: 4 + r() * 6, color: r() < 0.5 ? "#ffffff" : color });
       } else if (style === "fire") {
-        this.emit({ kind: "flame", x: midX, y: hitY - 2, vx: (r() - 0.5) * 60 + side * 30 * power, vy: -(120 + r() * 200) * power, g: -120, max: 0.35 + r() * 0.4, size: 8 + r() * 12, color: FIRE[Math.floor(r() * 2)] });
+        this.emitFx({ kind: "flame", x: midX, y: hitY - 2, vx: (r() - 0.5) * 60 + side * 30 * power, vy: -(120 + r() * 200) * power, g: -120, max: 0.35 + r() * 0.4, size: 8 + r() * 12, color: FIRE[Math.floor(r() * 2)] });
       } else if (style === "confetti") {
         const a = 0.9 + r() * 1.3;
         const sp = (200 + r() * 280) * power;
-        this.emit({ kind: "confetti", x: midX, y: hitY - 4, vx: side * Math.cos(a) * sp * 0.6, vy: -Math.sin(a) * sp, g: 380, drag: 1.4, max: 1 + r() * 0.8, size: 5 + r() * 4, rot: r() * 6, vr: (r() - 0.5) * 18, color: CONFETTI[Math.floor(r() * CONFETTI.length)] });
+        this.emitFx({ kind: "confetti", x: midX, y: hitY - 4, vx: side * Math.cos(a) * sp * 0.6, vy: -Math.sin(a) * sp, g: 380, drag: 1.4, max: 1 + r() * 0.8, size: 5 + r() * 4, rot: r() * 6, vr: (r() - 0.5) * 18, color: CONFETTI[Math.floor(r() * CONFETTI.length)] });
       } else if (style === "bubbles") {
-        this.emit({ kind: "bubble", x: midX, y: hitY - 4 - r() * 8, vx: (r() - 0.5) * 50, vy: -(50 + r() * 110) * power, g: -40, drag: 0.8, wander: 60, max: 0.9 + r() * 1.1, size: 3 + r() * 8, color: r() < 0.3 ? "#ffffff" : color });
+        this.emitFx({ kind: "bubble", x: midX, y: hitY - 4 - r() * 8, vx: (r() - 0.5) * 50, vy: -(50 + r() * 110) * power, g: -40, drag: 0.8, wander: 60, max: 0.9 + r() * 1.1, size: 3 + r() * 8, color: r() < 0.3 ? "#ffffff" : color });
       } else if (style === "petals") {
         const a = 1 + r() * 1.1;
         const sp = (120 + r() * 200) * power;
-        this.emit({ kind: "petal", x: midX, y: hitY - 4, vx: side * Math.cos(a) * sp, vy: -Math.sin(a) * sp, g: 90, drag: 1.8, wander: 80, max: 1.4 + r() * 1, size: 5 + r() * 4, rot: r() * 6, vr: (r() - 0.5) * 6, color: r() < 0.25 ? color : PETALS[Math.floor(r() * PETALS.length)] });
+        this.emitFx({ kind: "petal", x: midX, y: hitY - 4, vx: side * Math.cos(a) * sp, vy: -Math.sin(a) * sp, g: 90, drag: 1.8, wander: 80, max: 1.4 + r() * 1, size: 5 + r() * 4, rot: r() * 6, vr: (r() - 0.5) * 6, color: r() < 0.25 ? color : PETALS[Math.floor(r() * PETALS.length)] });
       } else if (style === "pixels") {
         const a = 0.5 + r() * 2.1;
         const sp = (120 + r() * 240) * power;
-        this.emit({ kind: "pixel", x: midX, y: hitY - 4, vx: Math.cos(a) * sp * (r() < 0.5 ? -1 : 1), vy: -Math.sin(a) * sp, g: 420, max: 0.5 + r() * 0.5, size: r() < 0.3 ? 6 : 4, color: r() < 0.35 ? "#ffffff" : color });
+        this.emitFx({ kind: "pixel", x: midX, y: hitY - 4, vx: Math.cos(a) * sp * (r() < 0.5 ? -1 : 1), vy: -Math.sin(a) * sp, g: 420, max: 0.5 + r() * 0.5, size: r() < 0.3 ? 6 : 4, color: r() < 0.35 ? "#ffffff" : color });
       }
     }
   }
@@ -779,8 +810,9 @@ export class Highway {
       ctx.globalAlpha = (0.4 + 0.55 * level) * flicker;
       const ww = Math.max(30, l.w * (1.4 + level));
       ctx.drawImage(glowSprite("#ffffff", 64), cx - ww / 2, hitY - ww * 0.4, ww, ww * 0.8);
-      const n = SPRAY_RATE * level * level * SPRAY_SHARE[style] * dt;
-      if (n > 0) this.burst(l, l.color, hitY, Math.floor(n) + (Math.random() < n % 1 ? 1 : 0), style, 0.85);
+      const a = this.amp(level);
+      const n = SPRAY_RATE * a.count * SPRAY_SHARE[style] * dt;
+      if (n > 0) this.burst(l, l.color, hitY, Math.floor(n) + (Math.random() < n % 1 ? 1 : 0), style, 0.85 * a.power);
     }
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = "source-over";
@@ -813,7 +845,7 @@ export class Highway {
       const sl = this.stringLaneOf(fx, view);
       if (sl) lanes.push(sl);
       if (view.dust !== "off") {
-        const burst: Record<DustStyle, number> = { off: 0, smoke: 5, sparkle: 10, nebula: 4, fog: 3, embers: 12, stardust: 10 };
+        const burst: Record<DustStyle, number> = { off: 0, smoke: 5, fountain: 18, plume: 5, rays: 12, sparkle: 10, nebula: 4, fog: 3, embers: 12, stardust: 10 };
         const tint = this.fxColor(fx);
         const reach = view.dust === "smoke" || view.dust === "nebula" ? 90 : 40;
         for (const l of lanes) this.cloud(l, tint, hitY, hitY - reach, burst[view.dust] * scale * view.dustLevel * 2, view.dust);
@@ -822,18 +854,23 @@ export class Highway {
         const style = view.effectStyle;
         // Auto-play paints in the note's own colour; the player's hits in the judgement colour.
         const tint = fx.auto ? this.fxColor(fx) : color;
+        const amp = this.amp(level);
         for (const l of lanes) {
           const lx = l.x + l.w / 2;
-          // A ring flash for every style; it is all the "glow" style shows.
-          this.emit({ kind: "ring", x: lx, y: hitY - 2, vx: 0, vy: 0, g: 0, max: 0.4, size: Math.max(24, l.w * 1.6), color: tint });
-          if (style === "glow") continue;
-          const dots = style === "sparks" || style === "stars" || style === "fire" ? Math.round(16 * scale * level) : 0;
+          // A ring flash for every style (two at high intensity); with a bloom it is all the "glow" style shows.
+          this.emitFx({ kind: "ring", x: lx, y: hitY - 2, vx: 0, vy: 0, g: 0, max: 0.4, size: Math.max(24, l.w * 1.6), color: tint });
+          if (level > 0.55) this.emitFx({ kind: "ring", x: lx, y: hitY - 2, vx: 0, vy: 0, g: 0, max: 0.5, size: Math.max(30, l.w * 1.9), color: mixHex(tint, "#ffffff", 0.6) });
+          if (style === "glow") {
+            this.emitFx({ kind: "dot", x: lx, y: hitY - 6, vx: 0, vy: -20, g: 0, max: 0.35, size: Math.max(40, l.w * 3) * (0.4 + level), color: tint });
+            continue;
+          }
+          const dots = style === "sparks" || style === "stars" || style === "fire" ? Math.round(16 * scale * amp.count) : 0;
           for (let i = 0; i < dots; i++) {
             const a = -Math.PI / 2 + (Math.random() - 0.5) * 1.6;
-            const sp = 90 + Math.random() * 220;
-            this.emit({ kind: "dot", x: lx + (Math.random() - 0.5) * 10, y: hitY - 2, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, g: 260, max: 0.35 + Math.random() * 0.45, size: 6 + Math.random() * 10, color: tint });
+            const sp = (90 + Math.random() * 220) * amp.power;
+            this.emitFx({ kind: "dot", x: lx + (Math.random() - 0.5) * 10, y: hitY - 2, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, g: 260, max: 0.35 + Math.random() * 0.45, size: 6 + Math.random() * 10, color: tint });
           }
-          this.burst(l, tint, hitY, Math.round(26 * scale * level), style, 1.15);
+          this.burst(l, tint, hitY, Math.max(1, Math.round(26 * scale * amp.count)), style, 1.15 * amp.power);
         }
       }
     }
@@ -904,7 +941,7 @@ export class Highway {
         case "ring": {
           const s = p.size * (0.4 + 0.9 * (1 - k));
           ctx.strokeStyle = p.color;
-          ctx.lineWidth = 2.5 * k;
+          ctx.lineWidth = Math.min(3.5, Math.max(1.5, p.size / 18)) * k;
           ctx.beginPath();
           ctx.ellipse(p.x, p.y, s, s * 0.32, 0, 0, Math.PI * 2);
           ctx.stroke();
@@ -932,6 +969,23 @@ export class Highway {
           const s = p.size * (0.6 + 0.9 * age);
           const sq = p.squash ?? 1;
           ctx.drawImage(softSprite(p.color, 64), p.x - s / 2, p.y - (s * sq) / 2, s, s * sq);
+          break;
+        }
+        case "jet": {
+          // A streak while it shoots up; as the drag slows it, it shrinks into a drifting speck of dust.
+          const age = p.life / p.max;
+          ctx.globalAlpha = Math.min(1, age * 12) * Math.pow(1 - age, 0.7) * (p.peak ?? 0.85);
+          const len = Math.hypot(p.vx, p.vy) * (p.trail ?? 0.05);
+          ctx.strokeStyle = p.color;
+          ctx.lineWidth = p.size;
+          ctx.beginPath();
+          ctx.moveTo(p.x, p.y);
+          if (len > p.size) {
+            const inv = len / Math.max(1e-3, Math.hypot(p.vx, p.vy));
+            ctx.lineTo(p.x - p.vx * inv, p.y - p.vy * inv);
+          } else ctx.lineTo(p.x + 0.01, p.y + p.size * 0.5);
+          ctx.stroke();
+          if (p.size > 1.8) ctx.drawImage(glowSprite(p.color, 32), p.x - p.size * 2.5, p.y - p.size * 2.5, p.size * 5, p.size * 5);
           break;
         }
         case "ember": {

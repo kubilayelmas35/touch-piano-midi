@@ -22,6 +22,8 @@ import { saveSettings, type Settings } from "./settings";
 import { DEFAULT_SESSION, setPanel, toast, useApp, type Session } from "./store";
 import { canImport } from "../auth/account";
 import { cloudAfterDelete, cloudAfterImport, cloudAfterRename } from "../auth/cloud";
+import { initSettingsSync, pushSettings } from "../auth/settingsSync";
+import { OVERLAY_EVENT } from "../ui/primitives";
 
 const LAST_SONG = "staveflow-last-song";
 
@@ -36,7 +38,8 @@ export function engineConfig(): Partial<EngineConfig> {
     accompVolume: settings.accompVolume,
     playTracks: session.playTracks,
     mutedTracks: session.mutedTracks,
-    hand: session.hand,
+    // On guitar/violin the hands split the playing technique (strike vs. fret), not the notes.
+    hand: settings.instrument === "piano" ? session.hand : "both",
     speed: session.speed,
     waitMode: session.waitMode,
     autoPlay: session.autoPlay,
@@ -77,6 +80,8 @@ export async function initApp(): Promise<void> {
   engine.configure(engineConfig());
   engine.subscribe(syncFromEngine);
   engine.onComplete = handleComplete;
+  window.addEventListener(OVERLAY_EVENT, () => engine.pause());
+  initSettingsSync(applyRemoteSettings);
 
   const migrated = await migrateLegacyLibrary();
   await refreshLibrary();
@@ -106,6 +111,15 @@ export async function refreshLibrary(): Promise<void> {
 
 export function updateSettings(patch: Partial<Settings>): void {
   const settings = { ...useApp.getState().settings, ...patch };
+  useApp.setState({ settings });
+  saveSettings(settings);
+  applyAudioSettings(settings);
+  engine.configure(engineConfig());
+  pushSettings(settings);
+}
+
+/** Replaces the settings wholesale with the copy saved on the account (no upload back). */
+export function applyRemoteSettings(settings: Settings): void {
   useApp.setState({ settings });
   saveSettings(settings);
   applyAudioSettings(settings);

@@ -214,6 +214,13 @@ export function Segmented<T extends string>({
   );
 }
 
+export const OVERLAY_EVENT = "sonatrio:overlay";
+
+/** Tells the app a dialog or menu opened, so playback can pause behind it. */
+function overlayOpened(): void {
+  window.dispatchEvent(new Event(OVERLAY_EVENT));
+}
+
 /** Modal built on <dialog> for focus trapping and Esc handling. */
 export function Dialog({
   open,
@@ -244,8 +251,10 @@ export function Dialog({
   useEffect(() => {
     const d = ref.current;
     if (!d) return;
-    if (open && !d.open) d.showModal();
-    else if (!open && d.open) d.close();
+    if (open && !d.open) {
+      d.showModal();
+      overlayOpened();
+    } else if (!open && d.open) d.close();
   }, [open]);
 
   return (
@@ -333,7 +342,14 @@ export function Popover({
   useClickOutside(refs, close, open);
   return (
     <div className="relative">
-      {trigger({ open, toggle: () => setOpen((o) => !o), ref: btn })}
+      {trigger({
+        open,
+        toggle: () => {
+          if (!open) overlayOpened();
+          setOpen(!open);
+        },
+        ref: btn,
+      })}
       {open && (
         <div
           ref={panel}
