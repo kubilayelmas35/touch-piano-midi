@@ -1,6 +1,6 @@
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "../auth/account";
-import { engine } from "../engine/engine";
+import { engine, type PlayerInput } from "../engine/engine";
 import { accuracyOf, type Stats } from "../engine/types";
 import { tNow } from "../i18n";
 import { SITE_URL } from "../lib/platform";
@@ -15,9 +15,9 @@ export type { DuetHand, DuetResult, DuetSide };
 
 /**
  * Live duet: two devices in a room, each playing one hand of the same song. The room is a Supabase Realtime
- * broadcast channel; the host picks song, speed and hands. Each device plays the partner's hand itself as
- * accompaniment, so nothing musical travels over the network: only the start moment, pauses, running scores
- * and the final results.
+ * broadcast channel; the host picks song, speed and hands. By default each device plays the partner's hand
+ * itself as accompaniment, so only the start moment, pauses, running scores and the final results travel.
+ * A player can instead hear the partner's real playing (their notes are then sent over) or nothing of it.
  */
 export interface DuetRoom {
   code: string;
@@ -39,6 +39,10 @@ export const DUET_SPEEDS = [0.5, 0.75, 1];
 const COUNTDOWN_MS = 3500;
 const NO_HOST_MS = 7000;
 const LIVE_EVERY_MS = 500;
+/** Partner notes are batched this long, which keeps the message rate low. */
+const NOTES_EVERY_MS = 40;
+/** Partner notes sound this long after their song time, so network jitter doesn't shake their rhythm. */
+const NOTES_BUFFER_SEC = 0.15;
 
 const clientId = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 let channel: RealtimeChannel | null = null;
@@ -54,6 +58,12 @@ let liveTimer = 0;
 let lastLive = "";
 let noHostTimer = 0;
 let inbox: RealtimeChannel | null = null;
+/** The partner wants to hear my real playing. */
+let partnerListens = false;
+/** Notes waiting to go out: [key id, midi (0 = let go), velocity, song time]. */
+let outbox: number[][] = [];
+let flushTimer = 0;
+const keyIds = new Map<string, number>();
 
 const room = () => useApp.getState().duet;
 const myName = () => useApp.getState().account.username;
@@ -67,6 +77,41 @@ function patch(p: Partial<DuetRoom>): void {
 
 function send(event: string, payload: Record<string, unknown> = {}): void {
   void channel?.send({ type: "broadcast", event, payload });
+}
+
+/** Tells the partner whether to send me their notes. */
+function sendSound(): void {
+  send("sound", { live: useApp.getState().settings.duetSound === "live" });
+}
+
+function queueNote(e: PlayerInput): void {
+  if (!together || !partnerListens || engine.status !== "playing") return;
+  if (e.type !== "on" && e.type !== "off" && e.type !== "mute") return;
+  let id = keyIds.get(e.key);
+  if (id === undefined) {
+    id = keyIds.size;
+    keyIds.set(e.key, id);
+  }
+  const t = Math.round(engine.time * 1000) / 1000;
+  outbox.push(e.type === "on" ? [id, e.midi, Math.round(e.velocity * 100) / 100, t] : [id, 0, 0, t]);
+  if (!flushTimer) flushTimer = window.setTimeout(flushNotes, NOTES_EVERY_MS);
+}
+
+function flushNotes(): void {
+  flushTimer = 0;
+  if (!outbox.length) return;
+  send("notes", { n: outbox });
+  outbox = [];
+}
+
+function receiveNotes(p: Record<string, unknown>): void {
+  if (!together || useApp.getState().settings.duetSound !== "live" || !Array.isArray(p.n)) return;
+  for (const e of p.n.slice(0, 64)) {
+    if (!Array.isArray(e) || e.length !== 4 || !e.every((v) => typeof v === "number" && Number.isFinite(v))) continue;
+    const [id, midi, velocity, t] = e as number[];
+    const on = midi >= 21 && midi <= 108;
+    engine.remoteNote(`duet:${id}`, on ? Math.round(midi) : null, Math.min(1, Math.max(0.05, velocity)), t, NOTES_BUFFER_SEC);
+  }
 }
 
 export function duetAvailable(): boolean {
@@ -211,6 +256,7 @@ function onPresence(ch: RealtimeChannel): void {
       toast(tNow("duetPartnerLeft", { name: who(r.partner.name) }), "info", 5000);
       if (together) engine.halt();
       together = false;
+      partnerListens = false;
       patch({ partner: null, live: null, phase: r.phase === "live" ? "lobby" : r.phase, startAt: null });
     }
     return;
@@ -219,6 +265,7 @@ function onPresence(ch: RealtimeChannel): void {
   if (!r.partner) {
     window.clearTimeout(noHostTimer);
     patch({ partner: { name, ready: false } });
+    sendSound();
     if (r.role === "host") {
       toast(tNow("duetPartnerJoined", { name: who(name) }), "success");
       sendSetup();
@@ -274,6 +321,12 @@ function onMessage(event: string, p: Record<string, unknown>): void {
       break;
     case "final":
       receiveFinal(p);
+      break;
+    case "sound":
+      partnerListens = p.live === true;
+      break;
+    case "notes":
+      receiveNotes(p);
       break;
   }
 }
@@ -357,6 +410,8 @@ function begin(pos: number, at: number): void {
   together = true;
   partnerFinal = null;
   lastLive = "";
+  keyIds.clear();
+  sendSound();
   useApp.setState({ results: null, panel: null, duet: { ...r, phase: "live", startAt: at, live: null } });
   engine.configure(engineConfig());
   void engine.startAt(pos, at);
@@ -386,6 +441,8 @@ export function duetAfterRun(stats: Stats, accuracy: number, stars: number): Due
   if (!r || !together) return undefined;
   together = false;
   window.clearInterval(liveTimer);
+  window.clearTimeout(flushTimer);
+  flushNotes();
   const me: DuetSide = { name: myName(), hand: r.myHand, stats, accuracy, stars };
   send("final", { stats, hand: r.myHand, name: me.name });
   const partner = partnerFinal;
@@ -424,8 +481,12 @@ export function leaveDuet(): void {
   prepToken++;
   together = false;
   partnerFinal = null;
+  partnerListens = false;
+  outbox = [];
   window.clearInterval(liveTimer);
   window.clearTimeout(noHostTimer);
+  window.clearTimeout(flushTimer);
+  flushTimer = 0;
   pongs.clear();
   if (ch) {
     void ch.untrack().finally(() => void supabase?.removeChannel(ch));
@@ -491,9 +552,11 @@ export function initDuet(): void {
     }
     // A host's song re-opened from its own prefs (e.g. after closing a dialog) keeps the duet hand.
     else if (r?.songId && s.session !== prev.session && s.currentId === r.songId && s.song !== prev.song) applySession();
+    if (r?.partner && s.settings.duetSound !== prev.settings.duetSound) sendSound();
     const id = s.social?.me?.id ?? null;
     if (id !== (prev.social?.me?.id ?? null)) watchInbox(id);
   });
+  engine.addInputListener(queueNote);
 
   const params = new URLSearchParams(window.location.search);
   const code = params.get("duet");

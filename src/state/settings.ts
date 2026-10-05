@@ -22,6 +22,9 @@ import {
 
 export type Language = "tr" | "en";
 
+export const DUET_SOUNDS = ["auto", "live", "off"] as const;
+export type DuetSound = (typeof DUET_SOUNDS)[number];
+
 export interface Settings {
   language: Language;
   noteNaming: NoteNaming;
@@ -76,6 +79,10 @@ export interface Settings {
   midiInput: string;
   /** Microphone listening: 0 only loud notes … 1 picks up quiet playing. */
   micSensitivity: number;
+  /** Microphone to listen with (a MediaDevices id); "" is the system default. */
+  micDevice: string;
+  /** Live duet: the partner's hand played here by the app, their real playing sent over, or silent. */
+  duetSound: DuetSound;
   /** Instrument panel height as a fraction of the game area. */
   instrumentHeight: number;
   /** Hides the drag handle so the panel can't be resized by accident while playing. */
@@ -172,6 +179,8 @@ export function defaultSettings(): Settings {
     columnPress: false,
     midiInput: "all",
     micSensitivity: 0.5,
+    micDevice: "",
+    duetSound: "auto",
     instrumentHeight: 0.3,
     lockHeight: false,
     keyZoom: 1,
@@ -289,6 +298,8 @@ function sanitize(s: Settings): Settings {
     pianoPedal: s.pianoPedal !== false,
     pianoSustain: num(s.pianoSustain, 0, 1, d.pianoSustain),
     micSensitivity: num(s.micSensitivity, 0, 1, d.micSensitivity),
+    micDevice: typeof s.micDevice === "string" ? s.micDevice.slice(0, 200) : "",
+    duetSound: oneOf(DUET_SOUNDS, s.duetSound, d.duetSound),
     noteKeyLabels: typeof s.noteKeyLabels === "boolean" ? s.noteKeyLabels : d.noteKeyLabels,
     fingerNumbers: s.fingerNumbers === true,
     staffView: s.staffView === true,

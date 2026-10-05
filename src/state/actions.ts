@@ -51,7 +51,8 @@ export function engineConfig(): Partial<EngineConfig> {
     metronome: settings.metronome,
     countIn: settings.countIn || together,
     timingWindowMs: settings.timingWindowMs,
-    accompVolume: settings.accompVolume,
+    // "live" hears the partner's own notes instead, "off" leaves their hand silent.
+    accompVolume: together && settings.duetSound !== "auto" ? 0 : settings.accompVolume,
     pianoPedal: settings.pianoPedal,
     pianoSustain: settings.pianoSustain,
     playTracks: session.playTracks,

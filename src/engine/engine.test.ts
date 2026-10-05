@@ -418,4 +418,35 @@ describe("engine", () => {
     expect(engine.status).toBe("ready");
     expect(asked).toEqual(["play", "seek", "pause", "stop"]);
   });
+
+  it("sounds a partner's note at its song time plus the buffer, or at once when it comes late", async () => {
+    const engine = await startEngine();
+    advance(0.5, engine);
+    const t = engine.time;
+    engine.remoteNote("p1", 72, 0.8, t + 0.5, 0.1);
+    expect(audio.played.at(-1)).toEqual({ midi: 72, when: expect.closeTo(audio.currentTime + 0.6, 1) });
+    engine.remoteNote("p2", 74, 0.8, t - 1, 0.1);
+    expect(audio.played.at(-1)).toEqual({ midi: 74, when: audio.currentTime });
+    engine.remoteNote("p1", null, 0, t + 0.6, 0.1);
+    expect(audio.stops.some((s) => s.midi === 72)).toBe(true);
+    engine.halt();
+    expect(audio.stops.some((s) => s.midi === 74)).toBe(true);
+  });
+
+  it("leaves silent backing out", async () => {
+    const engine = await startEngine({ accompVolume: 0 });
+    advance(3, engine);
+    expect(audio.played.some((p) => p.midi === 48)).toBe(false);
+  });
+
+  it("passes player input to every listener until it unsubscribes", async () => {
+    const engine = await startEngine();
+    const seen: string[] = [];
+    engine.onInput = (e) => seen.push(`rec:${e.type}`);
+    const off = engine.addInputListener((e) => seen.push(`duet:${e.type}`));
+    engine.press("k", 60);
+    off();
+    engine.release("k");
+    expect(seen).toEqual(["rec:on", "duet:on", "rec:off"]);
+  });
 });

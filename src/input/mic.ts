@@ -1,6 +1,7 @@
 import { audioCtx, unlockAudio } from "../audio/context";
 import { engine } from "../engine/engine";
 import { tNow } from "../i18n";
+import { updateSettings } from "../state/actions";
 import { toast, useApp } from "../state/store";
 import { NoteTracker, decimate, detectPitch, rmsOf } from "./pitch";
 
@@ -24,16 +25,56 @@ export function micState(): { level: number; midi: number | null } {
   return { level, midi: tracker?.current ?? null };
 }
 
+export interface MicDevice {
+  id: string;
+  label: string;
+}
+
+/** Microphones on this device; their names only show once microphone access has been given. */
+export async function listMics(): Promise<MicDevice[]> {
+  if (!navigator.mediaDevices?.enumerateDevices) return [];
+  try {
+    const all = await navigator.mediaDevices.enumerateDevices();
+    return all
+      .filter((d) => d.kind === "audioinput" && d.deviceId && d.deviceId !== "default" && d.deviceId !== "communications")
+      .map((d, i) => ({
+        id: d.deviceId,
+        // Windows appends the USB vendor:product id, e.g. "Mikrofon (Headset) (1532:057d)".
+        label: d.label.replace(/\s*\([0-9a-f]{4}:[0-9a-f]{4}\)$/i, "").trim() || tNow("micDeviceN", { n: i + 1 }),
+      }));
+  } catch {
+    return [];
+  }
+}
+
+function openStream(deviceId: string): Promise<MediaStream> {
+  // The app's own backing track is echo-cancelled away; the instrument's tone is left untouched otherwise.
+  return navigator.mediaDevices.getUserMedia({
+    audio: {
+      echoCancellation: true,
+      noiseSuppression: false,
+      autoGainControl: false,
+      ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
+    },
+  });
+}
+
 export async function startMic(): Promise<boolean> {
   if (stream) return true;
   if (!micSupported()) return false;
   useApp.setState({ mic: "starting" });
   await unlockAudio();
+  const device = useApp.getState().settings.micDevice;
   try {
-    // The app's own backing track is echo-cancelled away; the instrument's tone is left untouched otherwise.
-    stream = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false },
-    });
+    try {
+      stream = await openStream(device);
+    } catch (err) {
+      // A chosen microphone that's gone (unplugged headset) falls back to the default one.
+      if (!device || (err as Error)?.name === "NotAllowedError") throw err;
+      stream = await openStream("");
+      updateSettings({ micDevice: "" });
+      toast(tNow("micDeviceFailed"), "info");
+    }
   } catch (err) {
     console.warn("[mic] access denied", err);
     useApp.setState({ mic: "denied" });
@@ -84,6 +125,14 @@ export function stopMic(): void {
   stream = null;
   level = 0;
   if (useApp.getState().mic !== "denied") useApp.setState({ mic: "off" });
+}
+
+/** Switches to another microphone, re-opening it right away if listening. */
+export async function setMicDevice(id: string): Promise<void> {
+  updateSettings({ micDevice: id });
+  if (!stream) return;
+  stopMic();
+  await startMic();
 }
 
 export async function toggleMic(): Promise<void> {

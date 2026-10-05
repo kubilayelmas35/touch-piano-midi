@@ -16,8 +16,10 @@ import {
 } from "../social/live";
 import { dismissDuetInvite } from "../social/social";
 import { shareLink } from "../studio/share";
+import { updateSettings } from "../state/actions";
+import { DUET_SOUNDS } from "../state/settings";
 import { setPanel, toast, useApp } from "../state/store";
-import { IconCheck, IconClose, IconDuet, IconPlay, IconShare, IconStar } from "../ui/icons";
+import { IconCheck, IconClose, IconDuet, IconPlay, IconShare, IconSpeaker, IconSpeakerOff, IconStar } from "../ui/icons";
 import { Button, Dialog, Segmented, cx } from "../ui/primitives";
 
 type T = ReturnType<typeof useT>;
@@ -109,6 +111,30 @@ function InviteFriends({ room }: { room: DuetRoom }) {
         ))}
       </ul>
     </section>
+  );
+}
+
+const SOUND_LABEL = { auto: "duetSoundAuto", live: "duetSoundLive", off: "duetSoundOff" } as const;
+const SOUND_HINT = { auto: "duetSoundAutoHint", live: "duetSoundLiveHint", off: "duetSoundOffHint" } as const;
+
+/** How the partner's hand sounds here; each player picks for their own device. */
+function PartnerSound() {
+  const t = useT();
+  const mode = useApp((s) => s.settings.duetSound);
+  return (
+    <div>
+      <div className="mb-1.5 text-xs text-mist-400">{t("duetPartnerSound")}</div>
+      <Segmented
+        label={t("duetPartnerSound")}
+        className="w-full [&>*]:flex-1"
+        value={mode}
+        onChange={(v) => updateSettings({ duetSound: v })}
+        options={DUET_SOUNDS.map((m) => ({ value: m, label: t(SOUND_LABEL[m]) }))}
+      />
+      <p className="mt-1.5 text-xs leading-relaxed text-mist-400">
+        {t(SOUND_HINT[mode])} {t("duetSoundEach")}
+      </p>
+    </div>
   );
 }
 
@@ -204,6 +230,8 @@ function Lobby({ room }: { room: DuetRoom }) {
         </div>
       )}
 
+      {room.phase !== "connecting" && <PartnerSound />}
+
       {host && <InviteFriends room={room} />}
       {!host && room.partner && room.songId && !room.preparing && (
         <p className="text-center text-sm text-mist-300">{t("duetHostWillStart", { name: room.partner.name ? `@${room.partner.name}` : t("duetGuest") })}</p>
@@ -257,6 +285,7 @@ export function DuetDialog() {
 export function DuetHud() {
   const t = useT();
   const room = useApp((s) => s.duet);
+  const sound = useApp((s) => s.settings.duetSound);
   const [now, setNow] = useState(() => performance.now());
   const counting = !!room?.startAt && room.startAt > now;
 
@@ -273,10 +302,15 @@ export function DuetHud() {
 
   if (!room) return null;
   const partner = room.partner?.name ? `@${room.partner.name}` : t("duetGuest");
+  const cycleSound = () => {
+    const next = DUET_SOUNDS[(DUET_SOUNDS.indexOf(sound) + 1) % DUET_SOUNDS.length];
+    updateSettings({ duetSound: next });
+    toast(`${t("duetPartnerSound")}: ${t(SOUND_LABEL[next])}`, "info", 2500);
+  };
   return (
     <>
       {room.phase === "live" && room.partner ? (
-        <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-fuchsia-300/30 bg-fuchsia-400/15 py-1 pr-3 pl-2 text-sm font-semibold text-fuchsia-50 shadow-lg backdrop-blur animate-pop">
+        <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-fuchsia-300/30 bg-fuchsia-400/15 py-1 pr-1 pl-2 text-sm font-semibold text-fuchsia-50 shadow-lg backdrop-blur animate-pop">
           <IconDuet size={16} />
           <span className="max-w-[9rem] truncate">{partner}</span>
           <span className="text-xs text-fuchsia-200">{handLabel(t, other(room.myHand))}</span>
@@ -285,6 +319,16 @@ export function DuetHud() {
               {room.live.score.toLocaleString()} · {pct(room.live.accuracy)}
             </span>
           )}
+          <button
+            type="button"
+            onClick={cycleSound}
+            aria-label={`${t("duetPartnerSound")}: ${t(SOUND_LABEL[sound])}`}
+            title={`${t("duetPartnerSound")}: ${t(SOUND_LABEL[sound])}`}
+            className={cx("-my-0.5 flex h-7 items-center gap-1 rounded-full px-2 text-xs hover:bg-white/10", sound === "off" ? "text-fuchsia-300/70" : "text-fuchsia-100")}
+          >
+            {sound === "off" ? <IconSpeakerOff size={15} /> : <IconSpeaker size={15} />}
+            {sound === "live" && <span className="font-bold">{t("duetSoundLive")}</span>}
+          </button>
         </div>
       ) : (
         <button

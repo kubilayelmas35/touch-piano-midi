@@ -132,6 +132,9 @@ export class Engine {
   readonly held = new Map<string, HeldNote>();
   onComplete: ((r: RunResult) => void) | null = null;
   onInput: ((e: PlayerInput) => void) | null = null;
+  private inputListeners = new Set<(e: PlayerInput) => void>();
+  /** A live duet partner's notes, by their source key. */
+  private remote = new Map<string, Voice>();
   /** A pass through the A–B loop just ended (called before jumping back). */
   onLoopPass: ((p: LoopPass) => void) | null = null;
   /** Song times of presses that matched no note, this run. */
@@ -539,6 +542,36 @@ export class Engine {
   private killScheduled(): void {
     for (const v of this.scheduled) v.stop(0.06);
     this.scheduled = [];
+    for (const v of this.remote.values()) v.stop(0.08);
+    this.remote.clear();
+  }
+
+  /** Hears what the player does, next to `onInput`; returns the unsubscribe. */
+  addInputListener(fn: (e: PlayerInput) => void): () => void {
+    this.inputListeners.add(fn);
+    return () => this.inputListeners.delete(fn);
+  }
+
+  private emitInput(e: PlayerInput): void {
+    this.onInput?.(e);
+    for (const fn of this.inputListeners) fn(e);
+  }
+
+  /**
+   * A live duet partner's note, sounded at its song time plus `bufferSec` so their rhythm survives network
+   * jitter; one arriving later than that sounds at once. `midi` null lets the key go.
+   */
+  remoteNote(key: string, midi: number | null, velocity: number, songT: number, bufferSec: number): void {
+    const now = getBus().ctx.currentTime;
+    const when = this.status === "playing" ? Math.max(now, this.ctxAt(songT) + bufferSec) : now;
+    const prev = this.remote.get(key);
+    if (prev) {
+      prev.stop(midi === null && this.config.pianoPedal ? this.pedalTail : undefined, when);
+      this.remote.delete(key);
+    }
+    if (midi === null) return;
+    const v = playNote("piano", midi, velocity, { when, volume: this.config.playerVolume * 0.85 });
+    if (v) this.remote.set(key, v);
   }
 
   configure(patch: Partial<EngineConfig>): void {
@@ -801,7 +834,7 @@ export class Engine {
     while (this.accIdx < this.accomp.length && this.accomp[this.accIdx].time < horizon) {
       const n = this.accomp[this.accIdx++];
       const when = this.ctxAt(n.time);
-      if (when < late) continue;
+      if (when < late || cfg.accompVolume <= 0) continue;
       const v = playNote("piano", n.midi, n.velocity, {
         when,
         duration: n.duration / cfg.speed,
@@ -878,14 +911,14 @@ export class Engine {
       if (s >= 0 && midi - spec.tuning[s] <= spec.maxFret) place = { string: s, fret: midi - spec.tuning[s] };
     }
     this.held.set(sourceKey, { midi, string: place?.string ?? -1, fret: place?.fret ?? -1 });
-    this.onInput?.({ type: "on", key: sourceKey, midi, velocity });
+    this.emitInput({ type: "on", key: sourceKey, midi, velocity });
     this.judgePress(sourceKey, midi, place);
   }
 
   /** Lets go of a note; with `ring` the voice decays naturally (a plucked string) instead of stopping. */
   release(sourceKey: string, ring = false): void {
     const tail = !ring && !this.sustain && this.config.pianoPedal && this.instrumentId === "piano";
-    if (this.held.delete(sourceKey)) this.onInput?.({ type: "off", key: sourceKey, ring: ring || tail });
+    if (this.held.delete(sourceKey)) this.emitInput({ type: "off", key: sourceKey, ring: ring || tail });
     const v = this.voices.get(sourceKey);
     if (!v) return;
     this.voices.delete(sourceKey);
@@ -915,7 +948,7 @@ export class Engine {
     this.levels.delete(sourceKey);
     this.glides.delete(sourceKey);
     v.stop(release);
-    this.onInput?.({ type: "mute", key: sourceKey });
+    this.emitInput({ type: "mute", key: sourceKey });
   }
 
   /** Loudness of a held or ringing note (0–1), e.g. bow pressure or string energy. */
@@ -979,9 +1012,9 @@ export class Engine {
     if (!settled || nearest === g.note || Math.abs(pitch - nearest) > 0.3) return;
     g.note = nearest;
     if (held && this.held.has(sourceKey)) {
-      this.onInput?.({ type: "off", key: sourceKey, ring: false });
+      this.emitInput({ type: "off", key: sourceKey, ring: false });
       this.held.set(sourceKey, { midi: nearest, string: pos?.string ?? -1, fret: pos?.fret ?? -1 });
-      this.onInput?.({ type: "on", key: sourceKey, midi: nearest, velocity: 0.7 });
+      this.emitInput({ type: "on", key: sourceKey, midi: nearest, velocity: 0.7 });
     }
     this.judgePress(sourceKey, nearest, pos);
   }
@@ -995,7 +1028,7 @@ export class Engine {
     if (down) this.sustainBy.add(source);
     else this.sustainBy.delete(source);
     const on = this.sustainBy.size > 0;
-    if (this.sustain !== on) this.onInput?.({ type: "sustain", on });
+    if (this.sustain !== on) this.emitInput({ type: "sustain", on });
     this.sustain = on;
     if (!on) {
       const fade = this.config.pianoPedal && this.instrumentId === "piano" ? this.pedalTail : 0.35;
@@ -1023,7 +1056,7 @@ export class Engine {
     const set = new Set([m]);
     this.heard.set(sourceKey, set);
     this.held.set(sourceKey, { midi: m, string: -1, fret: -1 });
-    this.onInput?.({ type: "on", key: sourceKey, midi: m, velocity });
+    this.emitInput({ type: "on", key: sourceKey, midi: m, velocity });
     const hit = this.judgePress(sourceKey, m, undefined, true, lagSec);
     if (!hit) return;
     for (let i = this.pendingIdx; i < this.notes.length; i++) {
@@ -1037,7 +1070,7 @@ export class Engine {
 
   unhear(sourceKey: string): void {
     if (!this.heard.delete(sourceKey)) return;
-    if (this.held.delete(sourceKey)) this.onInput?.({ type: "off", key: sourceKey, ring: false });
+    if (this.held.delete(sourceKey)) this.emitInput({ type: "off", key: sourceKey, ring: false });
   }
 
   /** The pending note a heard pitch most likely means: the same pitch, else the nearest octave of it in the window. */

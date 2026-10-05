@@ -52,6 +52,20 @@ export const IconSettings = (p: IconProps) => (
     <circle cx="12" cy="12" r="3" />
   </Svg>
 );
+export const IconSpeaker = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M11 5 6 9H3v6h3l5 4V5Z" />
+    <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+    <path d="M18.5 5.5a9 9 0 0 1 0 13" />
+  </Svg>
+);
+export const IconSpeakerOff = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M11 5 6 9H3v6h3l5 4V5Z" />
+    <path d="m22 9-6 6" />
+    <path d="m16 9 6 6" />
+  </Svg>
+);
 export const IconLoop = (p: IconProps) => (
   <Svg {...p}>
     <path d="m17 2 4 4-4 4" />

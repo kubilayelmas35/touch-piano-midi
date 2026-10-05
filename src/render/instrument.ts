@@ -169,8 +169,7 @@ export class KeyboardRenderer extends CanvasSurface {
       if ((view.showAllNames || L.compact || m % 12 === 0) && kw >= 11) {
         ctx.font = `${m % 12 === 0 ? 700 : 600} ${fs}px system-ui, sans-serif`;
         ctx.fillStyle = sound || pressed ? "rgba(255,255,255,0.9)" : m % 12 === 0 ? "#4b4f86" : "rgba(75,79,134,0.7)";
-        const label = noteName(m, view.naming) + (m % 12 === 0 ? octaveOf(m) : "");
-        ctx.fillText(label, x + kw / 2, ly);
+        ctx.fillText(this.keyName(m, view, kw), x + kw / 2, ly);
       }
     }
 
@@ -205,21 +204,38 @@ export class KeyboardRenderer extends CanvasSurface {
         ctx.fill();
       }
       const keyLabel = view.keyLabels?.get(m);
-      if (keyLabel && lane.w >= 12) {
+      if (L.compact) {
+        // Same order as the white keys: computer key at the bottom, note name above it.
+        const fs = Math.max(8, Math.min(12, lane.w * 0.36));
+        let ly = h - 7;
+        if (keyLabel && lane.w >= 16) {
+          ctx.font = `700 ${fs}px system-ui, sans-serif`;
+          ctx.fillStyle = sound || pressed ? "rgba(255,255,255,0.95)" : "rgba(225,229,255,0.85)";
+          ctx.fillText(keyLabel.toUpperCase(), lane.x + lane.w / 2, ly);
+          ly -= fs + 4;
+        }
+        if (lane.w >= 11) {
+          ctx.font = `600 ${fs}px system-ui, sans-serif`;
+          ctx.fillStyle = sound || pressed ? "rgba(255,255,255,0.9)" : "rgba(200,205,240,0.6)";
+          ctx.fillText(this.keyName(m, view, lane.w), lane.x + lane.w / 2, ly);
+        }
+      } else if (keyLabel && lane.w >= 12) {
         const fs = Math.max(8, Math.min(11, lane.w * 0.45));
         ctx.font = `700 ${fs}px system-ui, sans-serif`;
         ctx.fillStyle = "rgba(220,224,255,0.8)";
-        ctx.fillText(keyLabel.toUpperCase(), lane.x + lane.w / 2, L.compact ? bh - 26 : bh - 6);
-      }
-      if (L.compact && lane.w >= 11) {
-        const fs = Math.max(8, Math.min(12, lane.w * 0.36));
-        ctx.font = `600 ${fs}px system-ui, sans-serif`;
-        ctx.fillStyle = sound || pressed ? "rgba(255,255,255,0.95)" : "rgba(200,205,240,0.75)";
-        ctx.fillText(noteName(m, view.naming), lane.x + lane.w / 2, h - 7);
+        ctx.fillText(keyLabel.toUpperCase(), lane.x + lane.w / 2, bh - 6);
       }
     }
 
     this.topShade();
+  }
+
+  /** Note name for a key; with only the song's keys shown neighbours can be octaves apart, so it carries the octave when it fits. */
+  private keyName(m: number, view: KeyboardView, width: number): string {
+    const base = noteName(m, view.naming);
+    if (m % 12 !== 0 && !view.layout.compact) return base;
+    const full = base + octaveOf(m);
+    return m % 12 === 0 || this.ctx.measureText(full).width <= width - 4 ? full : base;
   }
 
   private drawBare(view: KeyboardView, marks: Marks): void {

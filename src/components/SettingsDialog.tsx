@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { useT } from "../i18n";
 import { keyboardOctaveNow, pianoKeyMap } from "../input/keyboardBase";
 import { micSupported, toggleMic } from "../input/mic";
+import { MicDevicePicker, MicSensitivity } from "./MicChip";
 import { startMidi } from "../input/midi";
 import { useFullscreen } from "../lib/fullscreen";
 import { updateSettings } from "../state/actions";
@@ -585,15 +586,8 @@ export function SettingsDialog() {
                   </Button>
                   <span className="text-xs text-mist-400">{mic === "denied" ? t("micDenied") : t("micListenHint")}</span>
                 </div>
-                <Slider
-                  label={t("micSensitivity")}
-                  value={s.micSensitivity}
-                  min={0}
-                  max={1}
-                  step={0.05}
-                  onChange={(v) => updateSettings({ micSensitivity: v })}
-                  format={(v) => `${Math.round(v * 100)}%`}
-                />
+                <MicDevicePicker />
+                <MicSensitivity />
               </Section>
             )}
             <Section title={t("computerKeyboard")}>

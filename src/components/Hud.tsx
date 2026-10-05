@@ -54,7 +54,7 @@ export function Hud() {
         </div>
       )}
 
-      <div className="pointer-events-none absolute inset-x-0 top-3 flex flex-col items-center gap-2 px-24">
+      <div className="pointer-events-none absolute inset-x-0 top-3 z-20 flex flex-col items-center gap-2 px-24">
         <DrillChip />
         <DuelChip />
         <DuetHud />
@@ -108,13 +108,13 @@ export function Hud() {
       {coach && status === "ready" && !freePlay && !audioLoading && !songLoading && <CoachCard />}
 
       {idle && !(coach && status === "ready") && !freePlay && !audioLoading && !songLoading && (
-        <div className="absolute inset-0 flex items-center justify-center">
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <button
             type="button"
             onClick={() => void engine.play()}
             aria-label={t("play")}
             className={cx(
-              "group flex h-20 w-20 items-center justify-center rounded-full text-white",
+              "group pointer-events-auto flex h-20 w-20 items-center justify-center rounded-full text-white",
               "bg-gradient-to-b from-brand-400 to-brand-600 shadow-[0_18px_50px_-12px_rgba(139,92,246,0.9)]",
               "transition-transform duration-150 hover:scale-105 active:scale-95 animate-pop"
             )}
