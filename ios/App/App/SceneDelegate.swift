@@ -16,19 +16,16 @@ class SonatrioViewController: CAPBridgeViewController {
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         setNeedsStatusBarAppearanceUpdate()
-        setNeedsUpdateOfHomeIndicatorAutoHidden()
         setNeedsUpdateOfScreenEdgesDeferringSystemGestures()
     }
 
+    // The SystemBars plugin shows the status bar on load; this wins over it.
     override var prefersStatusBarHidden: Bool {
         return true
     }
 
-    // iOS ignores the deferred bottom edge while the home indicator is auto-hidden, so it stays visible.
-    override var prefersHomeIndicatorAutoHidden: Bool {
-        return false
-    }
-
+    // iOS ignores the deferred bottom edge while the home indicator is auto-hidden, so nothing may hide it
+    // (SystemBars.hide with the navigation bar would).
     override var preferredScreenEdgesDeferringSystemGestures: UIRectEdge {
         return .all
     }
