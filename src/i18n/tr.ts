@@ -1040,6 +1040,7 @@ export const tr: Dict = {
   tutorialSkip: "Geç",
   tutorialFirstHint: "Başlamadan önce kısa bir tur. İstersen geçebilir, dilediğin zaman Ayarlar → Yardım ve geri bildirim bölümünden yeniden izleyebilirsin.",
   videoOffline: "Video yüklenemedi. İnternet bağlantını kontrol et ve daha sonra Ayarlar → Yardım ve geri bildirim bölümünden tekrar dene.",
+  videoOpenExternal: "Videoyu aç",
   feedback: "Geri bildirim gönder",
   feedbackHint: "Şikâyet, öneri ve hata bildirimleri",
   feedbackTitle: "Geri bildirim",

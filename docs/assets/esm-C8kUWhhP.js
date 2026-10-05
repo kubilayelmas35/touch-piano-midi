@@ -1,2 +1,0 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["./web-DJUDAqpi.js","./dist-DfPCcM_r.js"])))=>i.map(i=>d[i]);
-import{I as e}from"./index-JlyJZxjI.js";import{registerPlugin as t}from"./dist-DfPCcM_r.js";var n=t(`ScreenOrientation`,{web:()=>e(()=>import(`./web-DJUDAqpi.js`).then(e=>new e.ScreenOrientationWeb),__vite__mapDeps([0,1]),import.meta.url)});export{n as ScreenOrientation};

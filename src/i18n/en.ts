@@ -1052,6 +1052,7 @@ export const en = {
   tutorialSkip: "Skip",
   tutorialFirstHint: "A quick tour before you start. You can skip it and watch it again any time in Settings → Help & feedback.",
   videoOffline: "The video couldn't be loaded. Check your internet connection and try again later from Settings → Help & feedback.",
+  videoOpenExternal: "Open the video",
   feedback: "Send feedback",
   feedbackHint: "Complaints, suggestions and bug reports",
   feedbackTitle: "Feedback",

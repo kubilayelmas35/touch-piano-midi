@@ -1,4 +1,5 @@
 import { reportError } from "../lib/errors";
+import { isNativeApp, SITE_URL } from "../lib/platform";
 import { getBus } from "./context";
 import { INSTRUMENTS, sampleUrl, type InstrumentDef, type InstrumentId } from "./instruments";
 
@@ -199,6 +200,15 @@ export function isLoaded(id: InstrumentId): boolean {
   return loaded.has(id);
 }
 
+async function fetchSample(url: string): Promise<ArrayBuffer> {
+  const res = await fetch(url);
+  // Capacitor's iOS file handler answers media files without an HTTP status, so a packaged sample arrives as status 0.
+  if (!res.ok && res.status !== 0) throw new Error(`HTTP ${res.status}`);
+  const bytes = await res.arrayBuffer();
+  if (!bytes.byteLength) throw new Error(`HTTP ${res.status}, empty body`);
+  return bytes;
+}
+
 let offline: OfflineAudioContext | null = null;
 
 function decodeWith(ctx: BaseAudioContext, data: ArrayBuffer, timeoutMs: number): Promise<AudioBuffer> {
@@ -253,9 +263,15 @@ export function loadInstrument(
       while (queue.length) {
         const midi = queue.shift()!;
         try {
-          const res = await fetch(sampleUrl(id, midi));
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const decoded = await decodeSample(ctx, await res.arrayBuffer());
+          const url = sampleUrl(id, midi);
+          let bytes: ArrayBuffer;
+          try {
+            bytes = await fetchSample(url);
+          } catch (err) {
+            if (!isNativeApp) throw err;
+            bytes = await fetchSample(SITE_URL + url.replace(/^\.?\//, ""));
+          }
+          const decoded = await decodeSample(ctx, bytes);
           buffers.set(midi, prepare(ctx, decoded, def));
         } catch (err) {
           failed++;

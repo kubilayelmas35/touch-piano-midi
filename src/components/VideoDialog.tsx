@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useT } from "../i18n";
 import { reportError } from "../lib/errors";
-import { platform, SITE_URL } from "../lib/platform";
+import { isNativeApp, platform, SITE_URL } from "../lib/platform";
 import { useApp, type VideoKind } from "../state/store";
 import type { Language } from "../state/settings";
 import { Button, Dialog } from "../ui/primitives";
@@ -15,7 +15,14 @@ export function videoUrl(kind: VideoKind, lang: Language, ext: "mp4" | "jpg" = "
 
 function describeVideo(el: HTMLVideoElement): string {
   const e = el.error;
-  return `code ${e?.code ?? "-"} ${e?.message ?? ""}; network ${el.networkState}, ready ${el.readyState}; ${el.currentSrc || el.src}`;
+  const mp4 = el.canPlayType('video/mp4; codecs="avc1.640028, mp4a.40.2"') || "no";
+  return `code ${e?.code ?? "-"} ${e?.message ?? ""}; network ${el.networkState}, ready ${el.readyState}; mp4 ${mp4}; ${el.currentSrc || el.src}`;
+}
+
+/** The system player (Safari view) when the in-app one can't play it. */
+async function openExternally(url: string): Promise<void> {
+  const { Browser } = await import("@capacitor/browser");
+  await Browser.open({ url });
 }
 
 export function VideoDialog() {
@@ -67,7 +74,13 @@ export function VideoDialog() {
       {video && (
         <>
           {video.first && <p className="mb-3 text-sm text-mist-300">{t("tutorialFirstHint")}</p>}
-          {failed === src ? (
+          {failed === src && isNativeApp ? (
+            <div className="flex justify-center rounded-2xl bg-white/[0.05] px-4 py-8">
+              <Button variant="primary" onClick={() => void openExternally(src).catch((err) => reportError("error", err))}>
+                {t("videoOpenExternal")}
+              </Button>
+            </div>
+          ) : failed === src ? (
             <p className="rounded-2xl bg-white/[0.05] px-4 py-8 text-center text-sm text-mist-300">{t("videoOffline")}</p>
           ) : (
             <video
