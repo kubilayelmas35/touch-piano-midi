@@ -644,6 +644,7 @@ export const tr: Dict = {
 
   proActive: "Pro aktif",
   proBody: "Mikrofon, MIDI klavye, arkadaşlar, tüm tasarımlar, kendi MIDI'lerin ve Stüdyo tek seferlik ödemeyle açılır.",
+  proBodyNoMidi: "Mikrofon, arkadaşlar, tüm tasarımlar, kendi MIDI'lerin ve Stüdyo tek seferlik ödemeyle açılır.",
   proPerk1: "Sınırsız MIDI yükle ve çal",
   proPerk2: "Tek seferlik ödeme, ömür boyu senin",
   proPerk3: "Aynı hesapla tüm cihazlarında geçerli",

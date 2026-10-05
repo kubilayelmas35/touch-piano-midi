@@ -705,7 +705,7 @@ export function ProDialog() {
         <h2 className="mt-3 text-xl font-extrabold tracking-tight">
           Sonatrio <span className="text-amber-300">Pro</span>
         </h2>
-        <p className="mt-1 text-sm text-mist-300">{account.pro ? t("proActive") : t("proBody")}</p>
+        <p className="mt-1 text-sm text-mist-300">{account.pro ? t("proActive") : t(midiOff ? "proBodyNoMidi" : "proBody")}</p>
         {!account.pro && trialActive(account) && (
           <p className="mt-2 inline-block rounded-lg bg-amber-300/15 px-2.5 py-1 text-xs font-bold text-amber-200">
             {t("trialActiveTitle", { n: trialDaysLeft(account) })}

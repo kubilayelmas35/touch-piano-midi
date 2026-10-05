@@ -654,6 +654,7 @@ export const en = {
   // Pro
   proActive: "Pro active",
   proBody: "Microphone, MIDI keyboard, friends, every design, your own MIDI files and the Studio, unlocked with one payment.",
+  proBodyNoMidi: "Microphone, friends, every design, your own MIDI files and the Studio, unlocked with one payment.",
   proPerk1: "Import and play unlimited MIDI files",
   proPerk2: "One-time purchase, yours forever",
   proPerk3: "Works on all your devices with the same account",
