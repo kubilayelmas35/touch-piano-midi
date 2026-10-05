@@ -378,6 +378,12 @@ export class Engine {
 
   async play(): Promise<void> {
     if (!this.song || this.status === "playing") return;
+    if (this.transportHook?.("play")) return;
+    await this.start();
+  }
+
+  private async start(): Promise<void> {
+    if (!this.song || this.status === "playing") return;
     await unlockAudio();
     const ok = await this.ensureAudio();
     if (!ok || !this.song) return;
@@ -395,7 +401,36 @@ export class Engine {
     this.emit();
   }
 
+  /**
+   * Starts so that song time `songT` falls on `perfAt` (a performance.now() time), catching up if that moment has
+   * passed: two devices given the same moment play in step. Bypasses the transport hook.
+   */
+  async startAt(songT: number, perfAt: number): Promise<void> {
+    if (!this.song) return;
+    if (this.status === "playing") this.halt();
+    if (this.status === "complete" || songT <= this.startTime + 0.001) this.resetRun();
+    else this.anchorSong = Math.max(this.startTime, Math.min(this.endTime, songT));
+    const ok = await this.ensureAudio();
+    if (!ok || !this.song) return;
+    const wait = perfAt - performance.now();
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    await this.start();
+    if (this.status !== "playing") return;
+    const late = (performance.now() - perfAt) / 1000;
+    if (late > 0.002) this.seekInternalKeepNotes(this.anchorSong + late * this.config.speed);
+  }
+
+  /** Asked before a user's play / pause / seek / restart; returning true takes the action over (live duet). */
+  transportHook: ((action: "play" | "pause" | "seek" | "stop") => boolean) | null = null;
+
   pause(): void {
+    if (this.status !== "playing") return;
+    if (this.transportHook?.("pause")) return;
+    this.halt();
+  }
+
+  /** Pauses without asking the transport hook. */
+  halt(): void {
     if (this.status !== "playing") return;
     this.anchorSong = this.time;
     this.status = "paused";
@@ -412,6 +447,13 @@ export class Engine {
   /** Back to the beginning, keeping the song loaded. */
   stop(): void {
     if (!this.song) return;
+    if (this.transportHook?.("stop")) return;
+    this.rewind();
+  }
+
+  /** Back to the beginning without asking the transport hook. */
+  rewind(): void {
+    if (!this.song) return;
     this.killScheduled();
     this.resetRun();
     this.status = "ready";
@@ -426,6 +468,7 @@ export class Engine {
 
   seek(t: number): void {
     if (!this.song) return;
+    if (this.transportHook?.("seek")) return;
     const target = Math.max(this.startTime, Math.min(this.endTime, t));
     if (this.notes.some((n) => n.state === NoteState.Hit || n.state === NoteState.Missed)) this.runDirty = true;
     this.countInActive = false;

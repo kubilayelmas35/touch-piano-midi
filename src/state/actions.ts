@@ -31,6 +31,7 @@ import { initProgress, recordDaily, recordRun } from "../progress/tracker";
 import { DAILY_STARS, dailySong } from "../progress/daily";
 import { initReminders } from "../lib/reminders";
 import { initSocial, reportRun, scoreable } from "../social/social";
+import { duetAfterRun, initDuet } from "../social/live";
 import { coachAfterRun } from "../coach/coach";
 import { drillAfterPass } from "../coach/drill";
 import { analyzeRun, type Hand } from "../coach/insights";
@@ -41,12 +42,14 @@ export { handTracks };
 const LAST_SONG = "staveflow-last-song";
 
 export function engineConfig(): Partial<EngineConfig> {
-  const { settings, session } = useApp.getState();
+  const { settings, session, duet } = useApp.getState();
+  // In a live duet both devices must run the very same timeline.
+  const together = !!duet?.songId;
   return {
     instrument: settings.instrument,
     guitarTone: settings.guitarTone,
     metronome: settings.metronome,
-    countIn: settings.countIn,
+    countIn: settings.countIn || together,
     timingWindowMs: settings.timingWindowMs,
     accompVolume: settings.accompVolume,
     pianoPedal: settings.pianoPedal,
@@ -55,11 +58,11 @@ export function engineConfig(): Partial<EngineConfig> {
     mutedTracks: session.mutedTracks,
     // On guitar/violin the hands split the playing technique (strike vs. fret), not the notes.
     hand: settings.instrument === "piano" ? session.hand : "both",
-    speed: session.speed,
-    waitMode: session.waitMode,
-    autoPlay: session.autoPlay,
-    loop: session.loop,
-    segmentEnd: session.segmentEnd,
+    speed: together ? duet.speed : session.speed,
+    waitMode: session.waitMode && !together,
+    autoPlay: session.autoPlay && !together,
+    loop: together ? NO_LOOP : session.loop,
+    segmentEnd: together ? 0 : session.segmentEnd,
   };
 }
 
@@ -124,6 +127,7 @@ export async function initApp(): Promise<void> {
   const exists = last && (isBuiltin(last) || useApp.getState().userSongs.some((s) => s.id === last));
   await openSong(exists ? last! : "ode-to-joy", { quiet: true });
   void engine.ensureAudio();
+  initDuet();
 }
 
 export async function refreshLibrary(): Promise<void> {
@@ -160,9 +164,9 @@ export function applyRemoteSettings(settings: Settings): void {
 let prefsTimer = 0;
 
 function persistSession(): void {
-  const { currentId, session, coach } = useApp.getState();
-  // Path lessons set their own hand and speed; the song keeps the player's own choices.
-  if (!currentId || coach) return;
+  const { currentId, session, coach, duet } = useApp.getState();
+  // Path lessons and duets set their own hand and speed; the song keeps the player's own choices.
+  if (!currentId || coach || duet) return;
   window.clearTimeout(prefsTimer);
   prefsTimer = window.setTimeout(() => {
     void patchPrefs(currentId, {
@@ -198,6 +202,12 @@ function sessionFor(song: Song, prefs: SongPrefs | undefined): Session {
     autoPlay: false,
     loop: prefs?.loop ? { ...prefs.loop } : { ...NO_LOOP },
   };
+}
+
+/** Back to the player's own tracks, hand and speed for the open song (after a duet set its own). */
+export function restoreSession(): void {
+  const { song, currentId, prefs } = useApp.getState();
+  if (song && currentId) updateSession(sessionFor(song, prefs[currentId]));
 }
 
 /** Which hand the player takes. Piano: picks the hand tracks (or splits at middle C). Guitar / violin: strike vs. fret. */
@@ -392,13 +402,15 @@ function handleComplete(r: { stats: import("../engine/types").Stats; dirty: bool
     speed: r.config.speed,
     practice: practice || partial,
   });
+  const duet = duetAfterRun(r.stats, accuracy, stars);
   // Skipping around or looping doesn't say how the whole step went.
-  const coach = r.dirty || r.config.loop.enabled ? undefined : coachAfterRun({ accuracy, stars, speed: r.config.speed, wait: r.config.waitMode });
+  const coach =
+    duet || r.dirty || r.config.loop.enabled ? undefined : coachAfterRun({ accuracy, stars, speed: r.config.speed, wait: r.config.waitMode });
   const insights = runInsights(r.config);
   const daily =
     !practice && !partial && stars >= DAILY_STARS && currentId === dailySong(useApp.getState().settings.skill) && recordDaily(currentId);
-  // Wait mode can't be missed, so it doesn't compete.
-  const social = !practice && !partial && !r.config.waitMode && r.stats.score > 0 && scoreable(currentId);
+  // Wait mode can't be missed, so it doesn't compete; a duet is half the song.
+  const social = !duet && !practice && !partial && !r.config.waitMode && r.stats.score > 0 && scoreable(currentId);
   useApp.setState({
     results: {
       stats: r.stats,
@@ -412,6 +424,7 @@ function handleComplete(r: { stats: import("../engine/types").Stats; dirty: bool
       insights,
       daily,
       social,
+      duet,
     },
   });
   if (social) void reportRun({ songId: currentId, instrument: r.config.instrument, score: r.stats.score, accuracy, stars });

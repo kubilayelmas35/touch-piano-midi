@@ -49,6 +49,17 @@ export interface SocialOverview {
   incoming: FriendRef[];
   outgoing: FriendRef[];
   duels: Duel[];
+  /** Friends calling me into a live duet room (the last 15 minutes). */
+  duet_invites?: DuetInvite[];
+}
+
+export interface DuetInvite {
+  id: number;
+  friend: string | null;
+  friend_id: string;
+  code: string;
+  song_id: string;
+  created_at: string;
 }
 
 export interface SongScore {
@@ -195,6 +206,24 @@ export async function declineDuel(id: number) {
   return r;
 }
 
+/** Calls a friend into a live duet room; their app hears about it at once through their inbox channel. */
+export async function sendDuetInvite(friendId: string, code: string, songId: string) {
+  const r = await call<number>("duet_invite", { p_friend: friendId, p_code: code, p_song: songId });
+  if (r.ok) {
+    const ch = supabase!.channel(`inbox:${friendId}`);
+    void ch
+      .httpSend("duet", {})
+      .catch(() => undefined)
+      .finally(() => void supabase!.removeChannel(ch));
+  }
+  return r;
+}
+
+export async function dismissDuetInvite(id: number) {
+  useApp.setState((s) => (s.social ? { social: { ...s.social, duet_invites: s.social.duet_invites?.filter((i) => i.id !== id) } } : {}));
+  return call<null>("duet_invite_dismiss", { p_id: id });
+}
+
 /**
  * Sends a finished run to the weekly board and, when it plays an open challenge with the challenger's settings
  * (same instrument, hand, and at least their speed), answers it. The open results dialog then shows both.
@@ -263,7 +292,7 @@ export function inviteLink(username: string): string {
 /** Things waiting for me: friend requests and challenges to answer. */
 export function pendingCount(s: SocialOverview | null): number {
   if (!s) return 0;
-  return s.incoming.length + s.duels.filter((d) => !d.mine && d.status === "open").length;
+  return s.incoming.length + s.duels.filter((d) => !d.mine && d.status === "open").length + (s.duet_invites?.length ?? 0);
 }
 
 export function socialErrorText(e: SocialError): string {

@@ -3,6 +3,7 @@ import { initAuth } from "./auth/account";
 import { AccountDialog, ProDialog } from "./components/AccountDialog";
 import { FeedbackDialog } from "./components/FeedbackDialog";
 import { FriendsDialog } from "./components/FriendsDialog";
+import { DuetDialog, DuetInviteBanner } from "./components/DuetDialog";
 import { PathDialog } from "./components/CoachUI";
 import { GameView } from "./components/GameView";
 import { LibraryPanel } from "./components/LibraryPanel";
@@ -90,6 +91,8 @@ export function App() {
       <ResultsDialog />
       <ProgressDialog />
       <FriendsDialog />
+      <DuetDialog />
+      <DuetInviteBanner />
       <WelcomeDialog />
       <PathDialog />
       <AccountDialog />

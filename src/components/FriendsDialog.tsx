@@ -6,6 +6,7 @@ import { playDuel } from "../social/duel";
 import {
   addFriend,
   declineDuel,
+  dismissDuetInvite,
   inviteLink,
   removeFriend,
   respondFriend,
@@ -17,7 +18,8 @@ import {
 } from "../social/social";
 import { shareLink } from "../studio/share";
 import { setPanel, toast, useApp } from "../state/store";
-import { IconCheck, IconClose, IconCrown, IconPlay, IconShare, IconSwords, IconTrophy, IconUser, IconUsers } from "../ui/icons";
+import { hostDuet, inviteToDuet, joinDuet } from "../social/live";
+import { IconCheck, IconClose, IconCrown, IconDuet, IconPlay, IconShare, IconSwords, IconTrophy, IconUser, IconUsers } from "../ui/icons";
 import { Button, Dialog, Segmented, cx } from "../ui/primitives";
 
 type Tab = "board" | "duels" | "friends";
@@ -243,16 +245,62 @@ function DuelRow({ d }: { d: Duel }) {
 
 function Duels({ duels }: { duels: Duel[] }) {
   const t = useT();
-  if (!duels.length) return <Empty icon={<IconSwords size={28} />}>{t("duelsEmpty")}</Empty>;
+  const invites = useApp((s) => s.social?.duet_invites) ?? [];
+  const lang = useApp((s) => s.settings.language);
+  if (!duels.length && !invites.length) return <Empty icon={<IconSwords size={28} />}>{t("duelsEmpty")}</Empty>;
   const order = (d: Duel) => (d.status === "open" && !d.mine ? 0 : d.status === "open" ? 1 : 2);
   return (
     <ul className="space-y-1.5">
+      {invites.map((i) => (
+        <li key={`inv-${i.id}`} className="flex items-center gap-3 rounded-2xl bg-fuchsia-400/10 px-3 py-2.5 ring-1 ring-fuchsia-300/25">
+          <IconDuet size={20} className="shrink-0 text-fuchsia-300" />
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-semibold">{t("duetInviteBanner", { name: i.friend ?? "?" })}</div>
+            <div className="truncate text-xs text-mist-400">{builtinTitle(i.song_id, lang)}</div>
+          </div>
+          <Button
+            size="sm"
+            variant="primary"
+            onClick={() => {
+              void dismissDuetInvite(i.id);
+              joinDuet(i.code);
+            }}
+          >
+            {t("duetJoin")}
+          </Button>
+        </li>
+      ))}
       {[...duels]
         .sort((a, b) => order(a) - order(b))
         .map((d) => (
           <DuelRow key={d.id} d={d} />
         ))}
     </ul>
+  );
+}
+
+/** Opens a room with the current song (or reuses mine) and calls the friend into it. */
+async function duetWith(id: string, name: string | null): Promise<void> {
+  const room = hostDuet();
+  if (room?.songId) await inviteToDuet(id, name);
+}
+
+function DuetEntry() {
+  const t = useT();
+  const room = useApp((s) => s.duet);
+  return (
+    <button
+      type="button"
+      onClick={() => setPanel("duet")}
+      className="mb-4 flex w-full items-center gap-3 rounded-2xl bg-gradient-to-br from-fuchsia-400/15 to-brand-500/15 px-3 py-2.5 text-left ring-1 ring-fuchsia-300/25 hover:ring-fuchsia-300/45"
+    >
+      <IconDuet size={24} className="shrink-0 text-fuchsia-300" />
+      <div className="min-w-0 flex-1">
+        <div className="font-bold">{t("duet")}</div>
+        <div className="truncate text-xs text-mist-400">{room ? `${t("duetRoomCode")}: ${room.code}` : t("duetEntryHint")}</div>
+      </div>
+      <IconPlay size={14} className="text-mist-400" />
+    </button>
   );
 }
 
@@ -302,9 +350,14 @@ function Friends() {
                     {t("friendRemoveConfirm")}
                   </Button>
                 ) : (
-                  <Button size="sm" variant="ghost" onClick={() => setConfirm(f.id)} aria-label={t("friendRemove")}>
-                    <IconClose size={14} />
-                  </Button>
+                  <>
+                    <Button size="sm" onClick={() => void duetWith(f.id, f.username)}>
+                      <IconDuet size={14} /> {t("duetShort")}
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setConfirm(f.id)} aria-label={t("friendRemove")}>
+                      <IconClose size={14} />
+                    </Button>
+                  </>
                 )}
               </li>
             ))}
@@ -339,7 +392,7 @@ export function FriendsDialog() {
   const [tab, setTab] = useState<Tab>("board");
   const close = () => setPanel(null);
 
-  const incomingDuels = social?.duels.filter((d) => !d.mine && d.status === "open").length ?? 0;
+  const incomingDuels = (social?.duels.filter((d) => !d.mine && d.status === "open").length ?? 0) + (social?.duet_invites?.length ?? 0);
   const signedIn = account.status === "signedIn";
   const username = social?.me?.username ?? account.username;
 
@@ -381,6 +434,7 @@ export function FriendsDialog() {
 
   return (
     <Dialog open={open} onClose={close} title={t("friends")} width="max-w-lg" closeLabel={t("close")}>
+      {account.status !== "disabled" && <DuetEntry />}
       {body}
     </Dialog>
   );

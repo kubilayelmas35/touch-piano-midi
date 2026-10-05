@@ -11,6 +11,7 @@ import { CoachResult, CoachResultActions } from "./CoachUI";
 import { SignInNudge } from "./SignInNudge";
 import { InsightsCard } from "./InsightsCard";
 import { ResultsSocial } from "./ResultsSocial";
+import { DuetResults } from "./DuetDialog";
 import { startCoach } from "../coach/coach";
 import { SPEEDS } from "../coach/path";
 import { MASTERY_STARS } from "../progress/progress";
@@ -130,7 +131,13 @@ export function ResultsDialog() {
         )
       }
     >
-      {results.coach ? <CoachResult outcome={results.coach} /> : !dirty && stars >= MASTERY_STARS && <NextUp />}
+      {results.duet ? (
+        <DuetResults result={results.duet} />
+      ) : results.coach ? (
+        <CoachResult outcome={results.coach} />
+      ) : (
+        !dirty && stars >= MASTERY_STARS && <NextUp />
+      )}
       <div className="text-center">
         <p className="truncate text-sm text-mist-400">{title}</p>
         <div className="mt-3 flex justify-center gap-1.5" role="img" aria-label={t("starsOf", { n: stars })}>

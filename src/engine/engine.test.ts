@@ -388,4 +388,34 @@ describe("engine", () => {
       expect(n.fret).toBeGreaterThanOrEqual(0);
     }
   });
+
+  it("startAt catches up when the shared start moment has already passed", async () => {
+    const engine = new Engine();
+    engine.load(makeSong(), { playTracks: [0], countIn: false, speed: 0.5 });
+    await engine.startAt(engine.startTime, now - 200);
+    expect(engine.status).toBe("playing");
+    expect(engine.time).toBeCloseTo(engine.startTime + 0.1, 3);
+  });
+
+  it("lets a transport hook take over play and seek but not halt / rewind", async () => {
+    const engine = new Engine();
+    engine.load(makeSong(), { playTracks: [0], countIn: false });
+    const asked: string[] = [];
+    engine.transportHook = (a) => {
+      asked.push(a);
+      return a === "play" || a === "seek";
+    };
+    await engine.play();
+    expect(engine.status).toBe("ready");
+    await engine.startAt(engine.startTime, now);
+    advance(1, engine);
+    const t = engine.time;
+    engine.seek(4);
+    expect(engine.time).toBeCloseTo(t, 3);
+    engine.pause();
+    expect(engine.status).toBe("paused");
+    engine.stop();
+    expect(engine.status).toBe("ready");
+    expect(asked).toEqual(["play", "seek", "pause", "stop"]);
+  });
 });

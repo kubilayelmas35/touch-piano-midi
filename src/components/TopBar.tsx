@@ -32,6 +32,7 @@ import {
   IconSparkles,
   IconUser,
   IconUsers,
+  IconDuet,
   IconViolin,
   IconWait,
 } from "../ui/icons";
@@ -342,6 +343,7 @@ function MoreMenu() {
             onClick: () => setPanel("friends"),
             extra: waiting > 0 ? <span className="rounded-full bg-rose-500 px-1.5 text-xs font-bold text-white">{waiting}</span> : undefined,
           },
+          { label: t("duet"), icon: <IconDuet size={18} />, onClick: () => setPanel("duet") },
           { label: t("account"), icon: <IconUser size={18} />, onClick: () => setPanel("account") },
         ]
       : []),

@@ -39,6 +39,8 @@ export interface Results {
   friendScores?: import("../social/social").SongScore[];
   /** This run answered a friend's challenge. */
   duel?: { friend: string | null; mine: number; theirs: number };
+  /** A live duet: my hand's run and the partner's (theirs arrives a moment later). */
+  duet?: import("../social/live").DuetResult;
 }
 
 /** Drilling a hard stretch: it loops, a notch faster after each clean pass, until it is clean at `target` speed. */
@@ -87,6 +89,7 @@ export type Panel =
   | "feedback"
   | "path"
   | "friends"
+  | "duet"
   | null;
 
 export type VideoKind = "tutorial" | "promo";
@@ -156,6 +159,8 @@ export interface AppState {
   activeDuel: import("../social/social").Duel | null;
   /** Username from an invite link, waiting to be sent as a friend request. */
   friendInvite: string | null;
+  /** Live duet room this device is in. */
+  duet: import("../social/live").DuetRoom | null;
   dragOver: boolean;
   audioLocked: boolean;
   account: Account;
@@ -217,6 +222,7 @@ export const useApp = create<AppState>(() => ({
   socialLoading: false,
   activeDuel: null,
   friendInvite: null,
+  duet: null,
   dragOver: false,
   audioLocked: false,
   account: {

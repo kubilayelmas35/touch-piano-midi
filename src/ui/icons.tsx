@@ -357,6 +357,15 @@ export const IconSwords = (p: IconProps) => (
     <path d="M14.5 6.5 18 3h3v3l-3.5 3.5M5 14l4 4M7 17l-3 3M3 19l2 2" />
   </Svg>
 );
+export const IconDuet = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="7.5" cy="5.5" r="2.5" />
+    <circle cx="16.5" cy="5.5" r="2.5" />
+    <path d="M3.5 12a4 4 0 0 1 8 0M12.5 12a4 4 0 0 1 8 0" />
+    <rect x="2.5" y="14.5" width="19" height="6.5" rx="1.5" />
+    <path d="M7.3 14.5V18M12 14.5V18M16.7 14.5V18" />
+  </Svg>
+);
 export const IconMic = (p: IconProps) => (
   <Svg {...p}>
     <rect x="9" y="2" width="6" height="12" rx="3" />
