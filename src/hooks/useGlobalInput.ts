@@ -201,6 +201,9 @@ export function useGlobalInput(): void {
     window.addEventListener("blur", releaseKeys);
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("pointerdown", firstGesture, { capture: true });
+    // iOS only lets audio start from the end of a touch, not from pointerdown.
+    window.addEventListener("pointerup", firstGesture, { capture: true });
+    window.addEventListener("touchend", firstGesture, { capture: true });
     window.addEventListener("keydown", firstGesture, { capture: true, once: true });
     window.addEventListener("dragenter", onDragEnter);
     window.addEventListener("dragover", onDragOver);
@@ -212,6 +215,8 @@ export function useGlobalInput(): void {
       window.removeEventListener("blur", releaseKeys);
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pointerdown", firstGesture, { capture: true });
+      window.removeEventListener("pointerup", firstGesture, { capture: true });
+      window.removeEventListener("touchend", firstGesture, { capture: true });
       window.removeEventListener("keydown", firstGesture, { capture: true });
       window.removeEventListener("dragenter", onDragEnter);
       window.removeEventListener("dragover", onDragOver);

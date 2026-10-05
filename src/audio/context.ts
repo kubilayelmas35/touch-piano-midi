@@ -29,6 +29,9 @@ function buildImpulse(ctx: AudioContext, seconds: number, decay: number): AudioB
 
 export function getBus(): MasterBus {
   if (bus) return bus;
+  // iOS treats Web Audio as "ambient" (silenced by the ring/silent switch) unless the page asks for playback.
+  const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
+  if (session) session.type = "playback";
   const ctx = new AudioContext({ latencyHint: "interactive" });
 
   const input = ctx.createGain();

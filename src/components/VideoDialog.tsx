@@ -1,15 +1,15 @@
 import { useState } from "react";
 import { useT } from "../i18n";
-import { isNativeApp, SITE_URL } from "../lib/platform";
+import { platform, SITE_URL } from "../lib/platform";
 import { useApp, type VideoKind } from "../state/store";
 import type { Language } from "../state/settings";
 import { Button, Dialog } from "../ui/primitives";
 import { followGoal } from "../coach/coach";
 
-/** The app package leaves the videos out (size), so it streams them from the website. */
+/** The Android app streams the videos from the website; the iOS app ships the tutorial and plays it offline. */
 export function videoUrl(kind: VideoKind, lang: Language, ext: "mp4" | "jpg" = "mp4"): string {
   const file = `videos/${kind}-${lang}.${ext}`;
-  return isNativeApp ? SITE_URL + file : file;
+  return platform === "android" ? SITE_URL + file : file;
 }
 
 export function VideoDialog() {

@@ -30,7 +30,7 @@ export function Hud() {
   return (
     <>
       {!autoPlay && (judged > 0 || status === "playing") && (
-        <div className="pointer-events-none absolute top-3 right-3 flex flex-col items-end gap-1 text-right">
+        <div className="pointer-events-none absolute top-3 right-[calc(var(--edge-right)+0.75rem)] flex flex-col items-end gap-1 text-right">
           <div className="text-[11px] font-semibold tracking-[0.14em] text-mist-400 uppercase">{t("score")}</div>
           <div className="text-2xl leading-none font-extrabold tabular-nums text-white drop-shadow sm:text-3xl">
             {stats.score.toLocaleString()}

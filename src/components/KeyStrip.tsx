@@ -68,7 +68,7 @@ export function KeyStrip({ piano, used }: { piano: PianoLayout; used: readonly n
 
   const btn = "grid h-6 min-w-6 place-items-center rounded-md px-1 text-sm font-semibold text-white/80 hover:bg-white/10 disabled:opacity-30";
   return (
-    <div className="flex h-full items-center gap-1 border-t border-white/5 bg-[#0c0d18] px-1.5">
+    <div className="flex h-full items-center gap-1 border-t border-white/5 bg-[#0c0d18] pr-[calc(var(--edge-right)+0.375rem)] pl-[calc(var(--edge-left)+0.375rem)]">
       <button type="button" className={btn} onClick={() => step(-1)} disabled={zoom <= 1} title={t("keyZoomOut")} aria-label={t("keyZoomOut")}>
         −
       </button>

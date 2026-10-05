@@ -501,7 +501,7 @@ export function TopBar() {
   const labels = (from: "lg" | "xl") => (dense >= 2 ? "[&>span]:hidden" : from === "lg" ? "max-lg:[&>span]:hidden" : "max-xl:[&>span]:hidden");
 
   return (
-    <header className="relative z-20 shrink-0 border-b border-white/[0.06] bg-ink-900/85 backdrop-blur-xl">
+    <header className="relative z-20 shrink-0 border-b border-white/[0.06] bg-ink-900/85 pt-[var(--edge-top)] pr-[var(--edge-right)] pl-[var(--edge-left)] backdrop-blur-xl">
       <div ref={rowRef} className="flex h-14 items-center gap-1.5 px-2 sm:gap-2 sm:px-3">
         <Logo iconOnly={dense >= 2} />
         <IconButton label={t("library")} onClick={() => setPanel("library")} showLabel className={cx("shrink-0", labels("lg"))}>

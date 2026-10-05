@@ -115,7 +115,7 @@ export function CoachChip() {
   if (!step) return null;
   const partSec = stepPartSeconds(step.song, state.part);
   return (
-    <div className="pointer-events-none absolute top-3 left-3 flex items-center gap-1.5 rounded-full border border-brand-300/25 bg-ink-900/70 px-3 py-1 text-xs font-bold text-brand-100 backdrop-blur">
+    <div className="pointer-events-none absolute top-3 left-[calc(var(--edge-left)+0.75rem)] flex items-center gap-1.5 rounded-full border border-brand-300/25 bg-ink-900/70 px-3 py-1 text-xs font-bold text-brand-100 backdrop-blur">
       <IconRoute size={13} />
       {t("coachLesson", { n: step.lesson + 1 })} · {text.stage(step.stage)} · {pct(speed)}
       {partSec !== null && ` · ${text.part(partSec)}`}

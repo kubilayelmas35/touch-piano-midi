@@ -21,13 +21,9 @@ class SonatrioViewController: CAPBridgeViewController {
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
 
+    // The window and its SonatrioViewController come from Main.storyboard (UISceneStoryboardFile); building a second
+    // one here would start a second web view and bridge behind it.
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
-        guard let windowScene = scene as? UIWindowScene else { return }
-
-        window = UIWindow(windowScene: windowScene)
-        window?.rootViewController = SonatrioViewController()
-        window?.makeKeyAndVisible()
-
         SceneDelegateProxy.shared.scene(scene, willConnectTo: session, options: connectionOptions)
     }
 
