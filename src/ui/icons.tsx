@@ -234,6 +234,12 @@ export const IconUser = (p: IconProps) => (
     <path d="M4 21a8 8 0 0 1 16 0" />
   </Svg>
 );
+export const IconCamera = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M4 8h3l2-3h6l2 3h3v11H4Z" />
+    <circle cx="12" cy="13" r="3.5" />
+  </Svg>
+);
 export const IconCrown = (p: IconProps) => (
   <Svg {...p}>
     <path d="M3 7l4.5 4L12 4l4.5 7L21 7l-2 12H5Z" />

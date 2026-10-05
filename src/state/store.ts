@@ -107,6 +107,12 @@ export interface Account {
   status: "disabled" | "loading" | "signedOut" | "signedIn";
   email: string | null;
   username: string | null;
+  /** Public URL of the profile picture. */
+  avatar: string | null;
+  /** When the username last changed; it can change again six months later. */
+  usernameChangedAt: string | null;
+  /** Signs in with e-mail and password (Google/Apple-only accounts can set one). */
+  hasPassword: boolean;
   pro: boolean;
   /** Cloud MIDI storage, switched on per member by an admin. */
   cloud: boolean;
@@ -229,6 +235,9 @@ export const useApp = create<AppState>(() => ({
     status: "disabled",
     email: null,
     username: null,
+    avatar: null,
+    usernameChangedAt: null,
+    hasPassword: false,
     pro: false,
     cloud: false,
     cloudQuotaMb: 0,

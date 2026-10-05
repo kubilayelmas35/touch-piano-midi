@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { USERNAME_RE } from "../auth/account";
+import { USERNAME_RE, avatarUrl } from "../auth/account";
+import { UserAvatar } from "./UserAvatar";
 import { useT } from "../i18n";
 import { builtinTitle } from "../midi/builtin";
 import { playDuel } from "../social/duel";
@@ -36,17 +37,8 @@ function Empty({ icon, children }: { icon: ReactNode; children: ReactNode }) {
   );
 }
 
-function Avatar({ name, me }: { name: string | null; me?: boolean }) {
-  return (
-    <div
-      className={cx(
-        "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-extrabold uppercase",
-        me ? "bg-brand-500/30 text-brand-100" : "bg-white/[0.08] text-mist-200"
-      )}
-    >
-      {(name ?? "?").slice(0, 1)}
-    </div>
-  );
+function Avatar({ name, path, me }: { name: string | null; path?: string | null; me?: boolean }) {
+  return <UserAvatar url={avatarUrl(path)} name={name} me={me} className="h-9 w-9 text-sm" />;
 }
 
 function UsernameForm() {
@@ -155,7 +147,7 @@ function Board({ rows }: { rows: BoardRow[] }) {
             <span className={cx("w-6 text-center text-sm font-extrabold tabular-nums", MEDAL[i] ?? "text-mist-400")}>
               {i < 3 && r.score > 0 ? <IconCrown size={16} className="mx-auto" /> : i + 1}
             </span>
-            <Avatar name={r.username} me={r.is_me} />
+            <Avatar name={r.username} path={r.avatar} me={r.is_me} />
             <div className="min-w-0 flex-1">
               <div className="truncate font-semibold">
                 {r.username ?? "?"} {r.is_me && <span className="text-xs font-normal text-mist-400">({t("you")})</span>}
@@ -317,7 +309,7 @@ function Friends() {
           <ul className="space-y-1.5">
             {social.incoming.map((f) => (
               <li key={f.id} className="flex items-center gap-3 rounded-2xl bg-sky-400/10 px-3 py-2 ring-1 ring-sky-300/25">
-                <Avatar name={f.username} />
+                <Avatar name={f.username} path={f.avatar} />
                 <div className="min-w-0 flex-1 truncate font-semibold">@{f.username ?? "?"}</div>
                 <Button size="sm" variant="ghost" onClick={() => void respondFriend(f.id, false)}>
                   {t("decline")}
@@ -340,7 +332,7 @@ function Friends() {
           <ul className="space-y-1.5">
             {friends.map((f) => (
               <li key={f.id} className="flex items-center gap-3 rounded-2xl bg-white/[0.04] px-3 py-2">
-                <Avatar name={f.username} />
+                <Avatar name={f.username} path={f.avatar} />
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-semibold">@{f.username ?? "?"}</div>
                   <div className="text-xs text-mist-400">{t("friendWeek", { score: f.score.toLocaleString() })}</div>

@@ -1,9 +1,14 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
   STORE_LINKS,
   USERNAME_RE,
+  changePassword,
+  changeUsername,
   deleteOwnAccount,
+  nextUsernameChange,
   refreshAccount,
+  removeAvatar,
+  uploadAvatar,
   sendPasswordReset,
   signInWithPassword,
   signInWithProvider,
@@ -17,9 +22,10 @@ import { PRO_CLOUD_SONGS } from "../auth/cloud";
 import { buyPro, canBuyInApp, proPrice, restorePro } from "../auth/purchase";
 import { useT, type TFn } from "../i18n";
 import { setPanel, toast, useApp } from "../state/store";
-import { IconApple, IconCheck, IconCloud, IconCrown, IconGoogle, IconShield, IconUser } from "../ui/icons";
+import { IconApple, IconCamera, IconCheck, IconCloud, IconCrown, IconGoogle, IconShield, IconUser } from "../ui/icons";
 import { Button, Dialog, Segmented, cx } from "../ui/primitives";
 import { LegalLinks } from "./LegalLinks";
+import { UserAvatar } from "./UserAvatar";
 
 function errorText(t: TFn, r: AuthResult): string {
   if (r.ok) return "";
@@ -227,20 +233,211 @@ function Recovery() {
   );
 }
 
+function ProfilePicture() {
+  const t = useT();
+  const account = useApp((s) => s.account);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const name = account.username ?? account.email ?? "";
+  const pick = (file: File | undefined) => {
+    if (!file) return;
+    setBusy(true);
+    void uploadAvatar(file).then((r) => {
+      setBusy(false);
+      if (r.ok) toast(t("avatarSaved"), "success");
+      else toast(r.error === "bad_image" ? t("avatarBadImage") : errorText(t, r), "error", 5000);
+    });
+  };
+  return (
+    <div className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => fileRef.current?.click()}
+        disabled={busy}
+        aria-label={t("avatarChange")}
+        title={t("avatarChange")}
+        className="group relative block rounded-full"
+      >
+        <UserAvatar url={account.avatar} name={name} me className={cx("h-16 w-16 text-2xl", busy && "opacity-50")} />
+        <span className="absolute -right-0.5 -bottom-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-brand-500 text-white ring-2 ring-ink-900 group-hover:bg-brand-400">
+          <IconCamera size={13} />
+        </span>
+      </button>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          pick(e.target.files?.[0]);
+          e.target.value = "";
+        }}
+      />
+    </div>
+  );
+}
+
+function UsernameEditor() {
+  const t = useT();
+  const lang = useApp((s) => s.settings.language);
+  const account = useApp((s) => s.account);
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(account.username ?? "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const next = nextUsernameChange(account.usernameChangedAt);
+  const save = async (e: FormEvent) => {
+    e.preventDefault();
+    const n = name.trim();
+    if (n === account.username) return setEditing(false);
+    if (!USERNAME_RE.test(n)) return setError(t("usernameHint"));
+    setBusy(true);
+    setError("");
+    const r = await changeUsername(n);
+    setBusy(false);
+    if (r.ok) {
+      setEditing(false);
+      toast(t("usernameChanged"), "success");
+    } else {
+      const e2 = r.error;
+      setError(e2.includes("username_taken") ? t("usernameTaken") : e2.includes("username_cooldown") ? t("usernameCooldown") : errorText(t, r));
+    }
+  };
+  if (!editing) {
+    return (
+      <div className="flex items-center gap-3 py-2">
+        <div className="min-w-0 flex-1">
+          <div className="text-xs font-semibold text-mist-400">{t("username")}</div>
+          <div className="truncate text-sm font-bold">{account.username ? `@${account.username}` : "—"}</div>
+          <div className="mt-0.5 text-[11px] text-mist-400">
+            {next ? t("usernameNextChange", { date: next.toLocaleDateString(lang) }) : t("usernameChangeRule")}
+          </div>
+        </div>
+        <Button
+          size="sm"
+          disabled={!!next}
+          onClick={() => {
+            setName(account.username ?? "");
+            setError("");
+            setEditing(true);
+          }}
+        >
+          {account.username ? t("change") : t("usernamePick")}
+        </Button>
+      </div>
+    );
+  }
+  return (
+    <form onSubmit={(e) => void save(e)} className="space-y-2 py-2">
+      <Field
+        label={t("username")}
+        hint={account.username ? t("usernameChangeWarn") : t("usernameHint")}
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        autoComplete="nickname"
+        maxLength={24}
+        autoFocus
+        required
+      />
+      {error && <p className="rounded-xl bg-rose-500/15 px-3 py-2 text-sm text-rose-200">{error}</p>}
+      <div className="flex gap-2">
+        <Button type="button" variant="ghost" className="flex-1" onClick={() => setEditing(false)} disabled={busy}>
+          {t("cancel")}
+        </Button>
+        <Button type="submit" variant="primary" className="flex-1" disabled={busy}>
+          {t("save")}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function PasswordEditor() {
+  const t = useT();
+  const hasPassword = useApp((s) => s.account.hasPassword);
+  const [open, setOpen] = useState(false);
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [again, setAgain] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  if (!open) {
+    return (
+      <div className="flex items-center gap-3 py-2">
+        <div className="min-w-0 flex-1">
+          <div className="text-xs font-semibold text-mist-400">{t("password")}</div>
+          <div className="text-sm font-bold tracking-widest">{hasPassword ? "••••••••" : "—"}</div>
+          {!hasPassword && <div className="mt-0.5 text-[11px] text-mist-400">{t("passwordSetHint")}</div>}
+        </div>
+        <Button size="sm" onClick={() => setOpen(true)}>
+          {hasPassword ? t("change") : t("passwordSet")}
+        </Button>
+      </div>
+    );
+  }
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (next !== again) return setError(t("passwordMismatch"));
+    setBusy(true);
+    setError("");
+    const r = await changePassword(current, next);
+    setBusy(false);
+    if (r.ok) {
+      toast(t("passwordUpdated"), "success");
+      setOpen(false);
+      setCurrent("");
+      setNext("");
+      setAgain("");
+    } else setError(r.error === "wrong_password" ? t("passwordWrong") : errorText(t, r));
+  };
+  return (
+    <form onSubmit={(e) => void submit(e)} className="space-y-2 py-2">
+      {hasPassword && (
+        <Field label={t("passwordCurrent")} type="password" value={current} onChange={(e) => setCurrent(e.target.value)} autoComplete="current-password" required />
+      )}
+      <Field label={t("newPassword")} hint={t("passwordHint")} type="password" value={next} onChange={(e) => setNext(e.target.value)} autoComplete="new-password" required minLength={8} />
+      <Field label={t("passwordAgain")} type="password" value={again} onChange={(e) => setAgain(e.target.value)} autoComplete="new-password" required minLength={8} />
+      {error && <p className="rounded-xl bg-rose-500/15 px-3 py-2 text-sm text-rose-200">{error}</p>}
+      <div className="flex gap-2">
+        <Button type="button" variant="ghost" className="flex-1" onClick={() => setOpen(false)} disabled={busy}>
+          {t("cancel")}
+        </Button>
+        <Button type="submit" variant="primary" className="flex-1" disabled={busy}>
+          {t("savePassword")}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
 function SignedIn() {
   const t = useT();
   const account = useApp((s) => s.account);
   const cloudCount = useApp((s) => s.cloudIds.length);
-  const name = account.username ?? account.email ?? "";
+  const [removing, setRemoving] = useState(false);
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-3">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-sky-400 to-brand-600 text-lg font-extrabold">
-          {name.slice(0, 1).toUpperCase() || <IconUser size={20} />}
-        </div>
+        <ProfilePicture />
         <div className="min-w-0 flex-1">
-          <div className="truncate font-bold">{account.username ?? t("signedInAs")}</div>
+          <div className="truncate font-bold">{account.username ? `@${account.username}` : t("signedInAs")}</div>
           <div className="truncate text-xs text-mist-400">{account.email}</div>
+          {account.avatar && (
+            <button
+              type="button"
+              disabled={removing}
+              className="mt-1 text-[11px] font-semibold text-mist-400 hover:text-rose-200"
+              onClick={() => {
+                setRemoving(true);
+                void removeAvatar().then((r) => {
+                  setRemoving(false);
+                  if (!r.ok) toast(errorText(t, r), "error");
+                });
+              }}
+            >
+              {t("avatarRemove")}
+            </button>
+          )}
         </div>
         {account.pro && (
           <span className="inline-flex items-center gap-1 rounded-lg bg-amber-300/15 px-2 py-1 text-xs font-bold text-amber-200">
@@ -248,6 +445,11 @@ function SignedIn() {
           </span>
         )}
       </div>
+      <section className="rounded-2xl border border-white/[0.06] bg-white/[0.025] px-3 py-1 divide-y divide-white/[0.05]">
+        <h3 className="pt-2 pb-1 text-xs font-bold tracking-[0.12em] text-mist-400 uppercase">{t("personalSettings")}</h3>
+        <UsernameEditor />
+        <PasswordEditor />
+      </section>
       {(account.cloud || account.pro) && (
         <div className="flex items-center gap-2 rounded-2xl border border-sky-300/15 bg-sky-400/[0.07] px-3 py-2.5 text-sm text-sky-100">
           <IconCloud size={16} className="shrink-0 text-sky-300" />

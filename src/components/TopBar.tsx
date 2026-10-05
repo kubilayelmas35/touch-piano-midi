@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { engine } from "../engine/engine";
 import type { InstrumentKind } from "../engine/types";
 import { useT } from "../i18n";
@@ -39,8 +39,9 @@ import {
 } from "../ui/icons";
 import { Button, IconButton, Popover, Segmented, Slider, Switch, cx } from "../ui/primitives";
 import { Timeline } from "./Timeline";
+import { UserAvatar } from "./UserAvatar";
 
-function Logo() {
+function Logo({ iconOnly }: { iconOnly?: boolean }) {
   return (
     <div className="flex shrink-0 items-center gap-2 pr-1 select-none" aria-label="Sonatrio">
       <img
@@ -51,7 +52,12 @@ function Logo() {
         draggable={false}
         className="rounded-[7px] shadow-[0_0_14px_rgba(139,92,246,0.45)]"
       />
-      <span className="hidden bg-gradient-to-r from-white via-violet-200 to-violet-400 bg-clip-text text-[17px] font-extrabold tracking-tight text-transparent xl:inline">
+      <span
+        className={cx(
+          "hidden bg-gradient-to-r from-white via-violet-200 to-violet-400 bg-clip-text text-[17px] font-extrabold tracking-tight text-transparent",
+          !iconOnly && "xl:inline"
+        )}
+      >
         Sonatrio
       </span>
     </div>
@@ -323,8 +329,8 @@ function AccountButton() {
   return (
     <IconButton label={t("account")} onClick={() => setPanel("account")} className="shrink-0">
       {account.status === "signedIn" && initial ? (
-        <span className="relative flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-sky-400 to-brand-600 text-[13px] font-extrabold text-white">
-          {initial}
+        <span className="relative">
+          <UserAvatar url={account.avatar} name={initial} me className="h-7 w-7 text-[13px]" />
           {account.pro && <IconCrown size={11} className="absolute -top-1.5 -right-1.5 text-amber-300" />}
         </span>
       ) : (
@@ -438,6 +444,33 @@ function StreakButton({ className }: { className?: string }) {
   );
 }
 
+const MAX_DENSITY = 5;
+
+/**
+ * How much the toolbar row has to fold up to fit: 0 shows everything its breakpoint allows; each
+ * level hides more (instrument names → other labels → practice toggles → right-side buttons → time). Stepped up before paint
+ * while the row still overflows, and started over whenever the width or `key` content changes.
+ */
+function useDensity(key: string) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+  const [fit, setFit] = useState({ key: "", level: 0 });
+  const fullKey = `${width}|${key}`;
+  const level = fit.key === fullKey ? fit.level : 0;
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([e]) => setWidth(Math.round(e.contentRect.width)));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (el && level < MAX_DENSITY && el.scrollWidth > el.clientWidth + 1) setFit({ key: fullKey, level: level + 1 });
+  });
+  return { level, ref };
+}
+
 export function TopBar() {
   const t = useT();
   const status = useApp((s) => s.status);
@@ -461,18 +494,28 @@ export function TopBar() {
   const handLabel = hand === "right" ? t("handRight") : hand === "left" ? t("handLeft") : null;
   const trackCount = session.playTracks.length;
   const coach = useApp((s) => !!s.coach);
+  const lang = useApp((s) => s.settings.language);
+  const instrument = useApp((s) => s.settings.instrument);
+  const accountStatus = useApp((s) => s.account.status);
+  const { level: dense, ref: rowRef } = useDensity(`${lang}|${instrument}|${accountStatus}`);
+  const labels = (from: "lg" | "xl") => (dense >= 2 ? "[&>span]:hidden" : from === "lg" ? "max-lg:[&>span]:hidden" : "max-xl:[&>span]:hidden");
 
   return (
     <header className="relative z-20 shrink-0 border-b border-white/[0.06] bg-ink-900/85 backdrop-blur-xl">
-      <div className="flex h-14 items-center gap-1.5 px-2 sm:gap-2 sm:px-3">
-        <Logo />
-        <IconButton label={t("library")} onClick={() => setPanel("library")} showLabel className="shrink-0 max-lg:[&>span]:hidden">
+      <div ref={rowRef} className="flex h-14 items-center gap-1.5 px-2 sm:gap-2 sm:px-3">
+        <Logo iconOnly={dense >= 2} />
+        <IconButton label={t("library")} onClick={() => setPanel("library")} showLabel className={cx("shrink-0", labels("lg"))}>
           <IconLibrary size={19} />
         </IconButton>
-        <IconButton label={t("myPath")} active={coach} onClick={() => setPanel("path")} showLabel className="shrink-0 max-xl:[&>span]:hidden">
+        <IconButton label={t("myPath")} active={coach} onClick={() => setPanel("path")} showLabel className={cx("shrink-0", labels("xl"))}>
           <IconRoute size={19} />
         </IconButton>
-        <IconButton label={t("studio")} onClick={() => setPanel("studio")} showLabel className="shrink-0 max-lg:hidden max-xl:[&>span]:hidden">
+        <IconButton
+          label={t("studio")}
+          onClick={() => setPanel("studio")}
+          showLabel
+          className={cx("shrink-0", dense >= 4 ? "hidden" : "max-lg:hidden", labels("xl"))}
+        >
           <IconSparkles size={19} />
         </IconButton>
         <IconButton
@@ -480,7 +523,7 @@ export function TopBar() {
           active={freePlay}
           onClick={openFreePlay}
           showLabel
-          className="shrink-0 max-lg:hidden max-xl:[&>span]:hidden"
+          className={cx("shrink-0", dense >= 4 ? "hidden" : "max-lg:hidden", labels("xl"))}
         >
           <IconKeyboard size={19} />
         </IconButton>
@@ -490,7 +533,7 @@ export function TopBar() {
           disabled={!song}
           onClick={() => setPanel("setup")}
           title={t("songSetup")}
-          className="group flex min-w-[4.5rem] flex-1 items-center gap-1 rounded-xl px-2 py-1 text-left transition-colors hover:bg-white/[0.06] lg:max-w-[26rem] lg:flex-initial"
+          className="group flex min-w-[4.5rem] flex-1 items-center lg:min-w-[10rem] gap-1 rounded-xl px-2 py-1 text-left transition-colors hover:bg-white/[0.06] lg:max-w-[26rem] lg:flex-initial"
         >
           <span className="min-w-0">
             <span className="block truncate text-[15px] leading-tight font-bold">{song?.title ?? "—"}</span>
@@ -520,23 +563,23 @@ export function TopBar() {
           >
             {playing ? <IconPause size={20} /> : <IconPlay size={20} className="translate-x-px" />}
           </button>
-          <div className="hidden w-[88px] text-center text-xs font-semibold tabular-nums text-mist-300 md:block">
+          <div className={cx("hidden w-[88px] text-center text-xs font-semibold tabular-nums text-mist-300", dense < 5 && "md:block")}>
             {formatTime(Math.max(0, time))} <span className="text-mist-400">/ {formatTime(Math.max(0, endTime - 0.6))}</span>
           </div>
         </div>
 
         <div className="hidden flex-1 lg:block" />
 
-        <div className="hidden shrink-0 lg:block">
+        <div className={cx("hidden shrink-0", dense < 3 && "lg:block")}>
           <PracticeToggles />
         </div>
-        <div className="hidden shrink-0 sm:block lg:hidden">
+        <div className={cx("hidden shrink-0 sm:block", dense < 3 && "lg:hidden")}>
           <PracticeMenu />
         </div>
         <div className="hidden shrink-0 sm:block">
-          <InstrumentSwitch />
+          <InstrumentSwitch compact={dense >= 1} />
         </div>
-        <div className="hidden shrink-0 items-center gap-1 lg:flex">
+        <div className={cx("hidden shrink-0 items-center gap-1", dense < 4 && "lg:flex")}>
           <StreakButton />
           <FriendsButton />
           <AccountButton />
@@ -544,7 +587,7 @@ export function TopBar() {
             <IconSettings size={19} />
           </IconButton>
         </div>
-        <div className="shrink-0 lg:hidden">
+        <div className={cx("shrink-0", dense < 4 && "lg:hidden")}>
           <MoreMenu />
         </div>
       </div>

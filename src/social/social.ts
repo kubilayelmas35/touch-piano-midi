@@ -12,6 +12,8 @@ export type DuelHand = "both" | "left" | "right";
 export interface BoardRow {
   id: string;
   username: string | null;
+  /** Storage path of the profile picture. */
+  avatar?: string | null;
   is_me: boolean;
   score: number;
   songs: number;
@@ -21,6 +23,7 @@ export interface BoardRow {
 export interface FriendRef {
   id: string;
   username: string | null;
+  avatar?: string | null;
 }
 
 export interface Duel {

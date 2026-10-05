@@ -1,4 +1,4 @@
-// Lets a signed-in user permanently delete their own account: cloud MIDI files, then the auth user
+// Lets a signed-in user permanently delete their own account: cloud MIDI files and profile pictures, then the auth user
 // (profiles, settings, progress and cloud_midis rows go with it via on delete cascade).
 // Deploy with verify_jwt = false; the caller's access token is verified here.
 import { createClient } from "jsr:@supabase/supabase-js@2";
@@ -33,13 +33,15 @@ Deno.serve(async (req) => {
   }
   if (body.confirm !== true) return json({ error: "bad_request" }, 400);
 
-  for (;;) {
-    const { data: files, error } = await admin.storage.from("midis").list(userId, { limit: 1000 });
-    if (error) return json({ error: error.message }, 500);
-    if (!files?.length) break;
-    const { error: rmErr } = await admin.storage.from("midis").remove(files.map((f) => `${userId}/${f.name}`));
-    if (rmErr) return json({ error: rmErr.message }, 500);
-    if (files.length < 1000) break;
+  for (const bucket of ["midis", "avatars"]) {
+    for (;;) {
+      const { data: files, error } = await admin.storage.from(bucket).list(userId, { limit: 1000 });
+      if (error) return json({ error: error.message }, 500);
+      if (!files?.length) break;
+      const { error: rmErr } = await admin.storage.from(bucket).remove(files.map((f) => `${userId}/${f.name}`));
+      if (rmErr) return json({ error: rmErr.message }, 500);
+      if (files.length < 1000) break;
+    }
   }
 
   const { error } = await admin.auth.admin.deleteUser(userId);

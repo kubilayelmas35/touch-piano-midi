@@ -1,4 +1,4 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
 import { setPanel, toast, useApp } from "../state/store";
 import { SITE_URL, desktop, isApp, isNativeApp } from "../lib/platform";
 import { tNow } from "../i18n";
@@ -27,28 +27,39 @@ function redirectUrl(): string {
 
 /** Last known Pro status per user, so Pro features keep working offline. */
 const PRO_CACHE = "sonatrio-pro-v1";
+const AVATARS = "avatars";
+/** Profile pictures are stored as squares this many pixels wide. */
+const AVATAR_PX = 256;
 
-function cachedPro(userId: string): { pro: boolean; cloud: boolean; username: string | null } | null {
+function cachedPro(userId: string): Record<string, unknown> | null {
   try {
     const c = JSON.parse(localStorage.getItem(PRO_CACHE) ?? "null");
-    return c?.id === userId ? { pro: c.pro === true, cloud: c.cloud === true, username: c.username ?? null } : null;
+    return c?.id === userId ? c : null;
   } catch {
     return null;
   }
 }
 
-async function loadProfile(userId: string, email: string | null): Promise<void> {
+/** Public address of a stored profile picture. */
+export function avatarUrl(path: string | null | undefined): string | null {
+  if (!supabase || !path) return null;
+  return supabase.storage.from(AVATARS).getPublicUrl(path).data.publicUrl;
+}
+
+async function loadProfile(user: User): Promise<void> {
   if (!supabase) return;
+  const userId = user.id;
   const res = await supabase
     .from("profiles")
-    .select("username, pro, cloud, cloud_quota_mb, is_admin")
+    .select("username, pro, cloud, cloud_quota_mb, is_admin, avatar_path, username_changed_at")
     .eq("id", userId)
     .maybeSingle();
   let data: Record<string, unknown> | null = res.data;
   if (res.error) data = cachedPro(userId);
   else
     try {
-      localStorage.setItem(PRO_CACHE, JSON.stringify({ id: userId, pro: data?.pro === true, cloud: data?.cloud === true, username: data?.username ?? null }));
+      const { pro, cloud, username, avatar_path } = data ?? {};
+      localStorage.setItem(PRO_CACHE, JSON.stringify({ id: userId, pro: pro === true, cloud: cloud === true, username, avatar_path }));
     } catch {
       /* storage full or blocked */
     }
@@ -58,8 +69,11 @@ async function loadProfile(userId: string, email: string | null): Promise<void> 
     account: {
       ...s.account,
       status: "signedIn",
-      email,
+      email: user.email ?? null,
       username: (data?.username as string | null) ?? null,
+      avatar: avatarUrl(data?.avatar_path as string | null),
+      usernameChangedAt: (data?.username_changed_at as string | null) ?? null,
+      hasPassword: (user.identities ?? []).some((i) => i.provider === "email"),
       pro: data?.pro === true,
       cloud: data?.cloud === true,
       cloudQuotaMb: Number(data?.cloud_quota_mb ?? 0),
@@ -92,10 +106,23 @@ export async function initAuth(): Promise<void> {
     const user = session?.user;
     if (user) {
       // Defer: Supabase forbids awaiting other calls inside this callback.
-      window.setTimeout(() => void loadProfile(user.id, user.email ?? null), 0);
+      window.setTimeout(() => void loadProfile(user), 0);
     } else {
       useApp.setState((s) => ({
-        account: { ...s.account, status: "signedOut", email: null, username: null, pro: false, cloud: false, cloudQuotaMb: 0, isAdmin: false, recovery: false },
+        account: {
+          ...s.account,
+          status: "signedOut",
+          email: null,
+          username: null,
+          avatar: null,
+          usernameChangedAt: null,
+          hasPassword: false,
+          pro: false,
+          cloud: false,
+          cloudQuotaMb: 0,
+          isAdmin: false,
+          recovery: false,
+        },
         cloudIds: [],
         cloudBytes: 0,
         panel: s.panel === "admin" ? null : s.panel,
@@ -137,7 +164,7 @@ export function requirePro(): boolean {
 export async function refreshAccount(): Promise<void> {
   if (!supabase) return;
   const { data } = await supabase.auth.getUser();
-  if (data.user) await loadProfile(data.user.id, data.user.email ?? null);
+  if (data.user) await loadProfile(data.user);
 }
 
 export type AuthResult = { ok: true; message?: string } | { ok: false; error: string };
@@ -242,6 +269,97 @@ export async function updatePassword(password: string): Promise<AuthResult> {
 
 export async function signOut(): Promise<void> {
   await supabase?.auth.signOut();
+}
+
+/** When the username may change again (six months after the last change), or null if it may now. */
+export function nextUsernameChange(changedAt: string | null): Date | null {
+  if (!changedAt) return null;
+  const next = new Date(changedAt);
+  next.setMonth(next.getMonth() + 6);
+  return next.getTime() > Date.now() ? next : null;
+}
+
+export async function changeUsername(name: string): Promise<AuthResult> {
+  if (!supabase) return { ok: false, error: "disabled" };
+  const { data, error } = await supabase.rpc("change_username", { p_name: name.trim() });
+  if (error) return fail(error);
+  useApp.setState((s) => ({ account: { ...s.account, username: name.trim(), usernameChangedAt: (data as string | null) ?? null } }));
+  void import("../social/social").then((m) => m.loadSocial());
+  return { ok: true };
+}
+
+/** Changes the password; an account that already has one must confirm the current one first. */
+export async function changePassword(current: string, next: string): Promise<AuthResult> {
+  if (!supabase) return { ok: false, error: "disabled" };
+  const { email, hasPassword } = useApp.getState().account;
+  if (hasPassword) {
+    if (!email) return { ok: false, error: "invalid" };
+    const { error } = await supabase.auth.signInWithPassword({ email, password: current });
+    if (error) return { ok: false, error: "wrong_password" };
+  }
+  const { error } = await supabase.auth.updateUser({ password: next });
+  if (error) return fail(error);
+  useApp.setState((s) => ({ account: { ...s.account, hasPassword: true } }));
+  return { ok: true };
+}
+
+/** Center-crops and scales a picture into a small square WebP (JPEG where WebP can't be encoded). */
+async function squareImage(file: Blob): Promise<{ blob: Blob; ext: "webp" | "jpg" }> {
+  const bmp = await createImageBitmap(file);
+  const side = Math.min(bmp.width, bmp.height);
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = AVATAR_PX;
+  const ctx = canvas.getContext("2d")!;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, AVATAR_PX, AVATAR_PX);
+  bmp.close();
+  const encode = (type: string) => new Promise<Blob | null>((res) => canvas.toBlob(res, type, 0.85));
+  const webp = await encode("image/webp");
+  if (webp && webp.type === "image/webp") return { blob: webp, ext: "webp" };
+  const jpg = await encode("image/jpeg");
+  if (!jpg) throw new Error("encode");
+  return { blob: jpg, ext: "jpg" };
+}
+
+async function clearOldAvatars(userId: string, keep: string | null): Promise<void> {
+  const { data } = await supabase!.storage.from(AVATARS).list(userId, { limit: 100 });
+  const old = (data ?? []).map((f) => `${userId}/${f.name}`).filter((p) => p !== keep);
+  if (old.length) await supabase!.storage.from(AVATARS).remove(old);
+}
+
+export async function uploadAvatar(file: Blob): Promise<AuthResult> {
+  if (!supabase) return { ok: false, error: "disabled" };
+  const { data: auth } = await supabase.auth.getUser();
+  const userId = auth.user?.id;
+  if (!userId) return { ok: false, error: "not_signed_in" };
+  let img: { blob: Blob; ext: string };
+  try {
+    img = await squareImage(file);
+  } catch {
+    return { ok: false, error: "bad_image" };
+  }
+  const path = `${userId}/${Date.now()}.${img.ext}`;
+  const up = await supabase.storage.from(AVATARS).upload(path, img.blob, { contentType: img.blob.type, upsert: false });
+  if (up.error) return fail(up.error);
+  const { error } = await supabase.rpc("set_avatar", { p_path: path });
+  if (error) return fail(error);
+  useApp.setState((s) => ({ account: { ...s.account, avatar: avatarUrl(path) } }));
+  void clearOldAvatars(userId, path);
+  void import("../social/social").then((m) => m.loadSocial());
+  return { ok: true };
+}
+
+export async function removeAvatar(): Promise<AuthResult> {
+  if (!supabase) return { ok: false, error: "disabled" };
+  const { data: auth } = await supabase.auth.getUser();
+  const userId = auth.user?.id;
+  if (!userId) return { ok: false, error: "not_signed_in" };
+  const { error } = await supabase.rpc("set_avatar", { p_path: null });
+  if (error) return fail(error);
+  useApp.setState((s) => ({ account: { ...s.account, avatar: null } }));
+  void clearOldAvatars(userId, null);
+  void import("../social/social").then((m) => m.loadSocial());
+  return { ok: true };
 }
 
 /** Permanently deletes the signed-in account and everything stored with it (cloud MIDIs, settings, progress). */
