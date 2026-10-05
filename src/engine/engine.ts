@@ -131,6 +131,7 @@ export class Engine {
   startTime = 0;
   endTime = 0;
   maxNoteDuration = 0;
+  private maxAccompDuration = 0;
   /** Held notes by input source key (for highlighting). */
   readonly held = new Map<string, HeldNote>();
   onComplete: ((r: RunResult) => void) | null = null;
@@ -329,6 +330,7 @@ export class Engine {
     this.notes = notes;
     this.assignFingers();
     this.maxNoteDuration = notes.reduce((m, n) => Math.max(m, n.duration), 0);
+    this.maxAccompDuration = this.accomp.reduce((m, n) => Math.max(m, n.duration), 0);
 
     const firstPlayer = notes.length ? notes[0].time : Infinity;
     const firstAcc = this.accomp.length ? this.accomp[0].time : Infinity;
@@ -428,8 +430,11 @@ export class Engine {
   async startAt(songT: number, perfAt: number): Promise<void> {
     if (!this.song) return;
     if (this.status === "playing") this.halt();
-    if (this.status === "complete" || songT <= this.startTime + 0.001) this.resetRun();
-    else this.anchorSong = Math.max(this.startTime, Math.min(this.endTime, songT));
+    const fromTop = this.status === "complete" || songT < this.firstNoteTime - 0.001;
+    if (fromTop) this.resetRun();
+    // Exactly the given position, even before this device's own lead-in: the count-in setting (and so the lead-in)
+    // can differ between the two devices of a duet, and their song clocks have to match.
+    this.anchorSong = Math.min(this.endTime, fromTop ? songT : Math.max(this.startTime, songT));
     const ok = await this.ensureAudio();
     if (!ok || !this.song) return;
     const wait = perfAt - performance.now();
@@ -1062,6 +1067,40 @@ export class Engine {
     for (const key of [...this.ringing.keys()]) this.mute(key);
     for (const key of [...this.heard.keys()]) this.unhear(key);
     this.held.clear();
+  }
+
+  /** Pitches the player should be sounding about now (pending notes in the timing window, or the one waited on). */
+  listenTargets(lagSec = 0): number[] {
+    if (this.status !== "playing" || this.config.autoPlay) return [];
+    const cfg = this.config;
+    const t = this.time - lagSec * cfg.speed;
+    const win = (cfg.timingWindowMs / 1000) * cfg.speed;
+    const waitGroup = this.waiting && this.pendingIdx < this.notes.length ? this.notes[this.pendingIdx].group : -1;
+    const out = new Set<number>();
+    for (let i = this.pendingIdx; i < this.notes.length; i++) {
+      const n = this.notes[i];
+      if (n.time > t + win * EARLY_FACTOR) break;
+      if (n.state !== NoteState.Pending) continue;
+      if (t - n.time <= win * LATE_FACTOR || n.group === waitGroup) out.add(n.midi);
+    }
+    return [...out];
+  }
+
+  /**
+   * The app itself is sounding this exact pitch through the speakers (the backing part). Octaves don't count: the
+   * hands often double each other an octave apart, and those notes must still be heard.
+   */
+  echoOf(midi: number, lagSec = 0): boolean {
+    if (this.status !== "playing" || this.config.accompVolume <= 0) return false;
+    const t = this.time - lagSec * this.config.speed;
+    const tail = 0.4 * this.config.speed;
+    let i = lowerBound(this.accomp, t - this.maxAccompDuration - tail);
+    for (; i < this.accomp.length; i++) {
+      const n = this.accomp[i];
+      if (n.time > t + 0.05) break;
+      if (n.midi === midi && n.time + n.duration + tail >= t) return true;
+    }
+    return false;
   }
 
   /**

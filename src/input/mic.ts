@@ -4,16 +4,23 @@ import { engine } from "../engine/engine";
 import { tNow } from "../i18n";
 import { updateSettings } from "../state/actions";
 import { toast, useApp } from "../state/store";
+import { KeyOnsets } from "./onsets";
 import { NoteTracker, decimate, detectPitch, rmsOf } from "./pitch";
 
 const KEY = "mic";
 /** Detection trails the sound by about this much (analysis window, debounce and input latency). */
 const DETECT_LAG_SEC = 0.05;
+/** The targeted detection waits for a clear rise in a long window, so it trails a little more. */
+const TARGET_LAG_SEC = 0.07;
 const HOP_MS = 12;
 
 let stream: MediaStream | null = null;
 let source: MediaStreamAudioSourceNode | null = null;
 let analyser: AnalyserNode | null = null;
+let spectrum: AnalyserNode | null = null;
+let onsets: KeyOnsets | null = null;
+/** Keys the targeted detection is holding down → their strength when struck. */
+const struckKeys = new Map<number, number>();
 let timer = 0;
 let tracker: NoteTracker | null = null;
 let unsub: (() => void) | null = null;
@@ -49,15 +56,28 @@ export async function listMics(): Promise<MicDevice[]> {
 }
 
 function openStream(deviceId: string): Promise<MediaStream> {
-  // The app's own backing track is echo-cancelled away; the instrument's tone is left untouched otherwise.
-  return navigator.mediaDevices.getUserMedia({
-    audio: {
-      echoCancellation: true,
-      noiseSuppression: false,
-      autoGainControl: false,
-      ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
-    },
-  });
+  // No voice processing at all: echo cancellation puts phones into call mode, whose noise suppression and gain
+  // treat a ringing piano note as noise. The backing track is told apart with engine.echoOf instead.
+  const audio: MediaTrackConstraints & { voiceIsolation?: boolean } = {
+    echoCancellation: false,
+    noiseSuppression: false,
+    autoGainControl: false,
+    voiceIsolation: false,
+    ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
+  };
+  return navigator.mediaDevices.getUserMedia({ audio });
+}
+
+/** Pitch class → when it was last heard; the two detectors must not count one note twice. */
+const recent = new Map<number, number>();
+const SAME_NOTE_SEC = 0.3;
+
+function heardLately(midi: number, now: number): boolean {
+  return now - (recent.get(((midi % 12) + 12) % 12) ?? -Infinity) < SAME_NOTE_SEC;
+}
+
+function markHeard(midi: number, now: number): void {
+  recent.set(((midi % 12) + 12) % 12, now);
 }
 
 export async function startMic(): Promise<boolean> {
@@ -88,6 +108,13 @@ export async function startMic(): Promise<boolean> {
   analyser.fftSize = 2048;
   analyser.smoothingTimeConstant = 0;
   source.connect(analyser);
+  // A long window resolves neighbouring keys down in the bass, for the targeted detection.
+  spectrum = ctx.createAnalyser();
+  spectrum.fftSize = 8192;
+  spectrum.smoothingTimeConstant = 0;
+  source.connect(spectrum);
+  const db = new Float32Array(spectrum.frequencyBinCount);
+  onsets = new KeyOnsets(spectrum.frequencyBinCount, ctx.sampleRate / spectrum.fftSize);
   const raw = new Float32Array(analyser.fftSize);
   const half = ctx.sampleRate > 30000;
   const rate = half ? ctx.sampleRate / 2 : ctx.sampleRate;
@@ -96,19 +123,45 @@ export async function startMic(): Promise<boolean> {
     if (tracker && s.settings.micSensitivity !== prev.settings.micSensitivity) tracker.sensitivity = s.settings.micSensitivity;
   });
   timer = window.setInterval(() => {
-    if (!analyser || !tracker) return;
+    if (!analyser || !spectrum || !tracker || !onsets) return;
+    const now = performance.now() / 1000;
     analyser.getFloatTimeDomainData(raw);
     const buf = half ? decimate(raw) : raw;
     const rms = rmsOf(buf);
     level = Math.max(rms * 5, level * 0.85);
     const pitch = rms > 0.002 ? detectPitch(buf, rate) : null;
     for (const ev of tracker.update({ rms, pitch })) {
-      if (ev.type === "on") engine.hear(KEY, ev.midi, ev.velocity, DETECT_LAG_SEC);
-      else engine.unhear(KEY);
+      if (ev.type === "off") engine.unhear(KEY);
+      else if (heardLately(ev.midi, now) || engine.echoOf(ev.midi, DETECT_LAG_SEC)) continue;
+      else {
+        markHeard(ev.midi, now);
+        engine.hear(KEY, ev.midi, ev.velocity, DETECT_LAG_SEC);
+      }
     }
+    spectrum.getFloatFrequencyData(db);
+    onsets.pushDb(db);
+    listenForTargets(rms, now);
   }, HOP_MS);
   useApp.setState({ mic: "on" });
   return true;
+}
+
+/** Targeted detection: an expected key whose harmonics just jumped counts as played, even under ringing notes. */
+function listenForTargets(rms: number, now: number): void {
+  if (!onsets || !tracker) return;
+  for (const [midi, peak] of struckKeys) {
+    if (rms < tracker.gateLevel || onsets.strength(midi) < peak * 0.25) {
+      struckKeys.delete(midi);
+      engine.unhear(`${KEY}:${midi}`);
+    }
+  }
+  if (rms < tracker.gateLevel) return;
+  for (const midi of engine.listenTargets(TARGET_LAG_SEC)) {
+    if (struckKeys.has(midi) || heardLately(midi, now) || !onsets.struck(midi) || engine.echoOf(midi, TARGET_LAG_SEC)) continue;
+    markHeard(midi, now);
+    struckKeys.set(midi, onsets.strength(midi));
+    engine.hear(`${KEY}:${midi}`, midi, Math.max(0.2, Math.min(1, rms * 6)), TARGET_LAG_SEC);
+  }
 }
 
 export function stopMic(): void {
@@ -117,6 +170,11 @@ export function stopMic(): void {
   tracker?.reset();
   tracker = null;
   engine.unhear(KEY);
+  for (const midi of struckKeys.keys()) engine.unhear(`${KEY}:${midi}`);
+  struckKeys.clear();
+  recent.clear();
+  onsets = null;
+  spectrum = null;
   unsub?.();
   unsub = null;
   source?.disconnect();

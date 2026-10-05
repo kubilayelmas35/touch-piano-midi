@@ -119,6 +119,7 @@ export function MicChip() {
             <MicDevicePicker />
             <MicSensitivity />
             <p className="text-xs leading-relaxed text-mist-400">{t("micLevelHint")}</p>
+            <p className="mt-2 text-xs leading-relaxed text-mist-400">{t("micNoiseHint")}</p>
           </div>
         )}
       </Popover>

@@ -399,6 +399,28 @@ describe("engine", () => {
     expect(engine.time).toBeCloseTo(engine.startTime + 0.1, 3);
   });
 
+  it("tells the microphone which keys to listen for and which pitches the backing part is sounding", async () => {
+    const engine = await startEngine();
+    advance(-engine.startTime + 1, engine);
+    expect(engine.listenTargets()).toEqual([62]);
+    expect(engine.echoOf(48)).toBe(true);
+    expect(engine.echoOf(60)).toBe(false);
+    expect(engine.echoOf(36)).toBe(false);
+    engine.configure({ accompVolume: 0 });
+    expect(engine.echoOf(48)).toBe(false);
+  });
+
+  it("startAt keeps the partner's start position whatever lead-in this device's count-in gives", async () => {
+    const host = new Engine();
+    host.load(makeSong(), { playTracks: [0], countIn: true });
+    const guest = new Engine();
+    guest.load(makeSong(), { playTracks: [0], countIn: false });
+    expect(host.startTime).not.toBeCloseTo(guest.startTime, 2);
+    await guest.startAt(host.startTime, now);
+    expect(guest.time).toBeCloseTo(host.startTime, 3);
+    expect(guest.notes.every((n) => n.state === NoteState.Pending)).toBe(true);
+  });
+
   it("lets a transport hook take over play and seek but not halt / rewind", async () => {
     const engine = new Engine();
     engine.load(makeSong(), { playTracks: [0], countIn: false });

@@ -379,10 +379,17 @@ class VoiceImpl implements Voice {
     if (this.done) return;
     const ctx = this.env.context as AudioContext;
     const t = ctx.currentTime;
-    this.env.gain.cancelScheduledValues(t);
-    this.env.gain.setTargetAtTime(0, t, 0.008);
+    const g = this.env.gain;
+    // Holding the current level matters: cancelling alone snaps back to the last scheduled value, a click.
+    if (typeof g.cancelAndHoldAtTime === "function") {
+      g.cancelAndHoldAtTime(t);
+    } else {
+      g.cancelScheduledValues(t);
+      g.setValueAtTime(g.value, t);
+    }
+    g.setTargetAtTime(0, t, 0.012);
     try {
-      this.source.stop(t + 0.04);
+      this.source.stop(t + 0.07);
     } catch {
       /* */
     }

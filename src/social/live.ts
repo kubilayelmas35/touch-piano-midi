@@ -40,9 +40,9 @@ const COUNTDOWN_MS = 3500;
 const NO_HOST_MS = 7000;
 const LIVE_EVERY_MS = 500;
 /** Partner notes are batched this long, which keeps the message rate low. */
-const NOTES_EVERY_MS = 40;
+const NOTES_EVERY_MS = 25;
 /** Partner notes sound this long after their song time, so network jitter doesn't shake their rhythm. */
-const NOTES_BUFFER_SEC = 0.15;
+const NOTES_BUFFER_SEC = 0.12;
 
 const clientId = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 let channel: RealtimeChannel | null = null;

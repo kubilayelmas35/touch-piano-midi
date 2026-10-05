@@ -28,6 +28,33 @@ function buildImpulse(ctx: AudioContext, seconds: number, decay: number, rate = 
   return buf;
 }
 
+/** Peaks of up to 0.98 in the curve's input range (±2). */
+export function softClipCurve(size = 2048): Float32Array<ArrayBuffer> {
+  const curve = new Float32Array(size);
+  const knee = 0.7;
+  const room = 0.98 - knee;
+  for (let i = 0; i < size; i++) {
+    const u = ((i / (size - 1)) * 2 - 1) * 2;
+    const a = Math.abs(u);
+    curve[i] = Math.sign(u) * (a <= knee ? a : knee + room * Math.tanh((a - knee) / room));
+  }
+  return curve;
+}
+
+/**
+ * Last stage before the speakers: untouched below 0.7, rounded off above, never past 0.98. Whatever the limiter
+ * lets through would otherwise be cut flat by the device, which is the harsh crackle.
+ */
+function softClipper(ctx: AudioContext): { input: AudioNode; output: AudioNode } {
+  const pre = ctx.createGain();
+  pre.gain.value = 0.5;
+  const shaper = ctx.createWaveShaper();
+  shaper.curve = softClipCurve();
+  shaper.oversample = "4x";
+  pre.connect(shaper);
+  return { input: pre, output: shaper };
+}
+
 export function getBus(): MasterBus {
   if (bus) return bus;
   // iOS treats Web Audio as "ambient" (silenced by the ring/silent switch) unless the page asks for playback.
@@ -40,19 +67,28 @@ export function getBus(): MasterBus {
   const master = ctx.createGain();
   master.gain.value = 0.9;
 
-  const compressor = ctx.createDynamicsCompressor();
-  compressor.threshold.value = -20;
-  compressor.knee.value = 12;
-  compressor.ratio.value = 3.5;
-  compressor.attack.value = 0.006;
-  compressor.release.value = 0.22;
+  // Rumble below hearing only eats headroom and makes small speakers rattle.
+  const rumble = ctx.createBiquadFilter();
+  rumble.type = "highpass";
+  rumble.frequency.value = 28;
+  rumble.Q.value = 0.6;
 
+  const compressor = ctx.createDynamicsCompressor();
+  compressor.threshold.value = -18;
+  compressor.knee.value = 10;
+  compressor.ratio.value = 4;
+  compressor.attack.value = 0.005;
+  compressor.release.value = 0.25;
+
+  // A fast release makes the limiter ride the waveform itself, which is heard as crackle on loud chords.
   const limiter = ctx.createDynamicsCompressor();
-  limiter.threshold.value = -2;
+  limiter.threshold.value = -4;
   limiter.knee.value = 0;
   limiter.ratio.value = 20;
   limiter.attack.value = 0.001;
-  limiter.release.value = 0.08;
+  limiter.release.value = 0.25;
+
+  const ceiling = softClipper(ctx);
 
   const reverb = ctx.createConvolver();
   // iOS can report one sample rate and then reject a buffer made at it ("does not match the context rate"), after
@@ -70,15 +106,17 @@ export function getBus(): MasterBus {
   const reverbReturn = ctx.createGain();
   reverbReturn.gain.value = 0.9;
 
-  input.connect(compressor);
+  input.connect(rumble);
   input.connect(reverbSend);
   reverbSend.connect(reverb);
   reverb.connect(reverbReturn);
-  reverbReturn.connect(compressor);
-  dryInput.connect(compressor);
+  reverbReturn.connect(rumble);
+  dryInput.connect(rumble);
+  rumble.connect(compressor);
   compressor.connect(master);
   master.connect(limiter);
-  limiter.connect(ctx.destination);
+  limiter.connect(ceiling.input);
+  ceiling.output.connect(ctx.destination);
 
   bus = { ctx, input, dryInput, master, reverbSend };
   return bus;

@@ -676,6 +676,7 @@ export function SettingsDialog() {
                 </div>
                 <MicDevicePicker />
                 <MicSensitivity />
+                <p className="pb-2 text-xs leading-relaxed text-mist-400">{t("micNoiseHint")}</p>
               </Section>
             )}
             <FoldSection title={t("computerKeyboard")} hint={t("computerKeyboardFold")} defaultOpen={keyboardFirst}>

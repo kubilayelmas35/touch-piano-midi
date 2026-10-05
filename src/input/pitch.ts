@@ -74,13 +74,14 @@ export interface TrackFrame {
   pitch: Pitch | null;
 }
 
-const MIN_CLARITY = 0.8;
+// Notes ringing on under the pedal or in the room blur the period, so a new note is rarely cleaner than this.
+const MIN_CLARITY = 0.72;
 /** Consecutive frames a new pitch must hold before it counts (filters attack noise and slides). */
 const STABLE_FRAMES = 2;
 const SILENT_FRAMES = 3;
 const UNVOICED_FRAMES = 8;
 /** A fresh attack on the same pitch: loudness rises this much over its dip since the last attack. */
-const REATTACK_RISE = 1.8;
+const REATTACK_RISE = 1.5;
 
 /** Turns pitch frames into note on/off events: debounced pitch changes, silence and re-struck notes. */
 export class NoteTracker {
@@ -96,6 +97,11 @@ export class NoteTracker {
 
   /** 0 (only loud notes) … 1 (picks up quiet playing). */
   constructor(public sensitivity = 0.5) {}
+
+  /** Loudness below which a frame counts as silence. */
+  get gateLevel(): number {
+    return this.gate();
+  }
 
   private gate(): number {
     const base = 0.02 - this.sensitivity * 0.016;
@@ -124,7 +130,7 @@ export class NoteTracker {
     const midi = Math.round(hzToMidi(f.pitch!.hz));
     if (midi === this.current) {
       this.candidate = null;
-      if (this.sinceOn >= 4 && this.valley < this.peak * 0.7 && f.rms > this.valley * REATTACK_RISE) {
+      if (this.sinceOn >= 4 && this.valley < this.peak * 0.75 && f.rms > this.valley * REATTACK_RISE) {
         out.push({ type: "off" });
         this.on(out, midi, f.rms);
       } else if (f.rms > this.peak) {
