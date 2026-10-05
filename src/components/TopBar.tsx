@@ -3,6 +3,7 @@ import { engine } from "../engine/engine";
 import type { InstrumentKind } from "../engine/types";
 import { useT } from "../i18n";
 import { micSupported, toggleMic } from "../input/mic";
+import { useHasPro } from "../auth/account";
 import { pendingCount } from "../social/social";
 import { formatTime } from "../lib/notes";
 import { dayKey, streak } from "../progress/progress";
@@ -137,15 +138,22 @@ function PedalButton() {
   );
 }
 
+/** Marks a toolbar button whose feature needs Pro. */
+function ProCrown() {
+  return <IconCrown size={11} className="absolute top-0.5 right-0.5 text-amber-300 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" />;
+}
+
 /** Listens to a real instrument through the microphone instead of the on-screen one. */
 function MicButton() {
   const t = useT();
   const mic = useApp((s) => s.mic);
+  const pro = useHasPro();
   if (!micSupported()) return null;
   return (
-    <IconButton label={t("micListen")} active={mic === "on"} onClick={() => void toggleMic()}>
+    <IconButton label={pro ? t("micListen") : `${t("micListen")} (Pro)`} active={mic === "on"} onClick={() => void toggleMic()}>
       <IconMic size={19} />
       {mic === "on" && <span className="absolute top-1 right-1 h-2 w-2 animate-pulse rounded-full bg-rose-400" />}
+      {!pro && <ProCrown />}
     </IconButton>
   );
 }
@@ -181,6 +189,7 @@ function PracticeMenu() {
   const piano = useApp((s) => s.settings.instrument === "piano");
   const pedal = useApp((s) => s.settings.pianoPedal);
   const mic = useApp((s) => s.mic);
+  const pro = useHasPro();
   const active = session.waitMode || session.autoPlay || session.loop.a >= 0 || metronome || session.speed !== 1 || mic === "on";
   return (
     <Popover
@@ -205,7 +214,12 @@ function PracticeMenu() {
             <Switch label={t("pianoPedal")} hint={t("pianoPedalHint")} checked={pedal} onChange={(v) => updateSettings({ pianoPedal: v })} />
           )}
           {micSupported() && (
-            <Switch label={t("micListen")} hint={t("micListenHint")} checked={mic === "on"} onChange={() => void toggleMic()} />
+            <Switch
+              label={pro ? t("micListen") : `${t("micListen")} · PRO`}
+              hint={t("micListenHint")}
+              checked={mic === "on"}
+              onChange={() => void toggleMic()}
+            />
           )}
           <Switch
             label={t("autoPlay")}
@@ -288,10 +302,12 @@ function FriendsButton() {
   const t = useT();
   const on = useApp((s) => s.account.status !== "disabled");
   const waiting = useApp((s) => pendingCount(s.social));
+  const pro = useHasPro();
   if (!on) return null;
   return (
-    <IconButton label={t("friends")} onClick={() => setPanel("friends")} className="shrink-0">
+    <IconButton label={pro ? t("friends") : `${t("friends")} (Pro)`} onClick={() => setPanel(pro ? "friends" : "pro")} className="shrink-0">
       <IconUsers size={19} />
+      {!pro && waiting === 0 && <ProCrown />}
       {waiting > 0 && (
         <span className="absolute -top-0.5 -right-0.5 min-w-4 rounded-full bg-rose-500 px-1 text-[10px] leading-4 font-extrabold text-white">{waiting}</span>
       )}
@@ -324,6 +340,7 @@ function MoreMenu() {
   const freePlay = useApp((s) => !!s.song && s.song.notes.length === 0);
   const accountOn = useApp((s) => s.account.status !== "disabled");
   const waiting = useApp((s) => pendingCount(s.social));
+  const pro = useHasPro();
   const p = useApp((s) => s.progress);
   const n = streak(p);
   const items: { label: string; icon: ReactNode; onClick: () => void; active?: boolean; extra?: ReactNode }[] = [
@@ -340,8 +357,13 @@ function MoreMenu() {
           {
             label: t("friends"),
             icon: <IconUsers size={18} />,
-            onClick: () => setPanel("friends"),
-            extra: waiting > 0 ? <span className="rounded-full bg-rose-500 px-1.5 text-xs font-bold text-white">{waiting}</span> : undefined,
+            onClick: () => setPanel(pro ? "friends" : "pro"),
+            extra:
+              waiting > 0 ? (
+                <span className="rounded-full bg-rose-500 px-1.5 text-xs font-bold text-white">{waiting}</span>
+              ) : !pro ? (
+                <IconCrown size={14} className="text-amber-300" />
+              ) : undefined,
           },
           { label: t("duet"), icon: <IconDuet size={18} />, onClick: () => setPanel("duet") },
           { label: t("account"), icon: <IconUser size={18} />, onClick: () => setPanel("account") },

@@ -1,4 +1,5 @@
 import { audioCtx, unlockAudio } from "../audio/context";
+import { requirePro } from "../auth/account";
 import { engine } from "../engine/engine";
 import { tNow } from "../i18n";
 import { updateSettings } from "../state/actions";
@@ -137,5 +138,5 @@ export async function setMicDevice(id: string): Promise<void> {
 
 export async function toggleMic(): Promise<void> {
   if (stream) stopMic();
-  else if (await startMic()) toast(tNow("micOn"), "info", 6000);
+  else if (requirePro() && (await startMic())) toast(tNow("micOn"), "info", 6000);
 }

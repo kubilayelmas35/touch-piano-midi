@@ -415,7 +415,20 @@ export function ProDialog() {
   const open = useApp((s) => s.panel === "pro");
   const account = useApp((s) => s.account);
   const [checking, setChecking] = useState(false);
-  const perks = [t("proPerk1"), t("proPerk4"), t("proPerk5"), t("proPerk6"), t("proPerk8"), t("proPerk7"), t("proPerk2"), t("proPerk3")];
+  const perks = [
+    t("proPerkMic"),
+    t("proPerkMidi"),
+    t("proPerkFriends"),
+    t("proPerkDesigns"),
+    t("proPerk1"),
+    t("proPerk4"),
+    t("proPerk5"),
+    t("proPerk6"),
+    t("proPerk8"),
+    t("proPerk7"),
+    t("proPerk2"),
+    t("proPerk3"),
+  ];
   return (
     <Dialog open={open} onClose={() => setPanel(null)} width="max-w-sm" closeLabel={t("close")} title="">
       <div className="pt-1 text-center">

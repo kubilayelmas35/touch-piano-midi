@@ -1,9 +1,11 @@
+import { hasPro } from "../auth/account";
 import { engine } from "../engine/engine";
 import { tNow } from "../i18n";
-import { toast, useApp } from "../state/store";
+import { setPanel, toast, useApp } from "../state/store";
 
 let access: MIDIAccess | null = null;
 let started = false;
+let askedPro = false;
 const known = new Set<string>();
 
 function selectedInput(): string {
@@ -20,6 +22,15 @@ function onMessage(this: MIDIInput, ev: MIDIMessageEvent): void {
   const d1 = data[1];
   const d2 = data.length > 2 ? data[2] : 0;
   const key = `midi:${this.id}:${channel}:${d1}`;
+  if (!hasPro()) {
+    // A MIDI keyboard is a Pro feature: the first key pressed explains it once per session.
+    if (status === 0x90 && d2 > 0 && !askedPro) {
+      askedPro = true;
+      toast(tNow("midiPro"), "info", 5000);
+      setPanel("pro");
+    }
+    return;
+  }
   if (status === 0x90 && d2 > 0) {
     engine.press(key, d1, Math.max(0.08, d2 / 127));
   } else if (status === 0x80 || (status === 0x90 && d2 === 0)) {

@@ -30,7 +30,16 @@ describe("piano fingering", () => {
     const rh = (midi: number, k: number): FingerNote => ({ midi, time: k * e, duration: e * 0.9, group: k, hand: "right" });
     const notes = [76, 75, 76, 75, 76, 71, 74, 72, 69].map(rh);
     notes.push(rh(60, 12), rh(64, 13), rh(69, 14), rh(71, 15));
-    expect(assignPianoFingers(notes).slice(5, 10)).toEqual([1, 3, 2, 1, 1]);
+    // B D C A sit under one hand position (A B C D = 1 2 3 4), so the thumb doesn't jump.
+    expect(assignPianoFingers(notes).slice(5, 10)).toEqual([2, 4, 3, 1, 1]);
+  });
+
+  it("fingers a flat row of song keys by column", () => {
+    // E2 E3 G#3 on columns 0, 2, 3 with column 1 (A2) between: little finger, middle, index.
+    const notes: FingerNote[] = [40, 52, 56].map((midi, k) => ({ midi, step: [0, 2, 3][k], time: k * 0.3, group: k, hand: "left" }));
+    expect(assignPianoFingers(notes)).toEqual([5, 3, 2]);
+    const row: FingerNote[] = [60, 61, 62, 63, 64].map((midi, k) => ({ midi, step: k, time: k * 0.3, group: k, hand: "right" }));
+    expect(assignPianoFingers(row)).toEqual([1, 2, 3, 4, 5]);
   });
 
   it("fingers both hands at once", () => {

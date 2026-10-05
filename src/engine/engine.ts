@@ -28,8 +28,6 @@ const GROUP_EPS = 0.035;
 const SCHEDULE_AHEAD = 0.25;
 /** Output latency compensated at most (s); some devices report wild values. */
 const MAX_OUTPUT_LAG = 0.3;
-/** Semitones of the white keys within an octave. */
-const WHITE_STEPS = [0, 2, 4, 5, 7, 9, 11];
 
 export interface PressPos {
   string: number;
@@ -368,11 +366,11 @@ export class Engine {
       const side = (lo + hi) / 2 < HAND_SPLIT - 6 ? "left" : "right";
       hand = () => side;
     }
-    // With only the song's keys on screen, neighbouring columns are fingered like neighbouring white keys.
+    // With only the song's keys on screen, the keys form one flat row: neighbouring columns, neighbouring fingers.
     const used = cfg.compactKeys ? [...new Set(notes.map((n) => n.midi))].sort((a, b) => a - b) : [];
-    const column = new Map(used.map((m, i) => [m, Math.floor(i / 7) * 12 + WHITE_STEPS[i % 7]]));
+    const column = new Map(used.map((m, i) => [m, i]));
     const fingers = assignPianoFingers(
-      notes.map((n) => ({ midi: column.get(n.midi) ?? n.midi, time: n.time, duration: n.duration, group: n.group, hand: hand(n) }))
+      notes.map((n) => ({ midi: n.midi, step: column.get(n.midi), time: n.time, duration: n.duration, group: n.group, hand: hand(n) }))
     );
     notes.forEach((n, i) => (n.finger = fingers[i]));
   }

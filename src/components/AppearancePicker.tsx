@@ -53,6 +53,17 @@ export interface ChoiceOption<T extends string> {
   value: T;
   label: string;
   preview: ReactNode;
+  /** Needs Pro: shown with a badge, and picking it calls `onLocked` instead. */
+  locked?: boolean;
+}
+
+/** Small gold "PRO" label on things that need Pro. */
+export function ProTag({ className }: { className?: string }) {
+  return (
+    <span className={cx("rounded-md bg-amber-300 px-1.5 text-[10px] leading-4 font-extrabold text-ink-950 shadow-[0_2px_8px_rgba(0,0,0,0.45)]", className)}>
+      PRO
+    </span>
+  );
 }
 
 /** A row of picture cards; the preview shows what each option looks like. */
@@ -61,12 +72,14 @@ export function ChoiceCards<T extends string>({
   value,
   options,
   onChange,
+  onLocked,
   disabled,
 }: {
   label: string;
   value: T;
   options: ChoiceOption<T>[];
   onChange: (v: T) => void;
+  onLocked?: () => void;
   disabled?: boolean;
 }) {
   return (
@@ -74,20 +87,24 @@ export function ChoiceCards<T extends string>({
       <div className="mb-2 text-sm font-medium">{label}</div>
       <div role="radiogroup" aria-label={label} className="grid grid-cols-3 gap-2 sm:grid-cols-5">
         {options.map((o) => {
-          const active = o.value === value;
+          const active = o.value === value && !o.locked;
           return (
             <button
               key={o.value}
               type="button"
               role="radio"
               aria-checked={active}
-              onClick={() => onChange(o.value)}
+              aria-label={o.locked ? `${o.label} (Pro)` : undefined}
+              onClick={() => (o.locked ? onLocked?.() : onChange(o.value))}
               className={cx(
                 "overflow-hidden rounded-xl border text-left transition",
                 active ? "border-brand-400/80 ring-2 ring-brand-400/35" : "border-white/10 hover:border-white/25"
               )}
             >
-              <div className="relative h-14 w-full overflow-hidden bg-ink-950">{o.preview}</div>
+              <div className="relative h-14 w-full overflow-hidden bg-ink-950">
+                {o.preview}
+                {o.locked && <ProTag className="absolute top-1 right-1" />}
+              </div>
               <div className={cx("truncate px-2 py-1.5 text-xs font-semibold", active ? "text-mist-100" : "text-mist-300")}>{o.label}</div>
             </button>
           );

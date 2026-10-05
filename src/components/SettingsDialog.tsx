@@ -9,11 +9,24 @@ import { updateSettings } from "../state/actions";
 import { INSTRUMENT_HEIGHT_RANGE, KEY_ZOOM_MAX, defaultSettings, hasKeyboard } from "../state/settings";
 import { openVideo, setPanel, useApp } from "../state/store";
 import { isNativeApp } from "../lib/platform";
-import { IconChevronDown, IconMessage, IconMic, IconPlug, IconSparkles, IconVideo } from "../ui/icons";
+import { IconChevronDown, IconCrown, IconMessage, IconMic, IconPlug, IconSparkles, IconVideo } from "../ui/icons";
+import { requirePro, useHasPro } from "../auth/account";
+import { FREE_DESIGNS, designLocked, visibleLook } from "../state/designs";
 import { KeyBindings } from "./KeyBindings";
 import { LegalLinks } from "./LegalLinks";
 import { ReminderSettings } from "./ReminderToggle";
-import { ApproachSwatch, BackgroundSwatch, ChoiceCards, ColorPicker, ColorSwatch, DustSwatch, EffectSwatch, NoteSwatch, StaffSwatch } from "./AppearancePicker";
+import {
+  ApproachSwatch,
+  BackgroundSwatch,
+  ChoiceCards,
+  ColorPicker,
+  ColorSwatch,
+  DustSwatch,
+  EffectSwatch,
+  NoteSwatch,
+  ProTag,
+  StaffSwatch,
+} from "./AppearancePicker";
 import { STAFF_STYLES, type StaffStyle } from "../render/staffThemes";
 import {
   APPROACH_STYLES,
@@ -114,10 +127,15 @@ type Tab = "general" | "look" | "sound" | "gameplay" | "input";
 
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 
-function Section({ title, children }: { title?: string; children: ReactNode }) {
+function Section({ title, proTag, children }: { title?: string; proTag?: boolean; children: ReactNode }) {
   return (
     <section className="mb-4 rounded-2xl border border-white/[0.06] bg-white/[0.025] px-4 py-2">
-      {title && <h3 className="pt-2 pb-1 text-xs font-bold tracking-[0.12em] text-mist-400 uppercase">{title}</h3>}
+      {title && (
+        <h3 className="flex items-center gap-2 pt-2 pb-1 text-xs font-bold tracking-[0.12em] text-mist-400 uppercase">
+          {title}
+          {proTag && <ProTag className="tracking-normal" />}
+        </h3>
+      )}
       {children}
     </section>
   );
@@ -198,6 +216,9 @@ export function SettingsDialog() {
   };
   const close = () => setPanel(null);
   const choice = { solid: s.solidColor, from: s.gradFrom, to: s.gradTo };
+  const pro = useHasPro();
+  const look = visibleLook(s, pro);
+  const toPro = () => setPanel("pro");
 
   const tabs: { id: Tab; label: string }[] = [
     { id: "general", label: t("general") },
@@ -347,28 +368,47 @@ export function SettingsDialog() {
         {tab === "look" && (
           <>
             <Section>
+              {!pro && (
+                <button
+                  type="button"
+                  onClick={toPro}
+                  className="mt-2 flex w-full items-center gap-2 rounded-xl bg-amber-300/10 px-3 py-2 text-left text-xs font-semibold text-amber-100 ring-1 ring-amber-200/20"
+                >
+                  <IconCrown size={15} className="shrink-0 text-amber-300" />
+                  <span className="flex-1">{t("designsProNote", { n: FREE_DESIGNS })}</span>
+                  <ProTag />
+                </button>
+              )}
               <ChoiceCards
                 label={t("background")}
-                value={s.background}
+                value={look.background}
                 onChange={(v) => updateSettings({ background: v })}
-                options={BACKGROUNDS.map((b) => ({ value: b, label: t(BG_LABEL[b]), preview: <BackgroundSwatch bg={b} /> }))}
+                onLocked={toPro}
+                options={BACKGROUNDS.map((b) => ({ value: b, label: t(BG_LABEL[b]), preview: <BackgroundSwatch bg={b} />, locked: designLocked("background", b, pro) }))}
               />
               <ChoiceCards
                 label={t("noteStyle")}
-                value={s.noteStyle}
+                value={look.noteStyle}
                 onChange={(v) => updateSettings({ noteStyle: v })}
-                options={NOTE_STYLES.map((n) => ({ value: n, label: t(NOTE_LABEL[n]), preview: <NoteSwatch style={n} /> }))}
+                onLocked={toPro}
+                options={NOTE_STYLES.map((n) => ({ value: n, label: t(NOTE_LABEL[n]), preview: <NoteSwatch style={n} />, locked: designLocked("noteStyle", n, pro) }))}
               />
               <ChoiceCards
                 label={t("noteColor")}
-                value={s.noteColor}
+                value={look.noteColor}
                 onChange={(v) => updateSettings({ noteColor: v })}
-                options={NOTE_COLORS.map((c) => ({ value: c, label: t(COLOR_LABEL[c]), preview: <ColorSwatch color={c} choice={choice} /> }))}
+                onLocked={toPro}
+                options={NOTE_COLORS.map((c) => ({
+                  value: c,
+                  label: t(COLOR_LABEL[c]),
+                  preview: <ColorSwatch color={c} choice={choice} />,
+                  locked: designLocked("noteColor", c, pro),
+                }))}
               />
-              {s.noteColor === "solid" && (
+              {look.noteColor === "solid" && (
                 <ColorPicker label={t("pickColor")} value={s.solidColor} onChange={(v) => updateSettings({ solidColor: v })} />
               )}
-              {s.noteColor === "custom" && (
+              {look.noteColor === "custom" && (
                 <>
                   <ColorPicker label={t("gradTop")} value={s.gradFrom} onChange={(v) => updateSettings({ gradFrom: v })} />
                   <ColorPicker label={t("gradBottom")} value={s.gradTo} onChange={(v) => updateSettings({ gradTo: v })} />
@@ -379,10 +419,11 @@ export function SettingsDialog() {
               <Switch label={t("staffView")} hint={t("staffViewHint")} checked={s.staffView} onChange={(v) => updateSettings({ staffView: v })} />
               <ChoiceCards
                 label={t("staffStyle")}
-                value={s.staffStyle}
+                value={look.staffStyle}
                 disabled={!s.staffView}
                 onChange={(v) => updateSettings({ staffStyle: v })}
-                options={STAFF_STYLES.map((v) => ({ value: v, label: t(STAFF_LABEL[v]), preview: <StaffSwatch style={v} /> }))}
+                onLocked={toPro}
+                options={STAFF_STYLES.map((v) => ({ value: v, label: t(STAFF_LABEL[v]), preview: <StaffSwatch style={v} />, locked: designLocked("staffStyle", v, pro) }))}
               />
             </Section>
             <Section>
@@ -400,9 +441,10 @@ export function SettingsDialog() {
                   />
                   <ChoiceCards
                     label={t("effectStyle")}
-                    value={s.effectStyle}
+                    value={look.effectStyle}
                     onChange={(v) => updateSettings({ effectStyle: v })}
-                    options={EFFECT_STYLES.map((e) => ({ value: e, label: t(FX_LABEL[e]), preview: <EffectSwatch style={e} /> }))}
+                    onLocked={toPro}
+                    options={EFFECT_STYLES.map((e) => ({ value: e, label: t(FX_LABEL[e]), preview: <EffectSwatch style={e} />, locked: designLocked("effectStyle", e, pro) }))}
                   />
                 </>
               )}
@@ -410,11 +452,12 @@ export function SettingsDialog() {
             <Section>
               <ChoiceCards
                 label={t("dust")}
-                value={s.dust}
+                value={look.dust}
                 onChange={(v) => updateSettings({ dust: v })}
-                options={DUST_STYLES.map((d) => ({ value: d, label: t(DUST_LABEL[d]), preview: <DustSwatch style={d} /> }))}
+                onLocked={toPro}
+                options={DUST_STYLES.map((d) => ({ value: d, label: t(DUST_LABEL[d]), preview: <DustSwatch style={d} />, locked: designLocked("dust", d, pro) }))}
               />
-              {s.dust !== "off" && (
+              {look.dust !== "off" && (
                 <Slider
                   label={t("dustLevel")}
                   value={s.dustLevel}
@@ -429,9 +472,10 @@ export function SettingsDialog() {
             <Section>
               <ChoiceCards
                 label={t("approach")}
-                value={s.approach}
+                value={look.approach}
                 onChange={(v) => updateSettings({ approach: v })}
-                options={APPROACH_STYLES.map((a) => ({ value: a, label: t(APPROACH_LABEL[a]), preview: <ApproachSwatch style={a} /> }))}
+                onLocked={toPro}
+                options={APPROACH_STYLES.map((a) => ({ value: a, label: t(APPROACH_LABEL[a]), preview: <ApproachSwatch style={a} />, locked: designLocked("approach", a, pro) }))}
               />
             </Section>
           </>
@@ -578,14 +622,14 @@ export function SettingsDialog() {
 
         {tab === "input" && (
           <>
-            <Section title={t("midiInput")}>
+            <Section title={t("midiInput")} proTag={!pro}>
               {!midiSupported ? (
                 <p className="py-2 text-sm text-mist-400">{t("midiUnsupported")}</p>
               ) : (
                 <div className="space-y-2 py-2">
                   <div className="flex flex-wrap items-center gap-2">
-                    {midiAccess !== "ready" && (
-                      <Button size="sm" onClick={() => void startMidi()}>
+                    {(midiAccess !== "ready" || !pro) && (
+                      <Button size="sm" onClick={() => requirePro() && void startMidi()}>
                         <IconPlug size={15} /> {t("midiConnect")}
                       </Button>
                     )}
@@ -618,7 +662,7 @@ export function SettingsDialog() {
               )}
             </Section>
             {micSupported() && (
-              <Section title={t("micListen")}>
+              <Section title={t("micListen")} proTag={!pro}>
                 <div className="flex flex-wrap items-center gap-2 py-2">
                   <Button size="sm" variant={mic === "on" ? "primary" : "subtle"} onClick={() => void toggleMic()}>
                     <IconMic size={15} /> {mic === "on" ? t("micStop") : t("micStart")}

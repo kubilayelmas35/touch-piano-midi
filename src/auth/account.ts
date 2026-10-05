@@ -25,13 +25,33 @@ function redirectUrl(): string {
   return isApp ? SITE_URL : window.location.origin + window.location.pathname;
 }
 
+/** Last known Pro status per user, so Pro features keep working offline. */
+const PRO_CACHE = "sonatrio-pro-v1";
+
+function cachedPro(userId: string): { pro: boolean; cloud: boolean; username: string | null } | null {
+  try {
+    const c = JSON.parse(localStorage.getItem(PRO_CACHE) ?? "null");
+    return c?.id === userId ? { pro: c.pro === true, cloud: c.cloud === true, username: c.username ?? null } : null;
+  } catch {
+    return null;
+  }
+}
+
 async function loadProfile(userId: string, email: string | null): Promise<void> {
   if (!supabase) return;
-  const { data } = await supabase
+  const res = await supabase
     .from("profiles")
     .select("username, pro, cloud, cloud_quota_mb, is_admin")
     .eq("id", userId)
     .maybeSingle();
+  let data: Record<string, unknown> | null = res.data;
+  if (res.error) data = cachedPro(userId);
+  else
+    try {
+      localStorage.setItem(PRO_CACHE, JSON.stringify({ id: userId, pro: data?.pro === true, cloud: data?.cloud === true, username: data?.username ?? null }));
+    } catch {
+      /* storage full or blocked */
+    }
   const prev = useApp.getState().account;
   const hadCloud = prev.status === "signedIn" && (prev.cloud || prev.pro);
   useApp.setState((s) => ({
@@ -91,6 +111,27 @@ export function canImport(): boolean {
   if (!supabase) return true;
   const a = useApp.getState().account;
   return a.pro || a.cloud;
+}
+
+function proOf(a: { status: string; pro: boolean; cloud: boolean }): boolean {
+  // While the account is still loading, Pro members shouldn't see their features flicker off.
+  return !supabase || a.status === "loading" || a.pro || a.cloud;
+}
+
+/** Whether Pro features (microphone, MIDI keyboard, friends, all designs) are unlocked. */
+export function hasPro(): boolean {
+  return proOf(useApp.getState().account);
+}
+
+export function useHasPro(): boolean {
+  return useApp((s) => proOf(s.account));
+}
+
+/** For a Pro feature: true when it may be used, otherwise opens the upgrade dialog. */
+export function requirePro(): boolean {
+  if (hasPro()) return true;
+  setPanel("pro");
+  return false;
 }
 
 export async function refreshAccount(): Promise<void> {

@@ -9,11 +9,16 @@ export interface FingerNote {
   /** Notes sharing a group sound together (a chord). */
   group: number;
   hand: HandSide;
+  /**
+   * Where the key sits, counted in white keys (black keys halfway between). Defaults to the piano's layout;
+   * a flat row of equal keys (only the song's keys on screen) passes its column and has no black keys.
+   */
+  step?: number;
 }
 
-/** Where each finger (1 thumb … 5 little finger) rests in a five-finger position, in semitones from the thumb. */
-const POS = [0, 0, 2, 4, 5, 7];
-/** The same for chord shapes, where a third (3–4 semitones) takes the middle finger. */
+/** Where each finger (1 thumb … 5 little finger) rests in a five-finger position, in white keys from the thumb. */
+const POS = [0, 0, 1, 2, 3, 4];
+/** The same for chord shapes in semitones, where a third (3–4 semitones) takes the middle finger. */
 const CHORD_POS = [0, 0, 2, 3, 5, 7];
 /** Passing the thumb under (or a finger over it) is easiest from the middle finger. */
 const CROSS = [0, 0, 3, 2.5, 4.5, 8];
@@ -21,24 +26,27 @@ const CROSS = [0, 0, 3, 2.5, 4.5, 8];
 const FREE_GAP = 0.8;
 /** Once the previous notes are let go for this long (seconds), the hand can jump anywhere. */
 const RELEASE_GAP = 0.25;
+/** Position of each pitch class in white keys from C. */
+const WHITE_POS = [0, 0.5, 1, 1.5, 2, 3, 3.5, 4, 4.5, 5, 5.5, 6];
 
-/** Effort of going from one note to the next with the given fingers; pitches are mirrored for the left hand. */
-function step(a: number, fa: number, b: number, fb: number, hand: HandSide): number {
-  const d = hand === "right" ? b - a : a - b;
-  if (fa === fb) return d === 0 ? 0 : 6 + Math.abs(d);
-  if (d === 0) return 1.5;
-  let c: number;
-  if (d > 0 && fb < fa) c = fb === 1 ? CROSS[fa] + Math.abs(d - 1.5) * 0.6 : 12;
-  else if (d < 0 && fb > fa) c = fa === 1 ? CROSS[fb] + Math.abs(-d - 1.5) * 0.6 : 12;
-  else {
-    const off = Math.abs(d - (POS[fb] - POS[fa]));
-    c = off * 0.6 + Math.max(0, off - 4) * 1.2;
-  }
-  return c;
+function whiteStep(midi: number): number {
+  return Math.floor(midi / 12) * 7 + WHITE_POS[((midi % 12) + 12) % 12];
 }
 
-function keyCost(midi: number, f: number): number {
-  if (!isBlack(midi)) return 0;
+/** Effort of going from one key to the next with the given fingers; positions are mirrored for the left hand. */
+function step(a: number, fa: number, b: number, fb: number, hand: HandSide): number {
+  const d = hand === "right" ? b - a : a - b;
+  if (fa === fb) return d === 0 ? 0 : 6 + Math.abs(d) * 1.7;
+  if (d === 0) return 1.5;
+  if (d > 0 && fb < fa) return fb === 1 ? CROSS[fa] + Math.abs(d - 1) : 12;
+  if (d < 0 && fb > fa) return fa === 1 ? CROSS[fb] + Math.abs(-d - 1) : 12;
+  // How far the hand has to shift or stretch; a half step (a black key between) still sits under the finger.
+  const off = Math.abs(d - (POS[fb] - POS[fa]));
+  return Math.max(0, off - 0.5) + Math.max(0, off - 2.5) * 2;
+}
+
+function keyCost(midi: number, f: number, flat: boolean): number {
+  if (flat || !isBlack(midi)) return 0;
   return f === 1 ? 2.5 : f === 5 ? 1 : 0;
 }
 
@@ -64,6 +72,7 @@ export function chordFingers(midis: number[], hand: HandSide): number[] {
 interface Group {
   idx: number[];
   midis: number[];
+  steps: number[];
   time: number;
   end: number;
   cands: number[][];
@@ -72,6 +81,7 @@ interface Group {
 /** Suggested finger (1–5, 0 = none) for every note, chosen for the least effort along each hand. */
 export function assignPianoFingers(notes: FingerNote[]): number[] {
   const out = new Array<number>(notes.length).fill(0);
+  const flat = notes.some((n) => n.step !== undefined);
   for (const hand of ["right", "left"] as const) {
     const byGroup = new Map<number, number[]>();
     notes.forEach((n, i) => {
@@ -83,22 +93,30 @@ export function assignPianoFingers(notes: FingerNote[]): number[] {
     const groups: Group[] = [...byGroup.values()].map((idx) => {
       idx.sort((x, y) => notes[x].midi - notes[y].midi);
       const midis = idx.map((i) => notes[i].midi);
-      const cands = midis.length === 1 ? [1, 2, 3, 4, 5].map((f) => [f]) : [chordFingers(midis, hand)];
+      const steps = idx.map((i) => notes[i].step ?? whiteStep(notes[i].midi));
+      const shape = flat ? steps.map((s) => (s * 12) / 7) : midis;
+      const cands = midis.length === 1 ? [1, 2, 3, 4, 5].map((f) => [f]) : [chordFingers(shape, hand)];
       const time = notes[idx[0]].time;
       const end = Math.max(...idx.map((i) => notes[i].time + (notes[i].duration ?? 0)));
-      return { idx, midis, time, end, cands };
+      return { idx, midis, steps, time, end, cands };
     });
     groups.sort((a, b) => a.time - b.time);
     if (!groups.length) continue;
 
-    const own = (g: Group, c: number[]) => g.midis.reduce((s, m, k) => s + keyCost(m, c[k]), 0);
+    // Equal choices lean towards the finger that matches where the key lies in this hand's range.
+    const lo = Math.min(...groups.flatMap((g) => g.steps));
+    const span = Math.max(4, Math.max(...groups.flatMap((g) => g.steps)) - lo);
+    const home = (s: number) => (hand === "right" ? 1 + ((s - lo) * 4) / span : 5 - ((s - lo) * 4) / span);
+    const own = (g: Group, c: number[]) =>
+      g.midis.reduce((s, m, k) => s + keyCost(m, c[k], flat) + (c[k] ? Math.abs(c[k] - home(g.steps[k])) * 0.02 : 0), 0);
     const link = (p: Group, pc: number[], g: Group, gc: number[]) => {
       // The note of each group nearest the other one carries the hand from one to the next.
-      const lead = g.midis.length === 1 ? 0 : g.midis.reduce((b, m, k) => (Math.abs(m - p.midis[0]) < Math.abs(g.midis[b] - p.midis[0]) ? k : b), 0);
-      const from = p.midis.reduce((b, m, k) => (Math.abs(m - g.midis[lead]) < Math.abs(p.midis[b] - g.midis[lead]) ? k : b), 0);
+      const lead = g.steps.length === 1 ? 0 : g.steps.reduce((b, m, k) => (Math.abs(m - p.steps[0]) < Math.abs(g.steps[b] - p.steps[0]) ? k : b), 0);
+      const from = p.steps.reduce((b, m, k) => (Math.abs(m - g.steps[lead]) < Math.abs(p.steps[b] - g.steps[lead]) ? k : b), 0);
       if (!pc[from] || !gc[lead]) return 0;
-      const cost = step(p.midis[from], pc[from], g.midis[lead], gc[lead], hand);
-      if (p.end > p.time && g.time - p.end >= RELEASE_GAP) return cost * 0.1;
+      const cost = step(p.steps[from], pc[from], g.steps[lead], gc[lead], hand);
+      // After letting go, any finger can take the next key, so the jump costs the same with each.
+      if (p.end > p.time && g.time - p.end >= RELEASE_GAP) return Math.min(cost, 3) * 0.1;
       return g.time - p.time > FREE_GAP ? cost * 0.3 : cost;
     };
 

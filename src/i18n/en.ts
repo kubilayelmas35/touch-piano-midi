@@ -634,7 +634,7 @@ export const en = {
 
   // Pro
   proActive: "Pro active",
-  proBody: "Pro is required to import your own MIDI files and to use the Studio (recording, audio → MIDI, notes → MIDI).",
+  proBody: "Microphone, MIDI keyboard, friends, every design, your own MIDI files and the Studio, unlocked with one payment.",
   proPerk1: "Import and play unlimited MIDI files",
   proPerk2: "One-time purchase, yours forever",
   proPerk3: "Works on web, Android and iOS with the same account",
@@ -987,6 +987,13 @@ export const en = {
   proPerk6: "Write notes and turn them into MIDI",
   proPerk7: "10 songs in the cloud on all your devices (1 MB per song)",
   proPerk8: "Note editor right on the falling notes",
+  proPerkMic: "Listen with microphone: play your real piano, guitar or violin",
+  proPerkMidi: "Connect a MIDI keyboard",
+  proPerkFriends: "Friends, weekly leaderboard, score challenges and live duet",
+  proPerkDesigns: "Every design: backgrounds, note styles, colours and effects",
+  designsProNote: "The first {n} designs of each kind are free. The ones marked PRO need Sonatrio Pro.",
+  midiPro: "Connecting a MIDI keyboard comes with Sonatrio Pro.",
+  duetProNote: "Hosting a duet is Pro. If a Pro friend invites you or gives you the code, you can join for free.",
   editSong: "Edit notes",
   editTitle: "Note editor",
   editUndo: "Undo",

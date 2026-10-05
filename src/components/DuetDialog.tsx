@@ -21,6 +21,8 @@ import { DUET_SOUNDS } from "../state/settings";
 import { setPanel, toast, useApp } from "../state/store";
 import { IconCheck, IconClose, IconDuet, IconPlay, IconShare, IconSpeaker, IconSpeakerOff, IconStar } from "../ui/icons";
 import { Button, Dialog, Segmented, cx } from "../ui/primitives";
+import { requirePro, useHasPro } from "../auth/account";
+import { ProTag } from "./AppearancePicker";
 
 type T = ReturnType<typeof useT>;
 const handLabel = (t: T, h: DuetHand) => (h === "right" ? t("trackRightHand") : t("trackLeftHand"));
@@ -43,6 +45,7 @@ function Player({ name, hand, status, me }: { name: string; hand: DuetHand; stat
 
 function Start() {
   const t = useT();
+  const pro = useHasPro();
   const [code, setCode] = useState("");
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -53,9 +56,11 @@ function Start() {
       <div className="rounded-2xl bg-gradient-to-br from-brand-500/20 to-fuchsia-400/10 p-4 ring-1 ring-white/[0.06]">
         <IconDuet size={30} className="text-brand-200" />
         <p className="mt-2 text-sm leading-relaxed text-mist-200">{t("duetIntro")}</p>
-        <Button variant="primary" size="lg" className="mt-3 w-full" onClick={() => hostDuet()}>
+        <Button variant="primary" size="lg" className="mt-3 w-full" onClick={() => requirePro() && hostDuet()}>
           <IconDuet size={18} /> {t("duetHost")}
+          {!pro && <ProTag />}
         </Button>
+        {!pro && <p className="mt-2 text-xs leading-relaxed text-mist-300">{t("duetProNote")}</p>}
       </div>
       <form onSubmit={submit} className="rounded-2xl bg-white/[0.04] p-3">
         <div className="mb-2 text-xs font-bold tracking-[0.12em] text-mist-400 uppercase">{t("duetJoinTitle")}</div>

@@ -6,6 +6,8 @@ import { glider } from "../input/glide";
 import { keyLabel, keyLabelMap, keyLabelRevision } from "../input/keyboard";
 import { pianoKeyMap } from "../input/keyboardBase";
 import { INSTRUMENT_HEIGHT_RANGE } from "../state/settings";
+import { visibleLook } from "../state/designs";
+import { hasPro } from "../auth/account";
 import { niceKeyboardRange } from "../lib/notes";
 import { Highway } from "../render/highway";
 import { StaffRenderer, staffMetrics } from "../render/staff";
@@ -168,7 +170,7 @@ export function GameView() {
       const v = viewRef.current;
       if (!r || !v.layout || !v.w) return;
       const st = useApp.getState();
-      const s = st.settings;
+      const s = visibleLook(st.settings, hasPro());
       const time = engine.frame();
       labels.perfect = t("perfect");
       labels.great = t("great");

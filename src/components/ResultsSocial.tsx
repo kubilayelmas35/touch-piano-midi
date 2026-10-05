@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useT } from "../i18n";
 import { createDuel, toastSocialError } from "../social/social";
+import { requirePro } from "../auth/account";
 import { toast, useApp } from "../state/store";
 import { IconClose, IconCrown, IconSwords } from "../ui/icons";
 import { Button, cx } from "../ui/primitives";
@@ -90,7 +91,7 @@ export function ResultsSocial() {
       {results.social && !duel && friends.length > 0 && (
         <div>
           {!picking ? (
-            <Button size="sm" className="w-full" onClick={() => setPicking(true)}>
+            <Button size="sm" className="w-full" onClick={() => requirePro() && setPicking(true)}>
               <IconSwords size={15} /> {t("challengeFriend")}
             </Button>
           ) : (
