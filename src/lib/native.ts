@@ -1,5 +1,5 @@
 import { engine } from "../engine/engine";
-import { isNativeApp } from "./platform";
+import { isNativeApp, platform } from "./platform";
 
 /** Android back button: close the top dialog or menu, then pause, then leave the app. */
 async function onBack(): Promise<void> {
@@ -25,6 +25,11 @@ async function onBack(): Promise<void> {
 export async function initNative(): Promise<void> {
   if (!isNativeApp) return;
   document.documentElement.classList.add("native-app");
+  if (platform === "ios") {
+    // The iOS home indicator fades while playing; Capacitor owns prefersHomeIndicatorAutoHidden.
+    const { SystemBars, SystemBarType } = await import("@capacitor/core");
+    void SystemBars.hide({ bar: SystemBarType.NavigationBar }).catch(() => {});
+  }
   const { App } = await import("@capacitor/app");
   await App.addListener("backButton", () => void onBack());
   await App.addListener("appStateChange", ({ isActive }) => {

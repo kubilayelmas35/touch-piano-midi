@@ -1,7 +1,8 @@
 import UIKit
 import Capacitor
 
-/// Full screen for playing with both hands: no bounce, the home indicator fades, edge swipes need a second swipe.
+/// Full screen for playing with both hands: no bounce, edge swipes need a second swipe.
+/// The home indicator is hidden from JS through the SystemBars plugin (Capacitor owns that property).
 class SonatrioViewController: CAPBridgeViewController {
     override func capacitorDidLoad() {
         super.capacitorDidLoad()
@@ -10,10 +11,6 @@ class SonatrioViewController: CAPBridgeViewController {
         web.scrollView.bounces = false
         web.scrollView.alwaysBounceVertical = false
         web.scrollView.contentInsetAdjustmentBehavior = .never
-    }
-
-    override var prefersHomeIndicatorAutoHidden: Bool {
-        return true
     }
 
     override var preferredScreenEdgesDeferringSystemGestures: UIRectEdge {
