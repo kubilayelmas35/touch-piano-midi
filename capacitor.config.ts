@@ -25,6 +25,8 @@ const config: CapacitorConfig = {
     SystemBars: {
       style: "DARK",
       initialViewportFitValueHint: "cover",
+      // MainActivity owns the insets: full screen into the camera cutout, keyboard padding only.
+      insetsHandling: "disable",
     },
   },
 };

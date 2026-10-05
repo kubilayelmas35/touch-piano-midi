@@ -1,6 +1,7 @@
 import {
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type ButtonHTMLAttributes,
@@ -335,13 +336,40 @@ export function Popover({
   label: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [place, setPlace] = useState<{ left: number; maxHeight: number; up: boolean } | null>(null);
+  const wrap = useRef<HTMLDivElement>(null);
   const btn = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLDivElement>(null);
   const refs = useRef([btn, panel]).current as RefObject<HTMLElement | null>[];
   const close = useRef(() => setOpen(false)).current;
   useClickOutside(refs, close, open);
+  useLayoutEffect(() => {
+    if (!open) {
+      setPlace(null);
+      return;
+    }
+    const measure = () => {
+      const w = wrap.current;
+      const p = panel.current;
+      if (!w || !p) return;
+      const r = w.getBoundingClientRect();
+      const gap = 8;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const pw = p.offsetWidth;
+      const ideal = align === "start" ? r.left : align === "end" ? r.right - pw : r.left + r.width / 2 - pw / 2;
+      const left = Math.min(Math.max(ideal, gap), Math.max(gap, vw - pw - gap));
+      const below = vh - r.bottom - gap * 2;
+      const above = r.top - gap * 2;
+      const up = below < 200 && above > below;
+      setPlace({ left: left - r.left, maxHeight: Math.max(120, up ? above : below), up });
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [open, align]);
   return (
-    <div className="relative">
+    <div ref={wrap} className="relative">
       {trigger({
         open,
         toggle: () => {
@@ -357,11 +385,11 @@ export function Popover({
           data-popover-open=""
           aria-label={label}
           className={cx(
-            "glass absolute top-[calc(100%+8px)] z-50 w-72 max-w-[calc(100vw-16px)] rounded-2xl p-3 animate-pop",
-            align === "center" && "left-1/2 -translate-x-1/2",
-            align === "start" && "left-0",
-            align === "end" && "right-0"
+            "glass scroll-thin absolute z-50 w-72 max-w-[calc(100vw-16px)] overflow-y-auto rounded-2xl p-3 animate-pop",
+            place?.up ? "bottom-[calc(100%+8px)]" : "top-[calc(100%+8px)]",
+            !place && "invisible left-0"
           )}
+          style={place ? { left: place.left, maxHeight: place.maxHeight } : undefined}
         >
           {children(close)}
         </div>

@@ -84,7 +84,7 @@
 :root {
   color-scheme: dark;
   -webkit-tap-highlight-color: transparent;
-  /* Notches and camera cutouts. The Android app injects --safe-area-inset-* where WebView's env() is unreliable. */
+  /* Notches and camera cutouts in browsers. The Android app draws over the cutout on purpose and reports no insets. */
   --safe-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
   --safe-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
   --safe-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
@@ -125,8 +125,17 @@
     -webkit-user-select: text;
   }
 
-  [class*="overflow-"] {
+  /* Only real scrollers: on an overflow-hidden box this stops touch scrolls from reaching the panel behind it. */
+  [class*="overflow-auto"],
+  [class*="overflow-y-auto"],
+  [class*="overflow-scroll"],
+  [class*="overflow-y-scroll"] {
     overscroll-behavior: contain;
+  }
+
+  [class*="overflow-x-auto"],
+  [class*="overflow-x-scroll"] {
+    overscroll-behavior-x: contain;
   }
 
   img {
