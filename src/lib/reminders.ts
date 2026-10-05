@@ -13,8 +13,10 @@ const IDS = Array.from({ length: DAYS }, (_, i) => ({ id: FIRST_ID + i }));
 
 export const remindersSupported = isNativeApp;
 
+// Wrapped: resolving a promise with the plugin proxy itself makes the runtime call proxy.then(), which iOS rejects.
 async function plugin() {
-  return (await import("@capacitor/local-notifications")).LocalNotifications;
+  const { LocalNotifications } = await import("@capacitor/local-notifications");
+  return { ln: LocalNotifications };
 }
 
 /** Notification texts for the coming days; skips today once practised or once the time has passed. */
@@ -47,7 +49,7 @@ export function syncReminders(): Promise<void> {
   if (!remindersSupported) return Promise.resolve();
   const run = async () => {
     try {
-      const ln = await plugin();
+      const { ln } = await plugin();
       await ln.cancel({ notifications: IDS });
       if (!useApp.getState().settings.reminder) return;
       if ((await ln.checkPermissions()).display !== "granted") return;
@@ -67,7 +69,7 @@ export function syncReminders(): Promise<void> {
 export async function askReminderPermission(): Promise<boolean> {
   if (!remindersSupported) return false;
   try {
-    const ln = await plugin();
+    const { ln } = await plugin();
     let state = (await ln.checkPermissions()).display;
     if (state !== "granted") state = (await ln.requestPermissions()).display;
     if (state !== "granted") toast(tNow("reminderDenied"), "error", 5000);

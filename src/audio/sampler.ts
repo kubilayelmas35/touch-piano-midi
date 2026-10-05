@@ -1,3 +1,4 @@
+import { reportError } from "../lib/errors";
 import { getBus } from "./context";
 import { INSTRUMENTS, sampleUrl, type InstrumentDef, type InstrumentId } from "./instruments";
 
@@ -198,6 +199,39 @@ export function isLoaded(id: InstrumentId): boolean {
   return loaded.has(id);
 }
 
+let offline: OfflineAudioContext | null = null;
+
+function decodeWith(ctx: BaseAudioContext, data: ArrayBuffer, timeoutMs: number): Promise<AudioBuffer> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`decode timed out (${ctx.constructor.name})`)), timeoutMs);
+    const ok = (b: AudioBuffer) => {
+      clearTimeout(timer);
+      resolve(b);
+    };
+    const fail = (e: unknown) => {
+      clearTimeout(timer);
+      reject(e instanceof Error ? e : new Error(`decode failed (${ctx.constructor.name})`));
+    };
+    // Callback form as well: older WebKit only calls these, and a rejection would otherwise go unseen.
+    const p = ctx.decodeAudioData(data, ok, fail) as Promise<AudioBuffer> | undefined;
+    p?.then(ok, fail);
+  });
+}
+
+/** Decodes on the live context; if that fails or stalls (WebKit before the first touch), on an offline one. */
+async function decodeSample(ctx: AudioContext, bytes: ArrayBuffer): Promise<AudioBuffer> {
+  try {
+    return await decodeWith(ctx, bytes.slice(0), 8000);
+  } catch (err) {
+    offline ??= new OfflineAudioContext(2, 1, ctx.sampleRate);
+    try {
+      return await decodeWith(offline, bytes, 8000);
+    } catch {
+      throw err;
+    }
+  }
+}
+
 export function loadInstrument(
   id: InstrumentId,
   onProgress?: (done: number, total: number) => void
@@ -208,20 +242,24 @@ export function loadInstrument(
   if (pending) return pending;
 
   const def = INSTRUMENTS[id];
-  const { ctx } = getBus();
   let done = 0;
   const promise = (async () => {
+    const { ctx } = getBus();
     const buffers = new Map<number, Sample>();
     const queue = [...def.notes];
+    let firstError = "";
+    let failed = 0;
     const worker = async () => {
       while (queue.length) {
         const midi = queue.shift()!;
         try {
           const res = await fetch(sampleUrl(id, midi));
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const decoded = await ctx.decodeAudioData(await res.arrayBuffer());
+          const decoded = await decodeSample(ctx, await res.arrayBuffer());
           buffers.set(midi, prepare(ctx, decoded, def));
         } catch (err) {
+          failed++;
+          firstError ||= err instanceof Error ? `${err.name}: ${err.message}` : String(err);
           console.warn(`[sampler] ${id} ${midi} failed`, err);
         }
         done++;
@@ -229,7 +267,10 @@ export function loadInstrument(
       }
     };
     await Promise.all(Array.from({ length: 6 }, worker));
-    if (!buffers.size) throw new Error(`No samples loaded for ${id}`);
+    if (failed) {
+      reportError("error", `Sampler ${id}: ${failed}/${def.notes.length} failed (${firstError}); context ${ctx.state} ${ctx.sampleRate} Hz`);
+    }
+    if (!buffers.size) throw new Error(`No samples loaded for ${id}: ${firstError}`);
     const inst = { def, buffers };
     loaded.set(id, inst);
     loading.delete(id);

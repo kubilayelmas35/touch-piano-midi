@@ -75,6 +75,7 @@ export function Hud() {
         <div className="absolute inset-x-0 bottom-6 flex justify-center px-4">
           <div className="glass w-full max-w-xs rounded-2xl px-4 py-3 text-center animate-pop" role="status">
             <div className="text-sm font-semibold">{audioError ? t("loadFailed") : t("loadingSounds")}</div>
+            {audioError && <div className="mt-1 text-[11px] break-words text-mist-400 select-text">{audioError}</div>}
             {!audioError && (
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
                 <div

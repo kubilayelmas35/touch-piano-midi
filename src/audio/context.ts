@@ -1,3 +1,5 @@
+import { reportError } from "../lib/errors";
+
 /** Shared AudioContext with a master bus: voices → dry/reverb → compressor → limiter → destination. */
 
 export interface MasterBus {
@@ -12,8 +14,7 @@ export interface MasterBus {
 
 let bus: MasterBus | null = null;
 
-function buildImpulse(ctx: AudioContext, seconds: number, decay: number): AudioBuffer {
-  const rate = ctx.sampleRate;
+function buildImpulse(ctx: AudioContext, seconds: number, decay: number, rate = ctx.sampleRate): AudioBuffer {
   const len = Math.floor(rate * seconds);
   const buf = ctx.createBuffer(2, len, rate);
   for (let ch = 0; ch < 2; ch++) {
@@ -54,7 +55,16 @@ export function getBus(): MasterBus {
   limiter.release.value = 0.08;
 
   const reverb = ctx.createConvolver();
-  reverb.buffer = buildImpulse(ctx, 2.2, 3.2);
+  // iOS can report one sample rate and then reject a buffer made at it ("does not match the context rate"), after
+  // the audio hardware switched between 44.1 and 48 kHz. Try the other rate, then go without reverb.
+  for (const rate of new Set([ctx.sampleRate, 48000, 44100])) {
+    try {
+      reverb.buffer = buildImpulse(ctx, 2.2, 3.2, rate);
+      break;
+    } catch (err) {
+      console.warn(`[audio] reverb at ${rate} Hz rejected`, err);
+    }
+  }
   const reverbSend = ctx.createGain();
   reverbSend.gain.value = 0.18;
   const reverbReturn = ctx.createGain();
@@ -78,14 +88,26 @@ export function audioCtx(): AudioContext {
   return getBus().ctx;
 }
 
+let stuckReported = false;
+
 /** Must be called from a user gesture at least once (autoplay policy). */
 export async function unlockAudio(): Promise<void> {
   const { ctx } = getBus();
   if (ctx.state !== "running") {
+    // WebKit only counts the context as started by a gesture once something plays inside that gesture.
+    const blip = ctx.createBufferSource();
+    blip.buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
+    blip.connect(ctx.destination);
+    blip.start();
     try {
       await ctx.resume();
     } catch {
       /* resumed on next gesture */
+    }
+    const state = ctx.state as AudioContextState;
+    if (state !== "running" && !stuckReported) {
+      stuckReported = true;
+      reportError("error", `Audio context stays ${state} after a gesture (${ctx.sampleRate} Hz)`);
     }
   }
 }
