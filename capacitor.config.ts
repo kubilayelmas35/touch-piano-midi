@@ -10,6 +10,12 @@ const config: CapacitorConfig = {
     allowMixedContent: false,
     captureInput: true,
   },
+  ios: {
+    // The page lays itself out with the safe-area insets (SonatrioViewController turns off the bounce).
+    contentInset: "never",
+    allowsLinkPreview: false,
+    backgroundColor: "#0a0d1f",
+  },
   plugins: {
     SplashScreen: {
       launchShowDuration: 900,

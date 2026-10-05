@@ -26,6 +26,7 @@ import {
 import { PRO_CLOUD_SONGS } from "../auth/cloud";
 import { buyPro, canBuyInApp, proPrice, restorePro } from "../auth/purchase";
 import { useT, type TFn } from "../i18n";
+import { isNativeApp, platform } from "../lib/platform";
 import { inviteLink } from "../social/social";
 import { shareLink } from "../studio/share";
 import { setPanel, toast, useApp } from "../state/store";
@@ -667,7 +668,7 @@ function PlayPurchase() {
       <Button variant="primary" className="w-full" disabled={busy !== null} onClick={() => run("buy")}>
         <IconCrown size={16} /> {price ? t("proBuyNow", { price }) : t("proBuyPlain")}
       </Button>
-      <p className="text-center text-xs leading-relaxed text-mist-400">{t("proPlayHowTo")}</p>
+      <p className="text-center text-xs leading-relaxed text-mist-400">{t(platform === "ios" ? "proAppStoreHowTo" : "proPlayHowTo")}</p>
       <Button variant="ghost" className="w-full" disabled={busy !== null} onClick={() => run("restore")}>
         {t("proRestore")}
       </Button>
@@ -680,9 +681,10 @@ export function ProDialog() {
   const open = useApp((s) => s.panel === "pro");
   const account = useApp((s) => s.account);
   const [checking, setChecking] = useState(false);
+  const midiOff = useApp((s) => isNativeApp && !s.midiSupported);
   const perks = [
     t("proPerkMic"),
-    t("proPerkMidi"),
+    ...(midiOff ? [] : [t("proPerkMidi")]),
     t("proPerkFriends"),
     t("proPerkDesigns"),
     t("proPerk1"),

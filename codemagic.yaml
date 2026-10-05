@@ -1,0 +1,48 @@
+# iOS build for the App Store (Capacitor, Swift Package Manager).
+# Codemagic setup: Team settings > Integrations > Developer Portal: add an App Store Connect API key named "Sonatrio ASC",
+# then Team settings > Code signing identities: generate an Apple Distribution certificate and fetch the
+# App Store profile for com.sonatrio.app.
+workflows:
+  ios-release:
+    name: iOS release (TestFlight)
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    integrations:
+      app_store_connect: Sonatrio ASC
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.sonatrio.app
+      node: 22
+      xcode: latest
+      vars:
+        ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+    triggering:
+      events:
+        - tag
+      tag_patterns:
+        - pattern: "ios-*"
+    scripts:
+      - name: Install dependencies
+        script: npm ci
+      - name: Build the web app and copy it into the Xcode project
+        script: npm run ios:sync
+      - name: Build number
+        script: |
+          sed -i '' "s/CURRENT_PROJECT_VERSION = [0-9]*;/CURRENT_PROJECT_VERSION = $BUILD_NUMBER;/g" ios/App/App.xcodeproj/project.pbxproj
+      - name: Code signing
+        script: xcode-project use-profiles --project ios/App/App.xcodeproj
+      - name: Build ipa
+        script: |
+          xcode-project build-ipa \
+            --project ios/App/App.xcodeproj \
+            --scheme App \
+            --config Release
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        submit_to_app_store: false

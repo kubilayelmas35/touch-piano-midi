@@ -8,7 +8,7 @@ import { useFullscreen } from "../lib/fullscreen";
 import { updateSettings } from "../state/actions";
 import { INSTRUMENT_HEIGHT_RANGE, KEY_ZOOM_MAX, defaultSettings, hasKeyboard } from "../state/settings";
 import { openVideo, setPanel, useApp } from "../state/store";
-import { isNativeApp } from "../lib/platform";
+import { isNativeApp, platform } from "../lib/platform";
 import { IconChevronDown, IconCrown, IconMessage, IconMic, IconPlug, IconSparkles, IconVideo } from "../ui/icons";
 import { requirePro, useHasPro } from "../auth/account";
 import { FREE_DESIGNS, designLocked, visibleLook } from "../state/designs";
@@ -332,7 +332,10 @@ export function SettingsDialog() {
             <Section title={t("helpSection")}>
               <div className="grid gap-2 py-2 sm:grid-cols-3">
                 <HelpButton icon={<IconVideo size={18} />} label={t("tutorialWatch")} hint={t("tutorialWatchHint")} onClick={() => openVideo("tutorial")} />
-                <HelpButton icon={<IconSparkles size={18} />} label={t("promoWatch")} hint={t("promoWatchHint")} onClick={() => openVideo("promo")} />
+                {/* The promo ends on a Google Play card, which App Review doesn't allow inside an iOS app. */}
+                {platform !== "ios" && (
+                  <HelpButton icon={<IconSparkles size={18} />} label={t("promoWatch")} hint={t("promoWatchHint")} onClick={() => openVideo("promo")} />
+                )}
                 <HelpButton icon={<IconMessage size={18} />} label={t("feedback")} hint={t("feedbackHint")} onClick={() => setPanel("feedback")} />
               </div>
             </Section>
@@ -622,6 +625,7 @@ export function SettingsDialog() {
 
         {tab === "input" && (
           <>
+            {(midiSupported || !isNativeApp) && (
             <Section title={t("midiInput")} proTag={!pro}>
               {!midiSupported ? (
                 <p className="py-2 text-sm text-mist-400">{t("midiUnsupported")}</p>
@@ -661,6 +665,7 @@ export function SettingsDialog() {
                 </div>
               )}
             </Section>
+            )}
             {micSupported() && (
               <Section title={t("micListen")} proTag={!pro}>
                 <div className="flex flex-wrap items-center gap-2 py-2">
