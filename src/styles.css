@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Phones in landscape: the note area is only ~200px tall. */
+@custom-variant short (@media (max-height: 520px));
+
 @theme {
   --font-sans: "Inter", "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
   --color-ink-950: #05060f;

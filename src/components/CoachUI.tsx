@@ -64,36 +64,38 @@ export function CoachCard() {
   if (!step) return null;
   const partSec = stepPartSeconds(step.song, state.part);
   return (
-    <div className="absolute inset-0 flex items-center justify-center p-4">
-      <div className="glass w-full max-w-sm rounded-3xl px-5 py-4 text-center shadow-2xl animate-pop">
-        <div className="text-[11px] font-bold tracking-[0.14em] text-brand-200 uppercase">
-          {t("coachLesson", { n: step.lesson + 1 })} · {t("stepOf", { n: coach!.step + 1, total: steps.length })}
-        </div>
-        <div className="mt-1 truncate text-lg font-extrabold">{text.title(step.song)}</div>
-        <div className="mt-2 flex flex-wrap justify-center gap-1.5">
-          <Pill tone="brand">{text.stage(step.stage)}</Pill>
-          <Pill>{text.part(partSec)}</Pill>
-          <Pill tone={speed < 1 ? "amber" : "plain"}>
-            {t("speed")} {pct(speed)}
-          </Pill>
-          {wait && (
-            <Pill tone="amber">
-              <IconWait size={12} /> {t("waitMode")}
+    <div className="absolute inset-0 flex items-center justify-center p-4 short:p-1.5">
+      <div className="glass scroll-thin max-h-full w-full max-w-sm overflow-y-auto rounded-3xl px-5 py-4 text-center shadow-2xl animate-pop short:flex short:max-w-xl short:items-center short:gap-4 short:rounded-2xl short:px-4 short:py-1.5 short:text-left">
+        <div className="min-w-0 flex-1">
+          <div className="text-[11px] font-bold tracking-[0.14em] text-brand-200 uppercase short:text-[10px] short:leading-tight">
+            {t("coachLesson", { n: step.lesson + 1 })} · {t("stepOf", { n: coach!.step + 1, total: steps.length })}
+          </div>
+          <div className="mt-1 truncate text-lg font-extrabold short:mt-0 short:text-base short:leading-snug">{text.title(step.song)}</div>
+          <div className="mt-2 flex flex-wrap justify-center gap-1.5 short:mt-1 short:justify-start">
+            <Pill tone="brand">{text.stage(step.stage)}</Pill>
+            <Pill>{text.part(partSec)}</Pill>
+            <Pill tone={speed < 1 ? "amber" : "plain"}>
+              {t("speed")} {pct(speed)}
             </Pill>
-          )}
+            {wait && (
+              <Pill tone="amber">
+                <IconWait size={12} /> {t("waitMode")}
+              </Pill>
+            )}
+          </div>
+          <p className="mt-3 text-sm leading-relaxed text-mist-200 short:mt-1 short:text-[13px] short:leading-snug">
+            {wait ? t("coachTipWait") : text.tip(step.stage)}
+            {partSec !== null && ` ${t("coachTipPart", { s: partSec })}`}
+          </p>
+          <p className="mt-1.5 text-xs text-mist-400 short:mt-0.5 short:text-[11px] short:leading-tight">
+            {t("coachGoal", { acc: Math.round(PASS * 100), speed: Math.round(goalSpeed(skill, step.lesson) * 100) })}
+          </p>
         </div>
-        <p className="mt-3 text-sm leading-relaxed text-mist-200">
-          {wait ? t("coachTipWait") : text.tip(step.stage)}
-          {partSec !== null && ` ${t("coachTipPart", { s: partSec })}`}
-        </p>
-        <p className="mt-1.5 text-xs text-mist-400">
-          {t("coachGoal", { acc: Math.round(PASS * 100), speed: Math.round(goalSpeed(skill, step.lesson) * 100) })}
-        </p>
         <button
           type="button"
           onClick={() => void engine.play()}
           aria-label={t("play")}
-          className="mx-auto mt-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-b from-brand-400 to-brand-600 text-white shadow-[0_18px_50px_-12px_rgba(139,92,246,0.9)] transition-transform hover:scale-105 active:scale-95"
+          className="mx-auto mt-4 flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-brand-400 to-brand-600 text-white shadow-[0_18px_50px_-12px_rgba(139,92,246,0.9)] transition-transform hover:scale-105 active:scale-95 short:m-0 short:h-14 short:w-14"
         >
           <IconPlay size={28} className="translate-x-0.5" />
         </button>
