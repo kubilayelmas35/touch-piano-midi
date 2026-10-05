@@ -1,7 +1,7 @@
 import { tNow } from "../i18n";
 import { toast, useApp } from "../state/store";
 import { getSong, listSongs, putSong, type StoredSong } from "../storage/db";
-import { supabase } from "./account";
+import { proOrTrial, supabase } from "./account";
 
 /**
  * Cloud copies of library songs. Pro members keep up to PRO_CLOUD_SONGS songs they pick; members an admin
@@ -26,7 +26,7 @@ interface CloudRow {
 
 export function cloudOn(): boolean {
   const a = useApp.getState().account;
-  return !!supabase && a.status === "signedIn" && (a.cloud || a.pro);
+  return !!supabase && a.status === "signedIn" && (a.cloud || proOrTrial(a));
 }
 
 /** Pro without an admin quota: a fixed number of songs, chosen per song instead of syncing everything. */

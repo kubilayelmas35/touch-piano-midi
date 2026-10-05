@@ -1,5 +1,6 @@
-import { Component, type ReactNode } from "react";
+import { Component, type ErrorInfo, type ReactNode } from "react";
 import { tNow } from "../i18n";
+import { reportError } from "../lib/errors";
 
 interface State {
   error: Error | null;
@@ -12,8 +13,10 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
     return { error };
   }
 
-  componentDidCatch(error: Error): void {
+  componentDidCatch(error: Error, info: ErrorInfo): void {
     console.error("[app] crashed", error);
+    if (info.componentStack) error.stack = `${error.stack ?? ""}\n--- components ---${info.componentStack}`;
+    reportError("crash", error);
   }
 
   render(): ReactNode {

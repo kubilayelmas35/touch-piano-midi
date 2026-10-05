@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
+  REFERRAL_MAX_DAYS,
   STORE_LINKS,
+  TRIAL_DAYS,
   USERNAME_RE,
   changePassword,
   changeUsername,
   deleteOwnAccount,
   nextUsernameChange,
+  proOrTrial,
   refreshAccount,
   removeAvatar,
   uploadAvatar,
@@ -14,6 +17,8 @@ import {
   signInWithProvider,
   signOut,
   signUp,
+  trialActive,
+  trialDaysLeft,
   updatePassword,
   usernameAvailable,
   type AuthResult,
@@ -21,8 +26,10 @@ import {
 import { PRO_CLOUD_SONGS } from "../auth/cloud";
 import { buyPro, canBuyInApp, proPrice, restorePro } from "../auth/purchase";
 import { useT, type TFn } from "../i18n";
+import { inviteLink } from "../social/social";
+import { shareLink } from "../studio/share";
 import { setPanel, toast, useApp } from "../state/store";
-import { IconApple, IconCamera, IconCheck, IconCloud, IconCrown, IconGoogle, IconShield, IconUser } from "../ui/icons";
+import { IconApple, IconCamera, IconCheck, IconCloud, IconCrown, IconGift, IconGoogle, IconShare, IconShield, IconUser } from "../ui/icons";
 import { Button, Dialog, Segmented, cx } from "../ui/primitives";
 import { LegalLinks } from "./LegalLinks";
 import { UserAvatar } from "./UserAvatar";
@@ -174,6 +181,9 @@ function SignedOut() {
             <Field label={t("username")} hint={t("usernameHint")} value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="nickname" required maxLength={24} />
             <Field label={t("email")} type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required />
             <Field label={t("password")} hint={t("passwordHint")} type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" required minLength={8} />
+            <p className="flex items-center gap-2 rounded-xl bg-amber-300/10 px-3 py-2 text-xs font-semibold text-amber-100">
+              <IconCrown size={14} className="shrink-0 text-amber-300" /> {t("trialSignUpHint", { n: TRIAL_DAYS })}
+            </p>
           </>
         )}
         {mode === "reset" && <Field label={t("email")} type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required />}
@@ -410,11 +420,62 @@ function PasswordEditor() {
   );
 }
 
+function TrialCard() {
+  const t = useT();
+  const lang = useApp((s) => s.settings.language);
+  const account = useApp((s) => s.account);
+  if (account.pro || !trialActive(account)) return null;
+  const days = trialDaysLeft(account);
+  return (
+    <div className="rounded-2xl border border-amber-300/25 bg-gradient-to-br from-amber-300/[0.12] to-orange-500/[0.08] p-3">
+      <div className="flex items-center gap-2.5">
+        <IconCrown size={18} className="shrink-0 text-amber-300" />
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-bold text-amber-100">{t("trialActiveTitle", { n: days })}</div>
+          <div className="text-[11px] text-amber-100/70">
+            {t("trialEnds", { date: new Date(account.trialUntil!).toLocaleDateString(lang, { day: "numeric", month: "long" }) })}
+          </div>
+        </div>
+      </div>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-black/30">
+        <div className="h-full rounded-full bg-amber-300" style={{ width: `${Math.min(100, (days / TRIAL_DAYS) * 100)}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function InviteCard() {
+  const t = useT();
+  const account = useApp((s) => s.account);
+  if (!account.username) return null;
+  const earned = account.referralDays;
+  const share = async () => {
+    const r = await shareLink(t("friendsInviteTitle"), t("referralShareText", { name: account.username! }), inviteLink(account.username!));
+    if (r === "copied") toast(t("linkCopied"), "success");
+  };
+  return (
+    <div className="flex items-center gap-3 rounded-2xl border border-sky-300/15 bg-sky-400/[0.06] p-3">
+      <IconGift size={22} className="shrink-0 text-sky-300" />
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-bold">{t("referralTitle")}</div>
+        <div className="text-[11px] leading-snug text-mist-400">
+          {earned >= REFERRAL_MAX_DAYS ? t("referralMaxed") : t("referralBody")}
+          {earned > 0 && ` · ${t("referralEarned", { n: earned, max: REFERRAL_MAX_DAYS })}`}
+        </div>
+      </div>
+      <Button size="sm" onClick={() => void share()}>
+        <IconShare size={14} /> {t("friendsInvite")}
+      </Button>
+    </div>
+  );
+}
+
 function SignedIn() {
   const t = useT();
   const account = useApp((s) => s.account);
   const cloudCount = useApp((s) => s.cloudIds.length);
   const [removing, setRemoving] = useState(false);
+  const trial = !account.pro && trialActive(account);
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-3">
@@ -439,18 +500,20 @@ function SignedIn() {
             </button>
           )}
         </div>
-        {account.pro && (
+        {(account.pro || trial) && (
           <span className="inline-flex items-center gap-1 rounded-lg bg-amber-300/15 px-2 py-1 text-xs font-bold text-amber-200">
-            <IconCrown size={13} /> PRO
+            <IconCrown size={13} /> {account.pro ? "PRO" : t("trialBadge")}
           </span>
         )}
       </div>
+      <TrialCard />
       <section className="rounded-2xl border border-white/[0.06] bg-white/[0.025] px-3 py-1 divide-y divide-white/[0.05]">
         <h3 className="pt-2 pb-1 text-xs font-bold tracking-[0.12em] text-mist-400 uppercase">{t("personalSettings")}</h3>
         <UsernameEditor />
         <PasswordEditor />
       </section>
-      {(account.cloud || account.pro) && (
+      <InviteCard />
+      {(account.cloud || proOrTrial(account)) && (
         <div className="flex items-center gap-2 rounded-2xl border border-sky-300/15 bg-sky-400/[0.07] px-3 py-2.5 text-sm text-sky-100">
           <IconCloud size={16} className="shrink-0 text-sky-300" />
           <span className="min-w-0 flex-1">{t("cloudOn")}</span>
@@ -465,7 +528,7 @@ function SignedIn() {
       </p>
       {!account.pro && !account.cloud && (
         <Button variant="primary" className="w-full" onClick={() => setPanel("pro")}>
-          <IconCrown size={16} /> {t("getPro")}
+          <IconCrown size={16} /> {trial ? t("trialKeepPro") : t("getPro")}
         </Button>
       )}
       {account.isAdmin && (
@@ -641,6 +704,11 @@ export function ProDialog() {
           Sonatrio <span className="text-amber-300">Pro</span>
         </h2>
         <p className="mt-1 text-sm text-mist-300">{account.pro ? t("proActive") : t("proBody")}</p>
+        {!account.pro && trialActive(account) && (
+          <p className="mt-2 inline-block rounded-lg bg-amber-300/15 px-2.5 py-1 text-xs font-bold text-amber-200">
+            {t("trialActiveTitle", { n: trialDaysLeft(account) })}
+          </p>
+        )}
       </div>
       <ul className="my-4 space-y-2">
         {perks.map((p) => (
@@ -652,6 +720,9 @@ export function ProDialog() {
       </ul>
       {account.pro ? null : account.status !== "signedIn" ? (
         <div className="space-y-2">
+          <p className="rounded-xl bg-amber-300/10 px-3 py-2 text-center text-sm font-semibold text-amber-100">
+            {t("trialSignUpHint", { n: TRIAL_DAYS })}
+          </p>
           <p className="text-center text-xs text-mist-400">{t("proSignInFirst")}</p>
           <Button variant="primary" className="w-full" onClick={() => setPanel("account")}>
             <IconUser size={16} /> {t("signIn")} / {t("signUp")}

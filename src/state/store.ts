@@ -114,6 +114,10 @@ export interface Account {
   /** Signs in with e-mail and password (Google/Apple-only accounts can set one). */
   hasPassword: boolean;
   pro: boolean;
+  /** End of the free Pro week (plus days earned by invites); Pro features stay on until then. */
+  trialUntil: string | null;
+  /** Days of Pro earned by inviting friends (at most 30). */
+  referralDays: number;
   /** Cloud MIDI storage, switched on per member by an admin. */
   cloud: boolean;
   cloudQuotaMb: number;
@@ -239,6 +243,8 @@ export const useApp = create<AppState>(() => ({
     usernameChangedAt: null,
     hasPassword: false,
     pro: false,
+    trialUntil: null,
+    referralDays: 0,
     cloud: false,
     cloudQuotaMb: 0,
     isAdmin: false,

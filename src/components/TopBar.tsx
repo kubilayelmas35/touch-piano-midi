@@ -3,7 +3,7 @@ import { engine } from "../engine/engine";
 import type { InstrumentKind } from "../engine/types";
 import { useT } from "../i18n";
 import { micSupported, toggleMic } from "../input/mic";
-import { useHasPro } from "../auth/account";
+import { proOrTrial, useHasPro } from "../auth/account";
 import { pendingCount } from "../social/social";
 import { formatTime } from "../lib/notes";
 import { dayKey, streak } from "../progress/progress";
@@ -331,7 +331,7 @@ function AccountButton() {
       {account.status === "signedIn" && initial ? (
         <span className="relative">
           <UserAvatar url={account.avatar} name={initial} me className="h-7 w-7 text-[13px]" />
-          {account.pro && <IconCrown size={11} className="absolute -top-1.5 -right-1.5 text-amber-300" />}
+          {proOrTrial(account) && <IconCrown size={11} className={cx("absolute -top-1.5 -right-1.5 text-amber-300", !account.pro && "opacity-60")} />}
         </span>
       ) : (
         <IconUser size={19} />

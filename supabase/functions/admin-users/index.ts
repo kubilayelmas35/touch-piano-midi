@@ -1,4 +1,4 @@
-// Admin-only account actions that need the service role: ban / unban and delete.
+// Admin-only account actions that need the service role: ban / unban, removing a profile picture, and delete.
 // Deploy with verify_jwt = false; the caller's access token is verified here and must belong to an admin.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
@@ -53,10 +53,22 @@ Deno.serve(async (req) => {
     await audit("unban");
     return json({ ok: true });
   }
+  const clearFolder = async (bucket: string) => {
+    const { data: files } = await admin.storage.from(bucket).list(userId, { limit: 1000 });
+    if (files?.length) await admin.storage.from(bucket).remove(files.map((f) => `${userId}/${f.name}`));
+  };
+  if (action === "remove_avatar") {
+    const { data: prof } = await admin.from("profiles").select("avatar_path").eq("id", userId).maybeSingle();
+    await clearFolder("avatars");
+    const { error } = await admin.from("profiles").update({ avatar_path: null }).eq("id", userId);
+    if (error) return json({ error: error.message }, 400);
+    await audit("remove_avatar", { path: prof?.avatar_path ?? null });
+    return json({ ok: true });
+  }
   if (action === "delete") {
     const { data: target } = await admin.auth.admin.getUserById(userId);
-    const { data: files } = await admin.storage.from("midis").list(userId, { limit: 1000 });
-    if (files?.length) await admin.storage.from("midis").remove(files.map((f) => `${userId}/${f.name}`));
+    await clearFolder("midis");
+    await clearFolder("avatars");
     const { error } = await admin.auth.admin.deleteUser(userId);
     if (error) return json({ error: error.message }, 400);
     await audit("delete_user", { email: target?.user?.email ?? null, userId });

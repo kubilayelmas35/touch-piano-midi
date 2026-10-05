@@ -234,6 +234,25 @@ export const IconUser = (p: IconProps) => (
     <path d="M4 21a8 8 0 0 1 16 0" />
   </Svg>
 );
+export const IconFlag = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M5 21V4" />
+    <path d="M5 4h11l-2 4 2 4H5" />
+  </Svg>
+);
+export const IconGift = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="3" y="8" width="18" height="4" rx="1" />
+    <path d="M5 12v9h14v-9M12 8v13" />
+    <path d="M12 8c-1.5-3-5-3.5-5-1.25S9.5 8 12 8c2.5 0 5-1 5-1.25S13.5 5 12 8Z" />
+  </Svg>
+);
+export const IconBug = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="7" y="8" width="10" height="12" rx="5" />
+    <path d="M9 8a3 3 0 0 1 6 0M12 12v8M3 13h4M17 13h4M4 7l3 2M20 7l-3 2M4 19l3-2M20 19l-3-2" />
+  </Svg>
+);
 export const IconCamera = (p: IconProps) => (
   <Svg {...p}>
     <path d="M4 8h3l2-3h6l2 3h3v11H4Z" />

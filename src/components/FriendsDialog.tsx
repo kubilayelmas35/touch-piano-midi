@@ -1,11 +1,12 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { USERNAME_RE, avatarUrl } from "../auth/account";
+import { TRIAL_DAYS, USERNAME_RE, avatarUrl } from "../auth/account";
 import { UserAvatar } from "./UserAvatar";
 import { useT } from "../i18n";
 import { builtinTitle } from "../midi/builtin";
 import { playDuel } from "../social/duel";
 import {
   addFriend,
+  blockUser,
   declineDuel,
   dismissDuetInvite,
   inviteLink,
@@ -14,14 +15,32 @@ import {
   setUsername,
   socialErrorText,
   toastSocialError,
+  unblockUser,
   type BoardRow,
   type Duel,
+  type FriendRef,
 } from "../social/social";
 import { shareLink } from "../studio/share";
 import { setPanel, toast, useApp } from "../state/store";
 import { hostDuet, inviteToDuet, joinDuet } from "../social/live";
-import { IconCheck, IconClose, IconCrown, IconDuet, IconPlay, IconShare, IconSwords, IconTrophy, IconUser, IconUsers } from "../ui/icons";
-import { Button, Dialog, Segmented, cx } from "../ui/primitives";
+import {
+  IconBan,
+  IconCheck,
+  IconClose,
+  IconCrown,
+  IconDuet,
+  IconFlag,
+  IconGift,
+  IconMore,
+  IconPlay,
+  IconShare,
+  IconSwords,
+  IconTrophy,
+  IconUser,
+  IconUsers,
+} from "../ui/icons";
+import { Button, Dialog, IconButton, Popover, Segmented, cx } from "../ui/primitives";
+import { ReportDialog } from "./ReportDialog";
 
 type Tab = "board" | "duels" | "friends";
 
@@ -296,19 +315,93 @@ function DuetEntry() {
   );
 }
 
+/** Remove / report / block, folded into one button per member. */
+function MemberMenu({ member, onRemove, onReport }: { member: FriendRef; onRemove?: () => void; onReport: () => void }) {
+  const t = useT();
+  const [confirmBlock, setConfirmBlock] = useState(false);
+  const item = "flex h-10 w-full items-center gap-2.5 rounded-xl px-3 text-left text-sm font-semibold transition-colors hover:bg-white/[0.07]";
+  return (
+    <Popover
+      label={t("memberActions")}
+      align="end"
+      trigger={({ open, toggle, ref }) => (
+        <IconButton
+          size="sm"
+          label={t("memberActions")}
+          active={open}
+          ref={ref}
+          aria-expanded={open}
+          onClick={() => {
+            setConfirmBlock(false);
+            toggle();
+          }}
+        >
+          <IconMore size={16} />
+        </IconButton>
+      )}
+    >
+      {(close) => (
+        <div className="-m-1 w-52 space-y-0.5">
+          {onRemove && (
+            <button
+              type="button"
+              className={item}
+              onClick={() => {
+                close();
+                onRemove();
+              }}
+            >
+              <IconClose size={15} className="text-mist-400" /> {t("friendRemove")}
+            </button>
+          )}
+          <button
+            type="button"
+            className={item}
+            onClick={() => {
+              close();
+              onReport();
+            }}
+          >
+            <IconFlag size={15} className="text-amber-300" /> {t("reportUser")}
+          </button>
+          {confirmBlock ? (
+            <button
+              type="button"
+              className={cx(item, "bg-rose-500/20 text-rose-100 hover:bg-rose-500/30")}
+              onClick={() => {
+                close();
+                void blockUser(member.id).then((r) => (r.ok ? toast(t("blockedToast", { name: member.username ?? "?" }), "success") : toastSocialError(r.error)));
+              }}
+            >
+              <IconBan size={15} /> {t("blockConfirm")}
+            </button>
+          ) : (
+            <button type="button" className={cx(item, "text-rose-200")} onClick={() => setConfirmBlock(true)}>
+              <IconBan size={15} /> {t("blockUser")}
+            </button>
+          )}
+        </div>
+      )}
+    </Popover>
+  );
+}
+
 function Friends() {
   const t = useT();
   const social = useApp((s) => s.social)!;
   const friends = social.board.filter((r) => !r.is_me);
+  const blocked = social.blocked ?? [];
   const [confirm, setConfirm] = useState<string | null>(null);
+  const [reporting, setReporting] = useState<FriendRef | null>(null);
   return (
     <div className="space-y-4">
+      <ReportDialog target={reporting} onClose={() => setReporting(null)} />
       {social.incoming.length > 0 && (
         <section>
           <h3 className="mb-2 text-xs font-bold tracking-[0.12em] text-mist-400 uppercase">{t("friendRequests")}</h3>
           <ul className="space-y-1.5">
             {social.incoming.map((f) => (
-              <li key={f.id} className="flex items-center gap-3 rounded-2xl bg-sky-400/10 px-3 py-2 ring-1 ring-sky-300/25">
+              <li key={f.id} className="flex items-center gap-2 rounded-2xl bg-sky-400/10 px-3 py-2 ring-1 ring-sky-300/25">
                 <Avatar name={f.username} path={f.avatar} />
                 <div className="min-w-0 flex-1 truncate font-semibold">@{f.username ?? "?"}</div>
                 <Button size="sm" variant="ghost" onClick={() => void respondFriend(f.id, false)}>
@@ -317,6 +410,7 @@ function Friends() {
                 <Button size="sm" variant="primary" onClick={() => void respondFriend(f.id, true)}>
                   <IconCheck size={14} /> {t("accept")}
                 </Button>
+                <MemberMenu member={f} onReport={() => setReporting(f)} />
               </li>
             ))}
           </ul>
@@ -346,9 +440,7 @@ function Friends() {
                     <Button size="sm" onClick={() => void duetWith(f.id, f.username)}>
                       <IconDuet size={14} /> {t("duetShort")}
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => setConfirm(f.id)} aria-label={t("friendRemove")}>
-                      <IconClose size={14} />
-                    </Button>
+                    <MemberMenu member={f} onRemove={() => setConfirm(f.id)} onReport={() => setReporting(f)} />
                   </>
                 )}
               </li>
@@ -356,6 +448,24 @@ function Friends() {
           </ul>
         )}
       </section>
+      {blocked.length > 0 && (
+        <section>
+          <h3 className="mb-2 text-xs font-bold tracking-[0.12em] text-mist-400 uppercase">
+            {t("blockedList")} · {blocked.length}
+          </h3>
+          <ul className="space-y-1.5">
+            {blocked.map((f) => (
+              <li key={f.id} className="flex items-center gap-3 rounded-2xl bg-white/[0.02] px-3 py-2 text-sm text-mist-300">
+                <IconBan size={15} className="shrink-0 text-rose-300/70" />
+                <span className="min-w-0 flex-1 truncate">@{f.username ?? "?"}</span>
+                <Button size="sm" variant="ghost" onClick={() => void unblockUser(f.id)}>
+                  {t("unblock")}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {social.outgoing.length > 0 && (
         <section>
           <h3 className="mb-2 text-xs font-bold tracking-[0.12em] text-mist-400 uppercase">{t("friendsPending")}</h3>
@@ -387,15 +497,16 @@ export function FriendsDialog() {
   const incomingDuels = (social?.duels.filter((d) => !d.mine && d.status === "open").length ?? 0) + (social?.duet_invites?.length ?? 0);
   const signedIn = account.status === "signedIn";
   const username = social?.me?.username ?? account.username;
+  const invitedBy = useApp((s) => s.friendInvite);
 
   let body: ReactNode;
   if (account.status === "disabled") body = <Empty icon={<IconUsers size={28} />}>{t("friendsUnavailable")}</Empty>;
   else if (!signedIn)
     body = (
       <div className="rounded-2xl bg-gradient-to-br from-sky-400/20 to-brand-500/15 p-4 text-center ring-1 ring-sky-300/30">
-        <IconUsers size={30} className="mx-auto text-sky-300" />
-        <div className="mt-2 font-bold">{t("friendsSignInTitle")}</div>
-        <p className="mt-1 text-sm text-mist-300">{t("friendsSignInBody")}</p>
+        {invitedBy ? <IconGift size={30} className="mx-auto text-amber-300" /> : <IconUsers size={30} className="mx-auto text-sky-300" />}
+        <div className="mt-2 font-bold">{invitedBy ? t("referralInvitedTitle", { name: invitedBy }) : t("friendsSignInTitle")}</div>
+        <p className="mt-1 text-sm text-mist-300">{invitedBy ? t("referralInvitedBody", { days: TRIAL_DAYS + 1 }) : t("friendsSignInBody")}</p>
         <Button className="mt-3" variant="primary" onClick={() => setPanel("account")}>
           <IconUser size={15} /> {t("signIn")} / {t("signUp")}
         </Button>

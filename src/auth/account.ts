@@ -46,25 +46,60 @@ export function avatarUrl(path: string | null | undefined): string | null {
   return supabase.storage.from(AVATARS).getPublicUrl(path).data.publicUrl;
 }
 
+/** Free Pro days every new account starts with (granted by the database on sign-up). */
+export const TRIAL_DAYS = 7;
+/** Most bonus days one member can earn by inviting friends (one per new member). */
+export const REFERRAL_MAX_DAYS = 30;
+
+type TrialFields = { trialUntil: string | null };
+
+/** Whether the free Pro week (or days earned by invites) is still running. */
+export function trialActive(a: TrialFields): boolean {
+  return !!a.trialUntil && new Date(a.trialUntil).getTime() > Date.now();
+}
+
+/** Whole days of trial left, rounded up (0 once it has ended). */
+export function trialDaysLeft(a: TrialFields): number {
+  if (!a.trialUntil) return 0;
+  return Math.max(0, Math.ceil((new Date(a.trialUntil).getTime() - Date.now()) / 86_400_000));
+}
+
+/** Bought Pro or still in the trial: everything Pro offers, including 10 cloud songs. */
+export function proOrTrial(a: { pro: boolean } & TrialFields): boolean {
+  return a.pro || trialActive(a);
+}
+
+let trialTimer = 0;
+
+/** Re-renders Pro gates the moment a trial runs out while the app is open. */
+function watchTrialEnd(until: string | null): void {
+  window.clearTimeout(trialTimer);
+  const ms = until ? new Date(until).getTime() - Date.now() : -1;
+  if (ms > 0 && ms < 2 ** 31 - 1) {
+    trialTimer = window.setTimeout(() => useApp.setState((s) => ({ account: { ...s.account } })), ms + 1000);
+  }
+}
+
 async function loadProfile(user: User): Promise<void> {
   if (!supabase) return;
   const userId = user.id;
   const res = await supabase
     .from("profiles")
-    .select("username, pro, cloud, cloud_quota_mb, is_admin, avatar_path, username_changed_at")
+    .select("username, pro, cloud, cloud_quota_mb, is_admin, avatar_path, username_changed_at, trial_until, referral_days")
     .eq("id", userId)
     .maybeSingle();
   let data: Record<string, unknown> | null = res.data;
   if (res.error) data = cachedPro(userId);
   else
     try {
-      const { pro, cloud, username, avatar_path } = data ?? {};
-      localStorage.setItem(PRO_CACHE, JSON.stringify({ id: userId, pro: pro === true, cloud: cloud === true, username, avatar_path }));
+      const { pro, cloud, username, avatar_path, trial_until } = data ?? {};
+      localStorage.setItem(PRO_CACHE, JSON.stringify({ id: userId, pro: pro === true, cloud: cloud === true, username, avatar_path, trial_until }));
     } catch {
       /* storage full or blocked */
     }
   const prev = useApp.getState().account;
-  const hadCloud = prev.status === "signedIn" && (prev.cloud || prev.pro);
+  const hadCloud = prev.status === "signedIn" && (prev.cloud || proOrTrial(prev));
+  const trialUntil = (data?.trial_until as string | null) ?? null;
   useApp.setState((s) => ({
     account: {
       ...s.account,
@@ -75,12 +110,56 @@ async function loadProfile(user: User): Promise<void> {
       usernameChangedAt: (data?.username_changed_at as string | null) ?? null,
       hasPassword: (user.identities ?? []).some((i) => i.provider === "email"),
       pro: data?.pro === true,
+      trialUntil,
+      referralDays: Number(data?.referral_days ?? 0),
       cloud: data?.cloud === true,
       cloudQuotaMb: Number(data?.cloud_quota_mb ?? 0),
       isAdmin: data?.is_admin === true,
     },
   }));
-  if ((data?.cloud === true || data?.pro === true) && !hadCloud) void import("./cloud").then((m) => m.syncCloud({ quiet: true }));
+  watchTrialEnd(trialUntil);
+  const now = useApp.getState().account;
+  if ((now.cloud || proOrTrial(now)) && !hadCloud) void import("./cloud").then((m) => m.syncCloud({ quiet: true }));
+  if (!res.error) void claimReferral();
+}
+
+const REFERRAL_KEY = "sonatrio-referral-v1";
+
+/** Remembers whose invite link opened the app, so the account made afterwards can credit them. */
+export function rememberReferral(username: string): void {
+  try {
+    localStorage.setItem(REFERRAL_KEY, JSON.stringify({ u: username, at: Date.now() }));
+  } catch {
+    /* storage blocked */
+  }
+}
+
+let claiming = false;
+
+/** A new account that came through a friend's link: both get a day of Pro and become friends. */
+async function claimReferral(): Promise<void> {
+  if (!supabase || claiming) return;
+  let pending: { u?: string; at?: number } | null = null;
+  try {
+    pending = JSON.parse(localStorage.getItem(REFERRAL_KEY) ?? "null");
+  } catch {
+    /* ignore */
+  }
+  if (!pending?.u) return;
+  if (Date.now() - (pending.at ?? 0) > 14 * 86_400_000 || pending.u === useApp.getState().account.username) {
+    localStorage.removeItem(REFERRAL_KEY);
+    return;
+  }
+  claiming = true;
+  const { data, error } = await supabase.rpc("claim_referral", { p_inviter: pending.u });
+  claiming = false;
+  if (error) return;
+  localStorage.removeItem(REFERRAL_KEY);
+  if ((data as { ok?: boolean })?.ok) {
+    toast(tNow("referralClaimed", { name: String((data as { inviter?: string }).inviter ?? pending.u) }), "success", 7000);
+    void refreshAccount();
+    void import("../social/social").then((m) => m.loadSocial());
+  }
 }
 
 async function loadProviders(): Promise<void> {
@@ -118,6 +197,8 @@ export async function initAuth(): Promise<void> {
           usernameChangedAt: null,
           hasPassword: false,
           pro: false,
+          trialUntil: null,
+          referralDays: 0,
           cloud: false,
           cloudQuotaMb: 0,
           isAdmin: false,
@@ -137,12 +218,12 @@ export async function initAuth(): Promise<void> {
 export function canImport(): boolean {
   if (!supabase) return true;
   const a = useApp.getState().account;
-  return a.pro || a.cloud;
+  return proOrTrial(a) || a.cloud;
 }
 
-function proOf(a: { status: string; pro: boolean; cloud: boolean }): boolean {
+function proOf(a: { status: string; pro: boolean; cloud: boolean } & TrialFields): boolean {
   // While the account is still loading, Pro members shouldn't see their features flicker off.
-  return !supabase || a.status === "loading" || a.pro || a.cloud;
+  return !supabase || a.status === "loading" || proOrTrial(a) || a.cloud;
 }
 
 /** Whether Pro features (microphone, MIDI keyboard, friends, all designs) are unlocked. */

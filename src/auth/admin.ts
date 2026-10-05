@@ -23,6 +23,26 @@ export interface AdminStats {
   proSources: Record<string, number>;
   signups: DayCount[];
   actives: DayCount[];
+  trial: number;
+  trialEnded: number;
+  trialConverted: number;
+  referrals: number;
+  referrals7: number;
+  reportsOpen: number;
+  errors24: number;
+  errorUsers24: number;
+  purchases7: number;
+  purchases30: number;
+  avatars: number;
+  friendships: number;
+  duels7: number;
+  feedbackNew: number;
+  /** Where errors came from in the last 7 days. */
+  platforms: Record<string, number>;
+  /** This week's most played songs on the friends boards. */
+  topSongs: { song: string; players: number; best: number }[];
+  purchases: DayCount[];
+  errors: DayCount[];
 }
 
 export interface AdminUser {
@@ -44,7 +64,81 @@ export interface AdminUser {
   bytes: number;
   is_admin: boolean;
   admin_note: string | null;
+  trial_until: string | null;
+  avatar_path: string | null;
+  open_reports: number;
+  referrals: number;
   total: number;
+}
+
+export interface UserExtra {
+  trial_until: string | null;
+  referral_days: number | null;
+  username_changed_at: string | null;
+  referred_by: { id: string; username: string | null } | null;
+  referrals: { id: string; username: string | null; at: string }[];
+  friends: number;
+  blocks_made: number;
+  blocked_by: number;
+  reports_made: number;
+  reports: { id: number; reason: ReportReason; details: string | null; status: ReportStatus; at: string; reporter: string | null }[];
+  duels: number;
+  weekly_songs: number;
+  purchases: { store: string; product: string; order: string | null; at: string }[];
+  errors: { created_at: string; kind: string; message: string; app_version: string | null; platform: string | null }[];
+  practice_seconds: number;
+  runs: number;
+  notes: number;
+  songs_played: number;
+  practice_days: number;
+  last_practice: string | null;
+  synced_at: string | null;
+}
+
+export type ReportReason = "avatar" | "username" | "harassment" | "cheating" | "spam" | "other";
+export type ReportStatus = "open" | "resolved" | "dismissed";
+
+export interface AdminReport {
+  id: number;
+  created_at: string;
+  reason: ReportReason;
+  details: string | null;
+  status: ReportStatus;
+  admin_note: string | null;
+  resolved_at: string | null;
+  target_id: string | null;
+  target_username: string | null;
+  target_email: string | null;
+  target_avatar: string | null;
+  /** Name and picture at the moment of the report, in case they changed since. */
+  reported_username: string | null;
+  reported_avatar: string | null;
+  target_banned: boolean;
+  target_reports: number;
+  reporter_id: string | null;
+  reporter_username: string | null;
+  reporter_email: string | null;
+  resolved_by_email: string | null;
+}
+
+export interface ErrorGroup {
+  fingerprint: string;
+  kind: string;
+  message: string;
+  stack: string | null;
+  url: string | null;
+  device: string | null;
+  count: number;
+  users: number;
+  first_seen: string;
+  last_seen: string;
+  versions: string[] | null;
+  platforms: string[] | null;
+}
+
+export interface ReferralStats {
+  top: { id: string; username: string | null; email: string | null; n: number; referral_days: number | null; last_at: string }[];
+  recent: { id: string; username: string | null; email: string | null; at: string; pro: boolean; inviter_id: string; inviter: string | null }[];
 }
 
 export interface AdminFile {
@@ -102,8 +196,8 @@ export interface FeedbackEntry {
 
 export type FeedbackCounts = Record<FeedbackStatus | "all", number>;
 
-export type UserFilter = "all" | "pro" | "free" | "cloud" | "admin" | "unconfirmed" | "banned";
-export type UserSort = "new" | "old" | "active" | "storage" | "name";
+export type UserFilter = "all" | "pro" | "trial" | "free" | "cloud" | "admin" | "reported" | "referrers" | "unconfirmed" | "banned";
+export type UserSort = "new" | "old" | "active" | "storage" | "name" | "reports" | "referrals";
 
 export interface UserPatch {
   pro?: boolean;
@@ -203,8 +297,42 @@ export async function deleteFeedback(id: number): Promise<void> {
   check(await client().rpc("admin_feedback_delete", { p_id: id }));
 }
 
-/** Ban / unban / delete go through an edge function because they need the service role. */
-export async function userAction(action: "ban" | "unban" | "delete", userId: string, hours?: number): Promise<void> {
+export async function userExtra(id: string): Promise<UserExtra> {
+  return check(await client().rpc("admin_user_extra", { p_user: id })) as UserExtra;
+}
+
+/** Adds days to the free trial; 0 ends it now. Returns the new end. */
+export async function setTrial(id: string, days: number): Promise<string> {
+  return check(await client().rpc("admin_set_trial", { p_user: id, p_days: days })) as string;
+}
+
+/** Clears an offensive username; the member is asked to pick a new one. */
+export async function resetUsername(id: string): Promise<void> {
+  check(await client().rpc("admin_reset_username", { p_user: id }));
+}
+
+export async function listReports(status: ReportStatus | "all", limit = 200): Promise<AdminReport[]> {
+  return check(await client().rpc("admin_reports", { p_status: status, p_limit: limit })) as AdminReport[];
+}
+
+export async function updateReport(id: number, patch: { status?: ReportStatus; note?: string }): Promise<void> {
+  check(await client().rpc("admin_report_update", { p_id: id, p_status: patch.status ?? null, p_note: patch.note ?? null }));
+}
+
+export async function listErrors(days: number, limit = 150): Promise<ErrorGroup[]> {
+  return check(await client().rpc("admin_errors", { p_days: days, p_limit: limit })) as ErrorGroup[];
+}
+
+export async function resolveError(fingerprint: string): Promise<number> {
+  return check(await client().rpc("admin_error_resolve", { p_fingerprint: fingerprint })) as number;
+}
+
+export async function referralStats(limit = 100): Promise<ReferralStats> {
+  return check(await client().rpc("admin_referrals", { p_limit: limit })) as ReferralStats;
+}
+
+/** Ban / unban / delete / remove_avatar go through an edge function because they need the service role. */
+export async function userAction(action: "ban" | "unban" | "delete" | "remove_avatar", userId: string, hours?: number): Promise<void> {
   const { data, error } = await client().functions.invoke("admin-users", { body: { action, userId, hours } });
   if (error) throw new Error(error.message);
   if (data?.error) throw new Error(String(data.error));
@@ -223,10 +351,13 @@ export function usersCsv(users: AdminUser[]): string {
     "pro",
     "pro_source",
     "pro_since",
+    "trial_until",
     "cloud",
     "cloud_quota_mb",
     "files",
     "bytes",
+    "open_reports",
+    "referrals",
     "is_admin",
   ];
   const cell = (v: unknown) => {

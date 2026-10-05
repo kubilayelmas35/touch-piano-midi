@@ -1,4 +1,4 @@
-import { supabase } from "../auth/account";
+import { rememberReferral, supabase } from "../auth/account";
 import type { InstrumentKind } from "../engine/types";
 import { tNow } from "../i18n";
 import type { DictKey } from "../i18n/en";
@@ -54,7 +54,12 @@ export interface SocialOverview {
   duels: Duel[];
   /** Friends calling me into a live duet room (the last 15 minutes). */
   duet_invites?: DuetInvite[];
+  /** Members I blocked: no requests, challenges or invites either way. */
+  blocked?: FriendRef[];
 }
+
+export type ReportReason = "avatar" | "username" | "harassment" | "cheating" | "spam" | "other";
+export const REPORT_REASONS: ReportReason[] = ["avatar", "username", "harassment", "cheating", "spam", "other"];
 
 export interface DuetInvite {
   id: number;
@@ -157,6 +162,23 @@ export async function respondFriend(id: string, accept: boolean) {
 
 export async function removeFriend(id: string) {
   const r = await call<null>("friend_remove", { p_user: id });
+  void loadSocial();
+  return r;
+}
+
+/** Sends a member to the moderators; reporting the same person again updates the open report. */
+export async function reportUser(id: string, reason: ReportReason, details: string) {
+  return call<number>("report_user", { p_user: id, p_reason: reason, p_details: details.trim() });
+}
+
+export async function blockUser(id: string) {
+  const r = await call<null>("block_user", { p_user: id });
+  void loadSocial();
+  return r;
+}
+
+export async function unblockUser(id: string) {
+  const r = await call<null>("unblock_user", { p_user: id });
   void loadSocial();
   return r;
 }
@@ -267,6 +289,7 @@ export function initSocial(): void {
     params.delete("friend");
     const qs = params.toString();
     window.history.replaceState(null, "", window.location.pathname + (qs ? `?${qs}` : "") + window.location.hash);
+    rememberReferral(invite.slice(0, 24));
     useApp.setState({ friendInvite: invite.slice(0, 24), panel: "friends" });
   }
   const refresh = (force = false) => {
