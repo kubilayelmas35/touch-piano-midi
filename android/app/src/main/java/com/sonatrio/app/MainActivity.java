@@ -1,8 +1,10 @@
 package com.sonatrio.app;
 
 import android.graphics.Color;
+import android.graphics.Rect;
 import android.os.Build;
 import android.os.Bundle;
+import android.view.View;
 import android.view.WindowManager;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -14,6 +16,8 @@ import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 
 import com.getcapacitor.BridgeActivity;
+
+import java.util.Arrays;
 
 public class MainActivity extends BridgeActivity {
     @Override
@@ -31,6 +35,13 @@ public class MainActivity extends BridgeActivity {
         settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setTextZoom(100);
         web.setOverScrollMode(WebView.OVER_SCROLL_NEVER);
+        web.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> keepEdgesForKeys(v));
+        immersive();
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
         immersive();
     }
 
@@ -38,6 +49,22 @@ public class MainActivity extends BridgeActivity {
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
         if (hasFocus) immersive();
+    }
+
+    /**
+     * The keys sit at the bottom: a finger sliding off them sideways must not trigger the back gesture.
+     * Android allows at most 200dp per edge; the home swipe can't be excluded, immersive mode makes it need two swipes.
+     */
+    private void keepEdgesForKeys(View v) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return;
+        float dp = getResources().getDisplayMetrics().density;
+        int w = v.getWidth();
+        int h = v.getHeight();
+        int edge = Math.round(40 * dp);
+        int tall = Math.min(h, Math.round(200 * dp));
+        v.setSystemGestureExclusionRects(Arrays.asList(
+            new Rect(0, h - tall, edge, h),
+            new Rect(w - edge, h - tall, w, h)));
     }
 
     /** Hide status and navigation bars; a swipe from the edge shows them briefly. */

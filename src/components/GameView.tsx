@@ -15,6 +15,7 @@ import { BLACK_KEY_RATIO, FretboardRenderer, KeyboardRenderer } from "../render/
 import { toast, useApp } from "../state/store";
 import { updateSettings } from "../state/actions";
 import { useT } from "../i18n";
+import { platform } from "../lib/platform";
 import { Hud } from "./Hud";
 import { RecordingBar } from "./RecordingUI";
 import { EmptyState } from "./EmptyState";
@@ -23,6 +24,12 @@ import { KEY_STRIP_H, KeyStrip } from "./KeyStrip";
 const COMPACT_TIP_KEY = "sonatrio-compact-tip";
 const MIN_WHITE = 15;
 const MAX_WHITE = 46;
+
+/** Touch force, or 0 when it means nothing: iPhones without 3D Touch report a small fixed value for a finger. */
+function pressureOf(e: React.PointerEvent): number {
+  if (platform === "ios" && e.pointerType !== "pen") return 0;
+  return e.pressure && e.pressure !== 0.5 ? e.pressure : 0;
+}
 
 function pianoRange(width: number): [number, number] {
   let low = 127;
@@ -295,7 +302,7 @@ export function GameView() {
       const bare = s.glidePiano && s.hideFrets;
       const midi = bare && !L.compact ? Math.round(L.pitchAt(x)) : L.hit(x, y, v.instH * BLACK_KEY_RATIO);
       if (midi == null) return;
-      const vel = e.pressure && e.pressure !== 0.5 ? e.pressure : 0.55 + 0.4 * Math.min(1, y / v.instH);
+      const vel = pressureOf(e) || 0.55 + 0.4 * Math.min(1, y / v.instH);
       engine.press(key, midi, vel);
       if (s.glidePiano) glider.start(key, bare && !L.compact ? L.pitchAt(x) : midi);
       pointers.current.set(e.pointerId, { key, midi, x0: x, y0: y, string: -1, fret: -1, zone: "keys", lastX: x, lastY: y, lastT: e.timeStamp });
@@ -304,7 +311,8 @@ export function GameView() {
       const count = L.spec.tuning.length;
       const base = { key, midi: -1, x0: x, y0: y, lastX: x, lastY: y, lastT: e.timeStamp };
       if (L.inPluckZone(x)) {
-        const vel = e.pressure && e.pressure !== 0.5 ? 0.4 + e.pressure * 0.6 : 0.82;
+        const pressure = pressureOf(e);
+        const vel = pressure ? 0.4 + pressure * 0.6 : 0.82;
         fretted.strikeSync(e.pointerId, stringsAt(y, e, count), vel);
         pointers.current.set(e.pointerId, { ...base, string: -1, fret: -1, zone: "pluck" });
       } else {

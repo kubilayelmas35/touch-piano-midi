@@ -1,2 +1,0 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["./web-gE71OzX9.js","./dist-DfPCcM_r.js"])))=>i.map(i=>d[i]);
-import{I as e}from"./index-CsvsAL24.js";import{registerPlugin as t}from"./dist-DfPCcM_r.js";var n=t(`App`,{web:()=>e(()=>import(`./web-gE71OzX9.js`).then(e=>new e.AppWeb),__vite__mapDeps([0,1]),import.meta.url)});export{n as App};
