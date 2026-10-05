@@ -132,6 +132,8 @@ export interface EngineConfig {
   pianoPedal: boolean;
   /** Piano: how long held and pedalled notes ring, 0 short … 1 long. */
   pianoSustain: number;
+  /** Piano shows only the song's keys side by side; finger numbers then follow those columns. */
+  compactKeys: boolean;
   loop: LoopRange;
   /** Song time (s) the run stops at; notes from there on are left out. 0 = the whole song. */
   segmentEnd: number;

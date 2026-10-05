@@ -6,14 +6,15 @@ import { MicDevicePicker, MicSensitivity } from "./MicChip";
 import { startMidi } from "../input/midi";
 import { useFullscreen } from "../lib/fullscreen";
 import { updateSettings } from "../state/actions";
-import { INSTRUMENT_HEIGHT_RANGE, KEY_ZOOM_MAX, defaultSettings } from "../state/settings";
+import { INSTRUMENT_HEIGHT_RANGE, KEY_ZOOM_MAX, defaultSettings, hasKeyboard } from "../state/settings";
 import { openVideo, setPanel, useApp } from "../state/store";
 import { isNativeApp } from "../lib/platform";
-import { IconMessage, IconMic, IconPlug, IconSparkles, IconVideo } from "../ui/icons";
+import { IconChevronDown, IconMessage, IconMic, IconPlug, IconSparkles, IconVideo } from "../ui/icons";
 import { KeyBindings } from "./KeyBindings";
 import { LegalLinks } from "./LegalLinks";
 import { ReminderSettings } from "./ReminderToggle";
-import { ApproachSwatch, BackgroundSwatch, ChoiceCards, ColorPicker, ColorSwatch, DustSwatch, EffectSwatch, NoteSwatch } from "./AppearancePicker";
+import { ApproachSwatch, BackgroundSwatch, ChoiceCards, ColorPicker, ColorSwatch, DustSwatch, EffectSwatch, NoteSwatch, StaffSwatch } from "./AppearancePicker";
+import { STAFF_STYLES, type StaffStyle } from "../render/staffThemes";
 import {
   APPROACH_STYLES,
   BACKGROUNDS,
@@ -31,6 +32,11 @@ import {
 import type { DictKey } from "../i18n/en";
 import { Button, Dialog, Segmented, Slider, Switch, cx } from "../ui/primitives";
 
+const STAFF_LABEL: Record<StaffStyle, DictKey> = {
+  night: "staffNight",
+  paper: "staffPaper",
+  neon: "staffNeon",
+};
 const BG_LABEL: Record<Background, DictKey> = {
   night: "bgNight",
   space: "bgSpace",
@@ -117,6 +123,28 @@ function Section({ title, children }: { title?: string; children: ReactNode }) {
   );
 }
 
+/** A section that starts folded where it's rarely needed (computer-keyboard options on phones). */
+function FoldSection({ title, hint, defaultOpen, children }: { title: string; hint?: string; defaultOpen: boolean; children: ReactNode }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <section className="mb-4 rounded-2xl border border-white/[0.06] bg-white/[0.025] px-4 py-2">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between gap-3 py-2 text-left"
+      >
+        <span className="min-w-0">
+          <span className="block text-xs font-bold tracking-[0.12em] text-mist-400 uppercase">{title}</span>
+          {!open && hint && <span className="mt-0.5 block text-xs text-mist-500">{hint}</span>}
+        </span>
+        <IconChevronDown size={16} className={cx("shrink-0 text-mist-400 transition-transform", open && "rotate-180")} />
+      </button>
+      {open && children}
+    </section>
+  );
+}
+
 function Row({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-2">
@@ -149,6 +177,7 @@ function HelpButton({ icon, label, hint, onClick }: { icon: ReactNode; label: st
 
 export function SettingsDialog() {
   const t = useT();
+  const [keyboardFirst] = useState(hasKeyboard);
   const open = useApp((s) => s.panel === "settings");
   const s = useApp((st) => st.settings);
   const midiSupported = useApp((st) => st.midiSupported);
@@ -345,6 +374,16 @@ export function SettingsDialog() {
                   <ColorPicker label={t("gradBottom")} value={s.gradTo} onChange={(v) => updateSettings({ gradTo: v })} />
                 </>
               )}
+            </Section>
+            <Section>
+              <Switch label={t("staffView")} hint={t("staffViewHint")} checked={s.staffView} onChange={(v) => updateSettings({ staffView: v })} />
+              <ChoiceCards
+                label={t("staffStyle")}
+                value={s.staffStyle}
+                disabled={!s.staffView}
+                onChange={(v) => updateSettings({ staffStyle: v })}
+                options={STAFF_STYLES.map((v) => ({ value: v, label: t(STAFF_LABEL[v]), preview: <StaffSwatch style={v} /> }))}
+              />
             </Section>
             <Section>
               <Switch label={t("effects")} checked={s.effects} onChange={(v) => updateSettings({ effects: v })} />
@@ -590,7 +629,7 @@ export function SettingsDialog() {
                 <MicSensitivity />
               </Section>
             )}
-            <Section title={t("computerKeyboard")}>
+            <FoldSection title={t("computerKeyboard")} hint={t("computerKeyboardFold")} defaultOpen={keyboardFirst}>
               <Switch label={t("showKeyLabels")} checked={s.showKeyLabels} onChange={(v) => updateSettings({ showKeyLabels: v })} />
               <Switch label={t("songKeys")} hint={t("songKeysHint")} checked={s.songKeys} onChange={(v) => updateSettings({ songKeys: v })} />
               <Switch label={t("autoOctave")} hint={t("autoOctaveHint")} checked={s.autoOctave} onChange={(v) => updateSettings({ autoOctave: v })} />
@@ -604,11 +643,11 @@ export function SettingsDialog() {
                 format={(v) => `C${v}`}
               />
               <p className="pb-2 text-xs leading-relaxed text-mist-400">{t("keyboardHint")}</p>
-            </Section>
-            <Section title={t("keyBindings")}>
+            </FoldSection>
+            <FoldSection title={t("keyBindings")} hint={t("computerKeyboardFold")} defaultOpen={keyboardFirst}>
               <KeyBindings />
-            </Section>
-            <Section title={t("shortcuts")}>
+            </FoldSection>
+            <FoldSection title={t("shortcuts")} hint={t("computerKeyboardFold")} defaultOpen={keyboardFirst}>
               <dl className="divide-y divide-white/[0.05]">
                 {shortcuts.map(([keys, desc]) => (
                   <div key={desc} className="flex items-center justify-between gap-3 py-2 text-sm">
@@ -621,7 +660,7 @@ export function SettingsDialog() {
                   </div>
                 ))}
               </dl>
-            </Section>
+            </FoldSection>
           </>
         )}
       </div>

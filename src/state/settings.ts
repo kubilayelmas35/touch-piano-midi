@@ -1,6 +1,8 @@
 import type { NoteNaming } from "../lib/notes";
 import type { GuitarTone, InstrumentKind } from "../engine/types";
 import { readLegacySettings } from "../storage/migrate";
+import { isNativeApp } from "../lib/platform";
+import { STAFF_STYLES, type StaffStyle } from "../render/staffThemes";
 import type { Goal, Skill } from "../coach/path";
 import { defaultKeymaps, isPianoPreset, PIANO_PRESETS, sanitizeKeymaps, type FretKeyMode, type Keymaps } from "../input/keyboard";
 import {
@@ -110,6 +112,8 @@ export interface Settings {
   fingerNumbers: boolean;
   /** Piano: a scrolling staff with the notes above the falling notes. */
   staffView: boolean;
+  /** Look of the scrolling staff. */
+  staffStyle: StaffStyle;
   /** Fretless play per instrument: sliding a finger glides the pitch instead of stepping key by key. */
   glidePiano: boolean;
   glideGuitar: boolean;
@@ -134,8 +138,9 @@ function detectLanguage(): Language {
   return langs.some((l) => l?.toLowerCase().startsWith("tr")) ? "tr" : "en";
 }
 
-/** A device with a precise pointer usually has a keyboard too; phones and tablets don't. */
-function hasKeyboard(): boolean {
+/** A device with a precise pointer usually has a keyboard too; phones, tablets and the phone app don't. */
+export function hasKeyboard(): boolean {
+  if (isNativeApp) return false;
   return typeof matchMedia !== "function" || matchMedia("(any-pointer: fine)").matches;
 }
 
@@ -154,7 +159,7 @@ export function defaultSettings(): Settings {
     timingWindowMs: 150,
     fallSeconds: 3,
     showNoteNames: true,
-    showKeyLabels: true,
+    showKeyLabels: hasKeyboard(),
     effects: true,
     effectLevel: 0.5,
     effectStyle: "sparks",
@@ -195,6 +200,7 @@ export function defaultSettings(): Settings {
     noteKeyLabels: hasKeyboard(),
     fingerNumbers: false,
     staffView: false,
+    staffStyle: "night",
     glidePiano: false,
     glideGuitar: false,
     glideViolin: false,
@@ -232,19 +238,26 @@ export function sanitizeSettings(raw: unknown): Settings {
   return sanitize({ ...defaultSettings(), ...obj });
 }
 
-const KEYMAP_REV = 2;
+const KEYMAP_REV = 3;
 
-/** Anyone still on an earlier default piano keymap moves to the current one. */
+/**
+ * Anyone still on an earlier default piano keymap moves to the current one. Rev 3: computer-key labels used to be
+ * on everywhere; devices without a keyboard turn them off once.
+ */
 function migrate(s: Partial<Settings>): Partial<Settings> {
   if (!s || typeof s !== "object" || (s.keymapRev ?? 0) >= KEYMAP_REV) return s;
   const piano = s.keymaps?.piano;
   const rev = s.keymapRev ?? 0;
   const old =
-    !!piano && typeof piano === "object" && (isPianoPreset(piano, "classic") || (rev >= 1 && isPianoPreset(piano, "twoRow")));
+    rev < 2 &&
+    !!piano &&
+    typeof piano === "object" &&
+    (isPianoPreset(piano, "classic") || (rev >= 1 && isPianoPreset(piano, "twoRow")));
   return {
     ...s,
     keymapRev: KEYMAP_REV,
     ...(old && s.keymaps ? { keymaps: { ...s.keymaps, piano: { ...PIANO_PRESETS.home } } } : {}),
+    ...(rev < 3 && !hasKeyboard() ? { showKeyLabels: false, noteKeyLabels: false } : {}),
   };
 }
 
@@ -303,6 +316,7 @@ function sanitize(s: Settings): Settings {
     noteKeyLabels: typeof s.noteKeyLabels === "boolean" ? s.noteKeyLabels : d.noteKeyLabels,
     fingerNumbers: s.fingerNumbers === true,
     staffView: s.staffView === true,
+    staffStyle: oneOf(STAFF_STYLES, s.staffStyle, d.staffStyle),
     glidePiano: s.glidePiano === true,
     glideGuitar: s.glideGuitar === true,
     glideViolin: s.glideViolin === true,

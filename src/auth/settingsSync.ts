@@ -5,7 +5,7 @@ import { supabase } from "./account";
 /** Keeps a copy of the settings on the member's account so they follow them to other devices. */
 
 /** Tied to this device's hardware / screen, so never copied between devices. */
-const DEVICE_ONLY = ["midiInput", "micSensitivity", "micDevice", "instrumentHeight", "lockHeight", "keyZoom"] as const satisfies readonly (keyof Settings)[];
+const DEVICE_ONLY = ["midiInput", "micSensitivity", "micDevice", "instrumentHeight", "lockHeight", "keyZoom", "showKeyLabels", "noteKeyLabels"] as const satisfies readonly (keyof Settings)[];
 
 let apply: (s: Settings) => void = () => {};
 let pushTimer = 0;

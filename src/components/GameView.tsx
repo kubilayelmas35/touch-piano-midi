@@ -210,7 +210,7 @@ export function GameView() {
       });
       if (v.staff) {
         r.staff.resize(v.w, v.staff.height);
-        r.staff.draw({ t: time, metrics: v.staff, fingers: s.fingerNumbers });
+        r.staff.draw({ t: time, metrics: v.staff, fingers: s.fingerNumbers, style: s.staffStyle });
       }
       if (v.layout.piano && pianoLabels) {
         r.kb.resize(v.w, v.instH);

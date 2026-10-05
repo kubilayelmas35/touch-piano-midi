@@ -10,7 +10,44 @@ import {
   type NoteColor,
   type NoteStyle,
 } from "../render/appearance";
+import { HAND_INK, STAFF_THEMES, type StaffStyle } from "../render/staffThemes";
 import { cx } from "../ui/primitives";
+
+/** A bit of the scrolling staff in the given look: five lines, a few notes, the playhead. */
+export function StaffSwatch({ style }: { style: StaffStyle }) {
+  const th = STAFF_THEMES[style];
+  const notes: [number, number, boolean, string][] = [
+    [30, 34, false, th.judged.perfect],
+    [48, 26, false, th.handColors ? HAND_INK[0] : th.ink],
+    [66, 30, true, th.handColors ? HAND_INK[0] : th.ink],
+    [84, 38, false, th.handColors ? HAND_INK[1] : th.ink],
+  ];
+  return (
+    <svg viewBox="0 0 100 56" preserveAspectRatio="none" className="absolute inset-0 h-full w-full" aria-hidden="true">
+      <defs>
+        <linearGradient id={`staff-${style}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor={th.bg[0]} />
+          <stop offset="1" stopColor={th.bg[1]} />
+        </linearGradient>
+      </defs>
+      <rect width="100" height="56" fill={`url(#staff-${style})`} />
+      {[14, 22, 30, 38, 46].map((y) => (
+        <rect key={y} x="0" y={y} width="100" height="0.8" fill={th.line} />
+      ))}
+      <rect x="57" y="14" width="0.8" height="32" fill={th.bar} />
+      <rect x="37" y="0" width="12" height="56" fill={th.playheadGlow} opacity="0.5" />
+      {notes.map(([x, y, hollow, color]) => (
+        <g key={x} transform={`rotate(-19 ${x} ${y})`} style={th.glow ? { filter: `drop-shadow(0 0 2px ${color})` } : undefined}>
+          <ellipse cx={x} cy={y} rx="4.6" ry="3.2" fill={hollow ? "none" : color} stroke={color} strokeWidth={hollow ? 1.4 : 0} />
+        </g>
+      ))}
+      {notes.map(([x, y, , color]) => (
+        <rect key={`s${x}`} x={x + 3.6} y={y - 17} width="0.9" height="17" fill={color} />
+      ))}
+      <rect x="42.6" y="0" width="1.4" height="56" fill={th.playhead} />
+    </svg>
+  );
+}
 
 export interface ChoiceOption<T extends string> {
   value: T;

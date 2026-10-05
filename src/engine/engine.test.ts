@@ -2,13 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const audio = vi.hoisted(() => ({
   currentTime: 0,
+  outputLatency: 0,
   played: [] as { midi: number; when?: number }[],
   stops: [] as { midi: number; release?: number }[],
   bends: [] as number[],
 }));
 
 vi.mock("../audio/context", () => ({
-  getBus: () => ({ ctx: { currentTime: audio.currentTime } }),
+  getBus: () => ({ ctx: { currentTime: audio.currentTime, outputLatency: audio.outputLatency } }),
   unlockAudio: async () => {},
 }));
 vi.mock("../audio/click", () => ({ scheduleClick: vi.fn() }));
@@ -67,6 +68,7 @@ async function startEngine(cfg: Partial<Engine["config"]> = {}): Promise<Engine>
 beforeEach(() => {
   now = 1000;
   audio.currentTime = 0;
+  audio.outputLatency = 0;
   audio.played = [];
   audio.stops = [];
   audio.bends = [];
@@ -437,6 +439,30 @@ describe("engine", () => {
     const engine = await startEngine({ accompVolume: 0 });
     advance(3, engine);
     expect(audio.played.some((p) => p.midi === 48)).toBe(false);
+  });
+
+  it("schedules audio early by the output latency so it sounds when the note is drawn", async () => {
+    const bassWhen = async () => {
+      audio.played = [];
+      const engine = await startEngine({ countIn: true });
+      advance(-engine.startTime + 0.1, engine);
+      return audio.played.find((p) => p.midi === 48)!.when!;
+    };
+    const plain = await bassWhen();
+    audio.currentTime = 0;
+    now = 1000;
+    audio.outputLatency = 0.1;
+    expect(await bassWhen()).toBeCloseTo(plain - 0.1, 3);
+  });
+
+  it("fingers only the song's keys as neighbours when the piano shows just those", () => {
+    const notes: SongNote[] = [60, 72, 84].map((midi, i) => ({ midi, time: i * 0.3, duration: 0.25, velocity: 0.8, track: 0 }));
+    const song = finalizeSong("octaves", notes, [{ index: 0, name: "Melody", instrument: "piano", isDrum: false, noteCount: 3, low: 60, high: 84 }], [], 60, 4);
+    const engine = new Engine();
+    engine.load(song, { playTracks: [0], hand: "right", compactKeys: true });
+    expect(engine.notes.map((n) => n.finger)).toEqual([1, 2, 3]);
+    engine.configure({ compactKeys: false });
+    expect(engine.notes.map((n) => n.finger)).not.toEqual([1, 2, 3]);
   });
 
   it("passes player input to every listener until it unsubscribes", async () => {

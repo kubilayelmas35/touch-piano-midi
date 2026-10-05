@@ -26,6 +26,10 @@ import {
 
 const GROUP_EPS = 0.035;
 const SCHEDULE_AHEAD = 0.25;
+/** Output latency compensated at most (s); some devices report wild values. */
+const MAX_OUTPUT_LAG = 0.3;
+/** Semitones of the white keys within an octave. */
+const WHITE_STEPS = [0, 2, 4, 5, 7, 9, 11];
 
 export interface PressPos {
   string: number;
@@ -59,6 +63,7 @@ export const DEFAULT_CONFIG: EngineConfig = {
   playerVolume: 1,
   pianoPedal: false,
   pianoSustain: 0.7,
+  compactKeys: false,
   loop: { a: -1, b: -1, enabled: false },
   segmentEnd: 0,
 };
@@ -323,20 +328,8 @@ export class Engine {
       });
     });
     notes.sort((a, b) => a.time - b.time || a.midi - b.midi);
-    if (cfg.instrument === "piano" && notes.length) {
-      let hand = handOfNote(song);
-      const lo = Math.min(...notes.map((n) => n.midi));
-      const hi = Math.max(...notes.map((n) => n.midi));
-      // A single narrow line (no hand tracks) is one hand's, even where it dips below middle C.
-      if (cfg.hand !== "both") hand = () => cfg.hand as "left" | "right";
-      else if (!handTracks(song) && hi - lo < 19) {
-        const side = (lo + hi) / 2 < HAND_SPLIT - 6 ? "left" : "right";
-        hand = () => side;
-      }
-      const fingers = assignPianoFingers(notes.map((n) => ({ midi: n.midi, time: n.time, duration: n.duration, group: n.group, hand: hand(n) })));
-      notes.forEach((n, i) => (n.finger = fingers[i]));
-    }
     this.notes = notes;
+    this.assignFingers();
     this.maxNoteDuration = notes.reduce((m, n) => Math.max(m, n.duration), 0);
 
     const firstPlayer = notes.length ? notes[0].time : Infinity;
@@ -362,6 +355,28 @@ export class Engine {
     this.beats = [...pre, ...grid];
   }
 
+  /** Suggested piano fingers for the player's notes. */
+  private assignFingers(): void {
+    const { song, notes, config: cfg } = this;
+    if (!song || cfg.instrument !== "piano" || !notes.length) return;
+    let hand = handOfNote(song);
+    const lo = Math.min(...notes.map((n) => n.midi));
+    const hi = Math.max(...notes.map((n) => n.midi));
+    // A single narrow line (no hand tracks) is one hand's, even where it dips below middle C.
+    if (cfg.hand !== "both") hand = () => cfg.hand as "left" | "right";
+    else if (!handTracks(song) && hi - lo < 19) {
+      const side = (lo + hi) / 2 < HAND_SPLIT - 6 ? "left" : "right";
+      hand = () => side;
+    }
+    // With only the song's keys on screen, neighbouring columns are fingered like neighbouring white keys.
+    const used = cfg.compactKeys ? [...new Set(notes.map((n) => n.midi))].sort((a, b) => a - b) : [];
+    const column = new Map(used.map((m, i) => [m, Math.floor(i / 7) * 12 + WHITE_STEPS[i % 7]]));
+    const fingers = assignPianoFingers(
+      notes.map((n) => ({ midi: column.get(n.midi) ?? n.midi, time: n.time, duration: n.duration, group: n.group, hand: hand(n) }))
+    );
+    notes.forEach((n, i) => (n.finger = fingers[i]));
+  }
+
   /** Song beat grid (including count-in beats) for drawing measure lines. */
   get grid(): readonly GridBeat[] {
     return this.beats;
@@ -370,9 +385,13 @@ export class Engine {
   // ------------------------------------------------------------- transport
 
   private reanchor(songT: number): void {
+    const ctx = getBus().ctx;
     this.anchorSong = songT;
     this.anchorPerf = performance.now();
-    this.anchorCtx = getBus().ctx.currentTime + 0.01;
+    // Audio reaches the speakers this much after its scheduled time, so it is scheduled that much earlier
+    // and sounds the moment its note crosses the hit line.
+    const lag = (ctx.outputLatency || 0) + (ctx.baseLatency || 0);
+    this.anchorCtx = ctx.currentTime + 0.01 - Math.min(MAX_OUTPUT_LAG, Math.max(0, lag));
   }
 
   private ctxAt(songT: number): number {
@@ -586,6 +605,7 @@ export class Engine {
       next.segmentEnd !== prev.segmentEnd ||
       next.playTracks.join() !== prev.playTracks.join() ||
       next.mutedTracks.join() !== prev.mutedTracks.join();
+    const fingersChanged = next.compactKeys !== prev.compactKeys;
     const timingChanged = next.speed !== prev.speed || next.autoPlay !== prev.autoPlay;
     const audioChanged = instrumentIdFor(next) !== instrumentIdFor(prev);
     this.config = next;
@@ -611,6 +631,7 @@ export class Engine {
       if (next.autoPlay !== prev.autoPlay) this.runDirty = true;
       this.seekInternalKeepNotes(t);
     }
+    if (fingersChanged && !notesChanged) this.assignFingers();
 
     if (audioChanged && wasPlaying && !isLoaded(this.instrumentId)) {
       this.pause();

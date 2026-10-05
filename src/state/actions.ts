@@ -55,6 +55,7 @@ export function engineConfig(): Partial<EngineConfig> {
     accompVolume: together && settings.duetSound !== "auto" ? 0 : settings.accompVolume,
     pianoPedal: settings.pianoPedal,
     pianoSustain: settings.pianoSustain,
+    compactKeys: settings.compactKeys,
     playTracks: session.playTracks,
     mutedTracks: session.mutedTracks,
     // On guitar/violin the hands split the playing technique (strike vs. fret), not the notes.
