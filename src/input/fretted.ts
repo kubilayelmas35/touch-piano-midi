@@ -20,8 +20,6 @@ class FrettedController {
   private kbFrets = new Map<string, number>();
   /** Strings each source is currently striking. */
   private striking = new Map<Source, Set<number>>();
-  /** Touched string → string actually struck, per source (differs only when strike-only play redirects). */
-  private routes = new Map<Source, Map<number, number>>();
   /** Fret each string is sounding at. */
   private sounding: number[] = [];
   /** performance.now() of the last strike per string, for the vibration animation. */
@@ -83,26 +81,6 @@ class FrettedController {
     return false;
   }
 
-  /** A note on `string` that is due right now (within the timing window, or the one wait mode waits for). */
-  private dueOn(string: number | null, exclude: Set<number>): number | null {
-    const t = engine.time;
-    const win = Math.max(0.2, (engine.config.timingWindowMs / 1000) * engine.config.speed * 1.5);
-    const [i0, i1] = engine.visibleRange(t - win, t + win);
-    for (let i = i0; i < i1; i++) {
-      const n = engine.notes[i];
-      if (n.state !== NoteState.Pending || n.string < 0 || exclude.has(n.string)) continue;
-      if (string === null || n.string === string) return n.string;
-    }
-    if (engine.waiting) {
-      for (const n of engine.notes) {
-        if (n.state !== NoteState.Pending) continue;
-        if (!exclude.has(n.string) && (string === null || n.string === string)) return n.string;
-        break;
-      }
-    }
-    return null;
-  }
-
   /** Strings with a note due right now at `fret` (all strings of a chord in that column). */
   private dueAtFret(fret: number): number[] {
     const out = new Set<number>();
@@ -123,18 +101,6 @@ class FrettedController {
       }
     }
     return [...out];
-  }
-
-  /**
-   * Strike-only play (auto fret): hitting a string with nothing due on it plays the note that is due on another
-   * string instead, so just strumming in time is enough.
-   */
-  private route(raw: number): number {
-    if (!this.autoFret || this.tapToPlay) return raw;
-    const busy = new Set<number>();
-    for (const set of this.striking.values()) for (const s of set) busy.add(s);
-    if (this.dueOn(raw, new Set()) !== null) return raw;
-    return this.dueOn(null, busy) ?? raw;
   }
 
   private autoFretFor(string: number): number | null {
@@ -231,11 +197,7 @@ class FrettedController {
   /** The set of strings a source touches in the pluck zone changed. */
   strikeSync(source: Source, strings: number[], velocity = 0.8): void {
     const prev = this.striking.get(source) ?? new Set<number>();
-    const prevRoutes = this.routes.get(source);
-    const routes = new Map<number, number>();
-    for (const raw of strings) routes.set(raw, prevRoutes?.get(raw) ?? this.route(raw));
-    this.routes.set(source, routes);
-    const next = new Set(routes.values());
+    const next = new Set(strings);
     this.striking.set(source, next);
     for (const s of next) if (!prev.has(s)) this.strike(s, velocity);
     for (const s of prev) if (!next.has(s)) this.letGo(s);
@@ -245,7 +207,6 @@ class FrettedController {
     const prev = this.striking.get(source);
     if (!prev) return;
     this.striking.delete(source);
-    this.routes.delete(source);
     for (const s of prev) this.letGo(s);
   }
 
