@@ -123,6 +123,30 @@ describe("fretted string physics", () => {
     expect(ring(1)).toBeGreaterThan(ring(0.45) * 1.2);
   });
 
+  it("keeps a bowed violin string ringing for a while after the bow is lifted", () => {
+    fake.engine.config.instrument = "violin";
+    fretted.strikeSync("p", [1], 0.8);
+    run(1000, backAndForth);
+    fretted.strikeEnd("p");
+    run(300);
+    expect(fake.ringing.has(KEY)).toBe(true);
+    expect(fake.levels.get(KEY)).toBeGreaterThan(0.2);
+  });
+
+  it("falls fully silent when a finger rests on the string without moving, and sounds again once it moves", () => {
+    for (const instrument of ["guitar", "violin"] as const) {
+      fretted.reset();
+      fake.engine.config.instrument = instrument;
+      fretted.strikeSync("p", [1], 0.8);
+      run(1000, backAndForth);
+      run(instrument === "violin" ? 3000 : 8000);
+      expect(fake.held.has(KEY)).toBe(true);
+      expect(fake.levels.get(KEY)).toBe(0);
+      run(300, backAndForth);
+      expect(fake.levels.get(KEY)).toBeGreaterThan(0.5);
+    }
+  });
+
   it("keeps a violin string ringing when the finger leaves the fret, but damps a guitar string", () => {
     const afterLift = (instrument: "guitar" | "violin") => {
       fretted.reset();

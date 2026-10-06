@@ -190,8 +190,10 @@ class FrettedController {
       } else e *= Math.exp(-dt / this.ringTime(s, violin));
       this.feed[s] = 0;
       this.energy[s] = e;
-      if (e < 0.04 && (!violin || !held)) {
-        engine.mute(key);
+      if (e < 0.04) {
+        // A finger still resting on the string keeps its voice silent, so moving again brings the sound back.
+        if (held) engine.setLevel(key, 0);
+        else engine.mute(key);
         this.energy[s] = 0;
         this.struckAt[s] = -Infinity;
         continue;
@@ -202,7 +204,7 @@ class FrettedController {
 
   /** Seconds a left-alone string takes to fade by 1/e: longer with the sustain setting, a harder pluck or a stronger bow. */
   private ringTime(string: number, violin: boolean): number {
-    if (violin) return 0.2 * 4 ** this.sustain * (0.4 + 1.2 * (this.drive[string] ?? 0));
+    if (violin) return 0.3 * 4 ** this.sustain * (0.4 + 1.2 * (this.drive[string] ?? 0));
     return 0.45 * 6 ** this.sustain * (0.7 + 0.6 * (this.hit[string] ?? 0.8));
   }
 
