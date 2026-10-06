@@ -6,6 +6,10 @@ import { glider } from "./glide";
 type Source = number | string;
 
 const strKey = (s: number) => `str:${s}`;
+/** Finger speed (px/ms) below which a resting hand's drift doesn't count as bowing or scrubbing. */
+const MIN_MOTION = 0.05;
+/** String energy below which a string is inaudible and stops; muting any earlier is heard as a cut. */
+const SILENT = 0.005;
 
 /**
  * Guitar / violin playing model: the left hand frets (touching the neck or holding fret keys sets the pitch
@@ -147,7 +151,7 @@ class FrettedController {
   stroke(source: Source, speed: number): void {
     const set = this.striking.get(source);
     if (!set) return;
-    const amount = Math.min(1, speed * 0.9);
+    const amount = Math.min(1, Math.max(0, speed - MIN_MOTION) * 0.9);
     for (const s of set) this.feed[s] = Math.max(this.feed[s] ?? 0, amount);
   }
 
@@ -155,7 +159,7 @@ class FrettedController {
   vibrate(source: Source, speed: number): void {
     const p = this.neck.get(source);
     if (!p) return;
-    const amount = Math.min(1, speed * 1.4);
+    const amount = Math.min(1, Math.max(0, speed - MIN_MOTION) * 1.4);
     for (const s of p.touched) this.feed[s] = Math.max(this.feed[s] ?? 0, amount);
   }
 
@@ -194,7 +198,7 @@ class FrettedController {
       } else e *= Math.exp(-dt / this.ringTime(s, violin));
       this.feed[s] = 0;
       this.energy[s] = e;
-      if (e < 0.04) {
+      if (e < SILENT) {
         // A finger still resting on the string keeps its voice silent, so moving again brings the sound back.
         if (held) engine.setLevel(key, 0);
         else engine.mute(key);
@@ -208,7 +212,7 @@ class FrettedController {
 
   /** Seconds a left-alone string takes to fade by 1/e: longer with the sustain setting, a harder pluck or a stronger bow. */
   private ringTime(string: number, violin: boolean): number {
-    if (violin) return 0.3 * 4 ** this.sustain * (0.4 + 1.2 * (this.drive[string] ?? 0));
+    if (violin) return 0.45 * 4 ** this.sustain * (0.4 + 1.2 * (this.drive[string] ?? 0));
     return 0.45 * 6 ** this.sustain * (0.7 + 0.6 * (this.hit[string] ?? 0.8));
   }
 

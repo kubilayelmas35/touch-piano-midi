@@ -275,9 +275,30 @@ export function GameView() {
   const pointers = useRef(
     new Map<
       number,
-      { key: string; midi: number; x0: number; y0: number; string: number; fret: number; zone: "keys" | "neck" | "pluck"; lastX: number; lastY: number; lastT: number }
+      {
+        key: string;
+        midi: number;
+        x0: number;
+        y0: number;
+        string: number;
+        fret: number;
+        zone: "keys" | "neck" | "pluck";
+        lastX: number;
+        trail: { x: number; y: number; t: number }[];
+      }
     >()
   );
+
+  /**
+   * Finger speed (px/ms) from its net travel over the last ~60 ms. Per-event speed would count the 1 px jitter a
+   * resting hand sends through a 1000 Hz mouse as fast bowing.
+   */
+  const trailSpeed = (trail: { x: number; y: number; t: number }[], x: number, y: number, t: number): number => {
+    trail.push({ x, y, t });
+    while (trail.length > 2 && t - trail[1].t >= 60) trail.shift();
+    const o = trail[0];
+    return Math.hypot(x - o.x, y - o.y) / Math.max(16, t - o.t);
+  };
 
   /** Strings under a touch in the strike zone; a fingertip near a boundary catches both strings. */
   const stringsAt = (y: number, e: React.PointerEvent, count: number): number[] => {
@@ -308,11 +329,11 @@ export function GameView() {
       const vel = pressureOf(e) || 0.55 + 0.4 * Math.min(1, y / v.instH);
       engine.press(key, midi, vel);
       if (s.glidePiano) glider.start(key, bare && !L.compact ? L.pitchAt(x) : midi);
-      pointers.current.set(e.pointerId, { key, midi, x0: x, y0: y, string: -1, fret: -1, zone: "keys", lastX: x, lastY: y, lastT: e.timeStamp });
+      pointers.current.set(e.pointerId, { key, midi, x0: x, y0: y, string: -1, fret: -1, zone: "keys", lastX: x, trail: [] });
     } else if (v.layout.fret && renderers.current) {
       const L = v.layout.fret;
       const count = L.spec.tuning.length;
-      const base = { key, midi: -1, x0: x, y0: y, lastX: x, lastY: y, lastT: e.timeStamp };
+      const base = { key, midi: -1, x0: x, y0: y, lastX: x, trail: [{ x, y, t: e.timeStamp }] };
       if (L.inPluckZone(x)) {
         const pressure = pressureOf(e);
         const vel = pressure ? 0.4 + pressure * 0.6 : 0.82;
@@ -352,13 +373,10 @@ export function GameView() {
     } else if (v.layout.fret) {
       const L = v.layout.fret;
       const count = L.spec.tuning.length;
+      const speed = trailSpeed(p.trail, x, y, e.timeStamp);
       if (p.zone === "pluck") {
         // Faster strums hit harder.
-        const dt = Math.max(1, e.timeStamp - p.lastT);
-        const speed = Math.hypot(x - p.lastX, y - p.lastY) / dt;
         p.lastX = x;
-        p.lastY = y;
-        p.lastT = e.timeStamp;
         fretted.strikeSync(e.pointerId, stringsAt(y, e, count), Math.max(0.45, Math.min(1, 0.5 + speed * 0.35)));
         // Moving on a string bows it (violin) or keeps it vibrating (guitar).
         fretted.stroke(e.pointerId, speed);
@@ -370,8 +388,7 @@ export function GameView() {
           // Fretless: the pitch follows the finger; moving keeps the string alive, a vertical wobble adds vibrato.
           fretted.neckMove(e.pointerId, fret, pos);
           p.fret = fret;
-          const dt = Math.max(1, e.timeStamp - p.lastT);
-          fretted.vibrate(e.pointerId, Math.hypot(x - p.lastX, y - p.lastY) / dt);
+          fretted.vibrate(e.pointerId, speed);
           if (!fretted.multiNote) {
             const rowH = v.instH / count;
             const cents = instrument === "violin" ? Math.max(-45, Math.min(45, (p.y0 - y) * 2.2)) : Math.min(200, (Math.abs(y - p.y0) / rowH) * 200);
@@ -384,19 +401,15 @@ export function GameView() {
           p.y0 = y;
         } else if (fretted.multiNote) {
           // Sliding across strings plays them instead of bending.
-          const dt = Math.max(1, e.timeStamp - p.lastT);
-          fretted.vibrate(e.pointerId, Math.hypot(x - p.lastX, y - p.lastY) / dt);
+          fretted.vibrate(e.pointerId, speed);
         } else {
           const rowH = v.instH / count;
           const dy = Math.abs(y - p.y0);
           const cents = instrument === "violin" ? Math.max(-45, Math.min(45, (p.y0 - y) * 2.2)) : Math.min(200, (dy / rowH) * 200);
           fretted.neckBend(e.pointerId, cents);
-          const dt = Math.max(1, e.timeStamp - p.lastT);
-          fretted.vibrate(e.pointerId, Math.hypot(x - p.lastX, y - p.lastY) / dt);
+          fretted.vibrate(e.pointerId, speed);
         }
         p.lastX = x;
-        p.lastY = y;
-        p.lastT = e.timeStamp;
       }
     }
   };

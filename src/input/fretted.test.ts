@@ -144,7 +144,7 @@ describe("fretted string physics", () => {
       fake.engine.config.instrument = instrument;
       fretted.strikeSync("p", [1], 0.8);
       run(1000, backAndForth);
-      run(instrument === "violin" ? 3000 : 8000);
+      run(12000);
       expect(fake.held.has(KEY)).toBe(true);
       expect(fake.levels.get(KEY)).toBe(0);
       run(300, backAndForth);
@@ -159,7 +159,7 @@ describe("fretted string physics", () => {
       fretted.stringKeyDown("KeyA", 1);
       const early = run(1500);
       expect(early[early.length - 1]).toBeGreaterThan(0.25);
-      run(instrument === "violin" ? 5000 : 7000);
+      run(14000);
       expect(fake.held.has(KEY)).toBe(true);
       expect(fake.levels.get(KEY)).toBe(0);
       fretted.stringKeyUp("KeyA");
