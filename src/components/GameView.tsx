@@ -24,6 +24,11 @@ import { KEY_STRIP_H, KeyStrip } from "./KeyStrip";
 const COMPACT_TIP_KEY = "sonatrio-compact-tip";
 const MIN_WHITE = 15;
 const MAX_WHITE = 46;
+/**
+ * Phone apps: the instrument stops this far above the screen edge, so a finger sliding up off a key doesn't start
+ * the system's home swipe (iOS and Android only let apps delay it, never block it).
+ */
+const HOME_GAP = platform === "ios" ? 20 : platform === "android" ? 18 : 0;
 
 /** Touch force, or 0 when it means nothing: iPhones without 3D Touch report a small fixed value for a finger. */
 function pressureOf(e: React.PointerEvent): number {
@@ -90,7 +95,7 @@ export function GameView() {
     if (!el) return;
     const ro = new ResizeObserver(() => {
       const r = el.getBoundingClientRect();
-      setSize({ w: Math.floor(r.width), h: Math.floor(r.height) });
+      setSize({ w: Math.floor(r.width), h: Math.max(0, Math.floor(r.height) - HOME_GAP) });
     });
     ro.observe(el);
     return () => ro.disconnect();
@@ -463,7 +468,7 @@ export function GameView() {
           <KeyStrip piano={layout.piano} used={used} />
         </div>
       )}
-      <div className="absolute inset-x-0 bottom-0" style={{ height: instH }}>
+      <div className="absolute inset-x-0" style={{ height: instH, bottom: HOME_GAP }}>
         <canvas
           ref={instRef}
           role="application"

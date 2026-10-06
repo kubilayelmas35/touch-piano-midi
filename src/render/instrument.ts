@@ -517,8 +517,10 @@ export class FretboardRenderer extends CanvasSurface {
       const e = this.energy(view, s, auto);
       const finger = fingers.get(s) ?? 0;
       const xv = finger > 0 ? Math.min(neckW, (finger + 1) * L.colW) : L.colW;
-      const color = e > 0.03 ? colors[s] : "rgba(225,225,235,0.75)";
-      ctx.fillStyle = "rgba(225,225,235,0.75)";
+      // Each string in its own colour (the one its notes fall in); full strength while it sounds.
+      const rest = withAlpha(colors[s], 0.85);
+      const color = e > 0.03 ? colors[s] : rest;
+      ctx.fillStyle = rest;
       if (xv > L.colW) ctx.fillRect(L.colW, y - thick / 2, xv - L.colW, thick);
       if (e > 0.03) {
         const amp = e * rowH * 0.16;

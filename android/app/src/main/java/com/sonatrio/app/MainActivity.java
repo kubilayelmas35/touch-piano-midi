@@ -89,6 +89,9 @@ public class MainActivity extends BridgeActivity {
 
         ViewCompat.setOnApplyWindowInsetsListener(getWindow().getDecorView(), (v, insets) -> {
             boolean keyboard = insets.isVisible(WindowInsetsCompat.Type.ime());
+            // The SystemBars plugin shows the bars once it loads (after onCreate); without the navigation bar
+            // hidden, a single swipe from the bottom leaves the app.
+            if (!keyboard && insets.isVisible(WindowInsetsCompat.Type.navigationBars())) v.post(this::immersive);
             v.setPadding(0, 0, 0, keyboard ? insets.getInsets(WindowInsetsCompat.Type.ime()).bottom : 0);
             return new WindowInsetsCompat.Builder(insets)
                 .setInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout(), Insets.NONE)
