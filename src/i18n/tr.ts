@@ -37,6 +37,8 @@ export const tr: Dict = {
   pianoSustain: "Piyano sustain süresi",
   pianoSustainHint: "Basılı tutulan ve pedallı notaların ne kadar uzun çınlayacağı. Sonuna kadar açarsan basılı tuş neredeyse hiç sönmez.",
   sustainEndless: "En uzun",
+  stringSustain: "Gitar / keman sustain süresi",
+  stringSustainHint: "Bıraktığın telin ne kadar uzun çınlayacağı. Sert vuruş ve hızlı yay sesi ayrıca uzatır.",
   autoPlay: "Dinle (otomatik çal)",
   autoPlayHint: "Kendi partini çalınırken dinle ve izle",
   practice: "Pratik",

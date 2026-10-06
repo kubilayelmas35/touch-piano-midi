@@ -92,18 +92,32 @@ function envelope(src: AudioBuffer) {
   return { win, nWin, smooth, peak };
 }
 
+/** Loudness averaged over ±`span` windows, so a gain that follows it tracks the decay but not the beating of the strings. */
+function averagedLevel(nWin: number, smooth: (w: number) => number, span: number) {
+  const sums = new Float64Array(nWin + 1);
+  for (let w = 0; w < nWin; w++) sums[w + 1] = sums[w] + smooth(w) ** 2;
+  return (w: number) => {
+    const a = Math.max(0, Math.min(nWin - 1, w - span));
+    const b = Math.min(nWin, Math.max(a + 1, w + span + 1));
+    return Math.max(1e-6, Math.sqrt((sums[b] - sums[a]) / (b - a)));
+  };
+}
+
 /**
- * Turns a decaying pluck into one that can sustain: the slice right after the attack (until it has dropped to
- * about a third) is levelled to a constant loudness and crossfade-looped.
+ * Turns a decaying pluck into one that can sustain: from shortly after the attack until it has faded by 40 dB (or
+ * the sample ends) it is levelled to a constant loudness and crossfade-looped. A short loop is heard as a pulse
+ * ("wow wow") while the string is kept going, so it is made as long as the sample allows.
  */
 function makePluckLoop(ctx: BaseAudioContext, src: AudioBuffer): Sample {
   const { win, nWin, smooth, peak } = envelope(src);
-  const startW = Math.min(nWin - 20, Math.max(peak + 3, 5));
-  const startLevel = smooth(startW);
+  const level = averagedLevel(nWin, smooth, 7);
+  const startW = Math.max(peak + 8, Math.round((0.44 * src.sampleRate) / win));
+  if (startW + 20 >= nWin) return { buffer: src, loopStart: null };
+  // Levelling may begin up to the longest crossfade (20 windows) before the loop start; measure the fade from there.
+  const floor = level(Math.max(peak + 4, startW - 20)) / 100;
   let endW = startW + 12;
-  while (endW < nWin - 2 && endW - startW < 60 && smooth(endW) > startLevel * 0.32) endW++;
-  if (startW < 2 || endW >= nWin) return { buffer: src, loopStart: null };
-  return levelledLoop(ctx, src, win, nWin, smooth, startW, endW);
+  while (endW < nWin - 6 && level(endW) > floor) endW++;
+  return levelledLoop(ctx, src, win, nWin, smooth, startW, endW, peak);
 }
 
 /**
@@ -114,15 +128,7 @@ function makeHoldSample(ctx: BaseAudioContext, src: AudioBuffer, hold: NonNullab
   const { win, nWin, smooth, peak } = envelope(src);
   const rate = src.sampleRate;
   if (nWin < 40) return { buffer: src, loopStart: null };
-  // Loudness averaged over 0.6 s, so the gain follows the decay but not the beating of the strings.
-  const span = 15;
-  const sums = new Float64Array(nWin + 1);
-  for (let w = 0; w < nWin; w++) sums[w + 1] = sums[w] + smooth(w) ** 2;
-  const level = (w: number) => {
-    const a = Math.max(0, w - span);
-    const b = Math.min(nWin, w + span + 1);
-    return Math.max(1e-6, Math.sqrt((sums[b] - sums[a]) / (b - a)));
-  };
+  const level = averagedLevel(nWin, smooth, 15);
   let top = 0;
   for (let w = 0; w < Math.min(nWin, 20); w++) top = Math.max(top, level(w));
   const floor = top * Math.pow(10, -hold.dropDb / 20);
@@ -161,12 +167,14 @@ function levelledLoop(
   nWin: number,
   smooth: (w: number) => number,
   startW: number,
-  endW: number
+  endW: number,
+  peak: number
 ): Sample {
   const rate = src.sampleRate;
   const start = startW * win;
   const end = endW * win;
-  const xf = Math.min(Math.floor(rate * 0.08), Math.floor((end - start) / 3));
+  // The crossfade reads from just before the loop start, which must stay clear of the attack.
+  const xf = Math.min(Math.floor(rate * 0.4), Math.floor((end - start) * 0.4), start - (peak + 4) * win);
   const p0 = start - xf;
   const ref = smooth(Math.floor(p0 / win));
   const out = ctx.createBuffer(src.numberOfChannels, end, rate);
@@ -179,7 +187,7 @@ function levelledLoop(
       const w0 = Math.max(0, Math.floor(fw));
       const k = Math.min(1, Math.max(0, fw - w0));
       const e = smooth(w0) * (1 - k) + smooth(Math.min(nWin - 1, w0 + 1)) * k;
-      b[i] *= Math.min(40, ref / e);
+      b[i] *= Math.min(120, ref / e);
     }
     for (let i = 0; i < xf; i++) {
       const t = i / xf;

@@ -112,6 +112,8 @@ export interface Settings {
   pianoPedal: boolean;
   /** Piano: how long held and pedalled notes ring, 0 short … 1 long. */
   pianoSustain: number;
+  /** Guitar / violin: how long a string rings once it is left alone, 0 short … 1 long. */
+  stringSustain: number;
   /** Falling notes also show the computer key that plays them. */
   noteKeyLabels: boolean;
   /** Piano: suggested finger numbers (1 thumb … 5 little finger) on the falling notes. */
@@ -206,6 +208,7 @@ export function defaultSettings(): Settings {
     landscapeLock: false,
     pianoPedal: true,
     pianoSustain: 0.7,
+    stringSustain: 0.55,
     noteKeyLabels: hasKeyboard(),
     fingerNumbers: false,
     staffView: false,
@@ -321,6 +324,7 @@ function sanitize(s: Settings): Settings {
     landscapeLock: s.landscapeLock === true,
     pianoPedal: s.pianoPedal !== false,
     pianoSustain: num(s.pianoSustain, 0, 1, d.pianoSustain),
+    stringSustain: num(s.stringSustain, 0, 1, d.stringSustain),
     micSensitivity: num(s.micSensitivity, 0, 1, d.micSensitivity),
     micDevice: typeof s.micDevice === "string" ? s.micDevice.slice(0, 200) : "",
     duetSound: oneOf(DUET_SOUNDS, s.duetSound, d.duetSound),

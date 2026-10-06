@@ -501,6 +501,16 @@ export function SettingsDialog() {
             />
             <p className="pb-2 text-xs leading-relaxed text-mist-400">{t("pianoSustainHint")}</p>
             <Switch label={t("pianoPedal")} hint={t("pianoPedalHint")} checked={s.pianoPedal} onChange={(v) => updateSettings({ pianoPedal: v })} />
+            <Slider
+              label={t("stringSustain")}
+              hint={t("stringSustainHint")}
+              value={s.stringSustain}
+              min={0}
+              max={1}
+              step={0.05}
+              onChange={(v) => updateSettings({ stringSustain: v })}
+              format={pct}
+            />
             <Row label={t("guitarTone")}>
               <Segmented
                 label={t("guitarTone")}

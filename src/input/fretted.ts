@@ -28,7 +28,15 @@ class FrettedController {
   private energy: number[] = [];
   /** Excitation gathered since the last tick (bow speed, vibrato, scrubbing the string). */
   private feed: number[] = [];
+  /** Excitation smoothed over the turnarounds of a back-and-forth motion, so the loudness doesn't pump. */
+  private drive: number[] = [];
+  /** performance.now() of the last excitation per string. */
+  private fedAt: number[] = [];
+  /** Velocity of the last strike per string; harder plucks ring longer. */
+  private hit: number[] = [];
   private lastTick = 0;
+  /** How long a string rings once left alone, 0 short … 1 long. */
+  sustain = 0.55;
   autoFret = false;
   tapToPlay = false;
   /** A finger frets (and with tap-to-play, sounds) every string it covers or slides across. */
@@ -122,6 +130,8 @@ class FrettedController {
     this.sounding[string] = fret;
     this.struckAt[string] = performance.now();
     this.energy[string] = this.violin ? 0.85 : 1;
+    this.hit[string] = velocity;
+    this.drive[string] = this.violin ? 0.4 : 0;
     engine.press(strKey(string), midiAt(spec, string, fret), velocity, { string, fret });
     glider.touch(strKey(string));
   }
@@ -165,14 +175,22 @@ class FrettedController {
       let feed = this.feed[s] ?? 0;
       // Computer keys and tap-to-play can't move, so they play steadily while held.
       if (held && this.steadyBow(s)) feed = Math.max(feed, 0.8);
-      // Both instruments sound only while the string is kept moving; a still string dies away (guitar a bit slower).
+      let d = this.drive[s] ?? 0;
       if (feed > 0.02) {
-        const target = violin ? Math.min(1, 0.45 + feed) : Math.min(1, 0.6 + feed * 0.6);
-        e += (Math.max(e, target) - e) * (1 - Math.exp(-dt / (violin ? 0.06 : 0.04)));
-      } else e *= Math.exp(-dt / (violin ? 0.45 : 0.6));
+        this.fedAt[s] = now;
+        d += (feed - d) * (1 - Math.exp(-dt / (feed > d ? 0.08 : 0.3)));
+        this.drive[s] = d;
+      }
+      // A string sounds while it is kept moving; the pauses where a back-and-forth turns around don't count as stopping.
+      const moving = now - (this.fedAt[s] ?? -Infinity) < 140;
+      if (moving) {
+        const target = violin ? Math.min(1, 0.45 + d) : Math.min(1, 0.6 + d * 0.5);
+        if (target > e) e += (target - e) * (1 - Math.exp(-dt / (violin ? 0.08 : 0.15)));
+        else if (violin) e += (target - e) * (1 - Math.exp(-dt / 0.5));
+      } else e *= Math.exp(-dt / this.ringTime(s, violin));
       this.feed[s] = 0;
       this.energy[s] = e;
-      if (!violin && e < 0.04) {
+      if (e < 0.04 && (!violin || !held)) {
         engine.mute(key);
         this.energy[s] = 0;
         this.struckAt[s] = -Infinity;
@@ -180,6 +198,12 @@ class FrettedController {
       }
       engine.setLevel(key, violin ? e / 0.85 : e);
     }
+  }
+
+  /** Seconds a left-alone string takes to fade by 1/e: longer with the sustain setting, a harder pluck or a stronger bow. */
+  private ringTime(string: number, violin: boolean): number {
+    if (violin) return 0.2 * 4 ** this.sustain * (0.4 + 1.2 * (this.drive[string] ?? 0));
+    return 0.45 * 6 ** this.sustain * (0.7 + 0.6 * (this.hit[string] ?? 0.8));
   }
 
   private steadyBow(string: number): boolean {
@@ -191,7 +215,7 @@ class FrettedController {
 
   private letGo(string: number): void {
     if (this.isStruck(string)) return;
-    engine.release(strKey(string), !this.violin);
+    engine.release(strKey(string), true);
   }
 
   /** The set of strings a source touches in the pluck zone changed. */
@@ -375,6 +399,9 @@ class FrettedController {
     this.sounding = [];
     this.energy = [];
     this.feed = [];
+    this.drive = [];
+    this.fedAt = [];
+    this.hit = [];
     this.struckAt.fill(-Infinity);
   }
 }

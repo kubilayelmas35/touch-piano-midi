@@ -38,6 +38,8 @@ export const en = {
   pianoSustain: "Piano sustain length",
   pianoSustainHint: "How long held and pedalled notes ring. All the way up, a held key hardly fades at all.",
   sustainEndless: "Longest",
+  stringSustain: "Guitar / violin sustain length",
+  stringSustainHint: "How long a string rings once you leave it. Harder plucks and faster bowing ring longer still.",
   autoPlay: "Listen (auto-play)",
   autoPlayHint: "Hear and watch your part being played",
   practice: "Practice",

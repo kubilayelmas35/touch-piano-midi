@@ -240,6 +240,7 @@ export function GameView() {
         fretted.multiNote = s.multiNote;
         fretted.columnPress = s.columnPress;
         fretted.glide = fretless;
+        fretted.sustain = s.stringSustain;
         fretted.tick(now);
         const km = s.instrument === "violin" ? s.keymaps.violin : s.keymaps.guitar;
         if (!fretLabels || fretLabels.src !== km || fretLabels.rev !== rev) {
