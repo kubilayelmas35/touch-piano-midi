@@ -879,23 +879,26 @@ export class Highway {
       if (!lane) continue;
       const x = lane.x + lane.w / 2;
       const color = JUDGEMENT_COLORS[fx.judgement] ?? "#ffffff";
+      const sl = this.stringLaneOf(fx, view);
       if (fx.judgement !== "wrong" && !fx.auto) {
-        // Labels are wider than a key, so neighbours replace each other instead of piling up.
-        this.popups = this.popups.filter((p) => Math.abs(p.x - x) > 70);
-        this.popups.push({
-          text: view.labels[fx.judgement] ?? fx.judgement,
-          sub: fx.timing ? view.labels[fx.timing] : undefined,
-          subColor: fx.timing === "early" ? "#7dd3fc" : "#fda4af",
-          color,
-          x,
-          born: fx.at,
-        });
-        if (this.popups.length > 8) this.popups.shift();
+        // Guitar / violin: shown over the fret and over the struck string, so each hand sees how it did.
+        for (const px of sl ? [x, sl.x + sl.w / 2] : [x]) {
+          // Labels are wider than a key, so neighbours replace each other instead of piling up.
+          this.popups = this.popups.filter((p) => Math.abs(p.x - px) > 70);
+          this.popups.push({
+            text: view.labels[fx.judgement] ?? fx.judgement,
+            sub: fx.timing ? view.labels[fx.timing] : undefined,
+            subColor: fx.timing === "early" ? "#7dd3fc" : "#fda4af",
+            color,
+            x: px,
+            born: fx.at,
+          });
+        }
+        while (this.popups.length > 8) this.popups.shift();
       }
       if (fx.judgement === "miss" || fx.judgement === "wrong") continue;
       const scale = fx.judgement === "perfect" ? 1 : fx.judgement === "great" ? 0.7 : 0.45;
       const lanes = [lane];
-      const sl = this.stringLaneOf(fx, view);
       if (sl) lanes.push(sl);
       if (view.dust !== "off") {
         const burst: Record<DustStyle, number> = { off: 0, smoke: 5, fountain: 18, plume: 5, rays: 12, sparkle: 10, nebula: 4, fog: 3, embers: 12, stardust: 10 };
@@ -1155,7 +1158,9 @@ export class Highway {
       const scale = age < 0.15 ? 0.7 + (age / 0.15) * 0.3 : 1;
       ctx.globalAlpha = age < 0.7 ? 1 : 1 - (age - 0.7) / 0.3;
       ctx.font = `800 ${Math.round(18 * scale)}px system-ui, sans-serif`;
-      const x = Math.max(44, Math.min(this.w - 44, p.x));
+      // Kept whole on screen: the outermost string lanes sit right at the edge.
+      const half = ctx.measureText(p.text).width / 2 + 6;
+      const x = Math.max(half, Math.min(this.w - half, p.x));
       ctx.lineWidth = 5;
       ctx.lineJoin = "round";
       ctx.strokeStyle = "rgba(7,10,26,0.85)";
