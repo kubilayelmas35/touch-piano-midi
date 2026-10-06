@@ -34,6 +34,8 @@ class FrettedController {
   private fedAt: number[] = [];
   /** Velocity of the last strike per string; harder plucks ring longer. */
   private hit: number[] = [];
+  /** performance.now() of the last strike per string, where a held key's bow stroke starts. */
+  private bowFrom: number[] = [];
   private lastTick = 0;
   /** How long a string rings once left alone, 0 short … 1 long. */
   sustain = 0.55;
@@ -131,6 +133,7 @@ class FrettedController {
     this.struckAt[string] = performance.now();
     this.energy[string] = this.violin ? 0.85 : 1;
     this.hit[string] = velocity;
+    this.bowFrom[string] = performance.now();
     this.drive[string] = this.violin ? 0.4 : 0;
     engine.press(strKey(string), midiAt(spec, string, fret), velocity, { string, fret });
     glider.touch(strKey(string));
@@ -173,8 +176,9 @@ class FrettedController {
       }
       let e = this.energy[s] ?? 0;
       let feed = this.feed[s] ?? 0;
-      // Computer keys and tap-to-play can't move, so they play steadily while held.
-      if (held && this.steadyBow(s)) feed = Math.max(feed, 0.8);
+      // Computer keys and tap-to-play can't move: on violin a held one draws a single bow stroke of limited length,
+      // a guitar string just rings out.
+      if (violin && held && this.steadyBow(s) && now - (this.bowFrom[s] ?? 0) < this.bowSeconds() * 1000) feed = Math.max(feed, 0.8);
       let d = this.drive[s] ?? 0;
       if (feed > 0.02) {
         this.fedAt[s] = now;
@@ -206,6 +210,11 @@ class FrettedController {
   private ringTime(string: number, violin: boolean): number {
     if (violin) return 0.3 * 4 ** this.sustain * (0.4 + 1.2 * (this.drive[string] ?? 0));
     return 0.45 * 6 ** this.sustain * (0.7 + 0.6 * (this.hit[string] ?? 0.8));
+  }
+
+  /** Length of the bow stroke a held computer key or tap draws on violin, longer with the sustain setting. */
+  private bowSeconds(): number {
+    return 1.5 * 3 ** this.sustain;
   }
 
   private steadyBow(string: number): boolean {
@@ -407,6 +416,7 @@ class FrettedController {
     this.drive = [];
     this.fedAt = [];
     this.hit = [];
+    this.bowFrom = [];
     this.struckAt.fill(-Infinity);
   }
 }

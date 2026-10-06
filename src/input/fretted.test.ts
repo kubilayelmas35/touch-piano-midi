@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const fake = vi.hoisted(() => {
   const held = new Set<string>();
@@ -80,7 +80,12 @@ beforeEach(() => {
   fake.engine.config.instrument = "guitar";
   fretted.sustain = 0.55;
   now = 1000;
+  vi.spyOn(performance, "now").mockImplementation(() => now);
   fretted.tick(now);
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe("fretted string physics", () => {
@@ -144,6 +149,20 @@ describe("fretted string physics", () => {
       expect(fake.levels.get(KEY)).toBe(0);
       run(300, backAndForth);
       expect(fake.levels.get(KEY)).toBeGreaterThan(0.5);
+    }
+  });
+
+  it("lets a held computer key play one bow stroke on violin and ring out on guitar, then fall silent", () => {
+    for (const instrument of ["guitar", "violin"] as const) {
+      fretted.reset();
+      fake.engine.config.instrument = instrument;
+      fretted.stringKeyDown("KeyA", 1);
+      const early = run(1500);
+      expect(early[early.length - 1]).toBeGreaterThan(0.25);
+      run(instrument === "violin" ? 5000 : 7000);
+      expect(fake.held.has(KEY)).toBe(true);
+      expect(fake.levels.get(KEY)).toBe(0);
+      fretted.stringKeyUp("KeyA");
     }
   });
 
