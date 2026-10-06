@@ -348,7 +348,7 @@ export class FretboardRenderer extends CanvasSurface {
   private energy(view: FretboardView, s: number, auto: Map<number, { e: number }>): number {
     const a = auto.get(s)?.e ?? 0;
     const e = view.energyOf(s);
-    if (view.violin) return view.isStruck(s) ? Math.max(0.1, e * 0.7) : a * 0.7;
+    if (view.violin) return Math.max(e, a) * 0.7;
     return Math.max(e * e, a * a);
   }
 
@@ -522,7 +522,7 @@ export class FretboardRenderer extends CanvasSurface {
       const color = e > 0.03 ? colors[s] : rest;
       ctx.fillStyle = rest;
       if (xv > L.colW) ctx.fillRect(L.colW, y - thick / 2, xv - L.colW, thick);
-      if (e > 0.03) {
+      if (e > 0.008) {
         const amp = e * rowH * 0.16;
         const phase = Math.sin(now * (view.violin ? 0.11 : 0.09) + s * 1.7);
         const span = w - xv;

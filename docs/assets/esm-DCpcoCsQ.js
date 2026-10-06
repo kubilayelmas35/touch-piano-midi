@@ -1,0 +1,2 @@
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["./web-D3f2pHD2.js","./dist-CixD3Ru4.js"])))=>i.map(i=>d[i]);
+import{I as e}from"./index-CdXSLUS1.js";import{r as t}from"./dist-CixD3Ru4.js";var n=t(`Browser`,{web:()=>e(()=>import(`./web-D3f2pHD2.js`).then(e=>new e.BrowserWeb),__vite__mapDeps([0,1]),import.meta.url)});export{n as Browser};
