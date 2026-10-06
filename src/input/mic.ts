@@ -1,7 +1,8 @@
-import { audioCtx, unlockAudio } from "../audio/context";
+import { audioCtx, setAudioSession, unlockAudio } from "../audio/context";
 import { requirePro } from "../auth/account";
 import { engine } from "../engine/engine";
 import { tNow } from "../i18n";
+import { reportError } from "../lib/errors";
 import { updateSettings } from "../state/actions";
 import { toast, useApp } from "../state/store";
 import { KeyOnsets } from "./onsets";
@@ -85,6 +86,7 @@ export async function startMic(): Promise<boolean> {
   if (!micSupported()) return false;
   useApp.setState({ mic: "starting" });
   await unlockAudio();
+  setAudioSession(true);
   const device = useApp.getState().settings.micDevice;
   try {
     try {
@@ -98,6 +100,8 @@ export async function startMic(): Promise<boolean> {
     }
   } catch (err) {
     console.warn("[mic] access denied", err);
+    reportError("error", `Microphone failed: ${(err as Error)?.name ?? "Error"}: ${(err as Error)?.message ?? err}`);
+    setAudioSession(false);
     useApp.setState({ mic: "denied" });
     toast(tNow("micDenied"), "error");
     return false;
@@ -180,6 +184,7 @@ export function stopMic(): void {
   source?.disconnect();
   source = null;
   analyser = null;
+  if (stream) setAudioSession(false);
   stream?.getTracks().forEach((tr) => tr.stop());
   stream = null;
   level = 0;

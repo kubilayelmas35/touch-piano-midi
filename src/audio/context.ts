@@ -55,11 +55,18 @@ function softClipper(ctx: AudioContext): { input: AudioNode; output: AudioNode }
   return { input: pre, output: shaper };
 }
 
+/**
+ * iOS treats Web Audio as "ambient" (silenced by the ring/silent switch) unless the page asks for playback,
+ * but a "playback" session refuses the microphone outright, without even asking for permission.
+ */
+export function setAudioSession(recording: boolean): void {
+  const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
+  if (session) session.type = recording ? "play-and-record" : "playback";
+}
+
 export function getBus(): MasterBus {
   if (bus) return bus;
-  // iOS treats Web Audio as "ambient" (silenced by the ring/silent switch) unless the page asks for playback.
-  const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
-  if (session) session.type = "playback";
+  setAudioSession(false);
   const ctx = new AudioContext({ latencyHint: "interactive" });
 
   const input = ctx.createGain();
