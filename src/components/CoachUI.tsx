@@ -32,9 +32,15 @@ export function useStageText() {
   return {
     part: (sec: number | null) => (sec === null ? t("partWhole") : t("partFirst", { s: sec })),
     stage: (s: Stage) =>
-      piano ? (s === "right" ? t("coachRightHand") : s === "left" ? t("coachLeftHand") : t("coachBothHands")) : s === "right" ? t("coachStrike") : t("coachFull"),
+      piano
+        ? s === "right" ? t("coachRightHand") : s === "left" ? t("coachLeftHand") : t("coachBothHands")
+        : s === "right" ? t("coachStrike") : s === "left" ? t("coachFrets") : t("coachFull"),
     tip: (s: Stage) =>
-      t(piano ? (s === "right" ? "coachTipRight" : s === "left" ? "coachTipLeft" : "coachTipBoth") : s === "right" ? "coachTipStrike" : "coachTipFull"),
+      t(
+        piano
+          ? s === "right" ? "coachTipRight" : s === "left" ? "coachTipLeft" : "coachTipBoth"
+          : s === "right" ? "coachTipStrike" : s === "left" ? "coachTipFrets" : "coachTipFull"
+      ),
     title: (id: string) => builtinTitle(id, lang),
   };
 }
@@ -317,7 +323,7 @@ export function PathDialog() {
         </>
       }
     >
-      <p className="text-sm text-mist-300">{t("pathIntro")}</p>
+      <p className="text-sm text-mist-300">{t(instrument === "piano" ? "pathIntro" : "pathIntroFretted")}</p>
       <div className="mt-3 flex flex-wrap items-center gap-1.5">
         <Pill tone="brand">{t(instrument)}</Pill>
         <Pill>{skillLabel}</Pill>

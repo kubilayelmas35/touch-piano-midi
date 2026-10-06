@@ -3,7 +3,10 @@ import { BUILTIN_BY_DIFFICULTY, isArranged } from "../midi/builtin";
 
 export type Skill = "new" | "some" | "good";
 export type Goal = "learn" | "songs" | "free";
-/** Piano: which hand plays. Guitar / violin: "right" = strike only (frets are pressed for you). */
+/**
+ * Which hand plays. Guitar / violin: "right" = strike only (frets are pressed for you),
+ * "left" = fret only (the strings are played for you).
+ */
 export type Stage = "right" | "left" | "both";
 
 export interface PathStep {
@@ -54,9 +57,19 @@ export function goalSpeed(skill: Skill, lesson: number): number {
   return Math.min(1, Math.round((base + 0.1 * lesson) * 10) / 10);
 }
 
-export function stagesFor(instrument: InstrumentKind, skill: Skill): Stage[] {
-  if (instrument === "piano") return skill === "new" ? ["right", "left", "both"] : skill === "some" ? ["right", "both"] : ["both"];
-  return skill === "new" ? ["right", "both"] : ["both"];
+export function stagesFor(_instrument: InstrumentKind, skill: Skill): Stage[] {
+  return skill === "new" ? ["right", "left", "both"] : skill === "some" ? ["right", "both"] : ["both"];
+}
+
+/** Bumped when the steps of a path change; saved paths of an older layout are moved onto the new steps. */
+export const PATH_LAYOUT = 2;
+/** Guitar / violin steps before they got a fret-only (left hand) step like piano. */
+const FRETTED_V1: Record<Skill, Stage[]> = { new: ["right", "both"], some: ["both"], good: ["both"] };
+
+/** The same lesson and stage in the new layout (or the lesson's first stage if that stage is gone). */
+function remapStep(step: number, from: Stage[], to: Stage[]): number {
+  const lesson = Math.floor(step / from.length);
+  return lesson * to.length + Math.max(0, to.indexOf(from[step % from.length]));
 }
 
 /** Tunes nearly everyone knows open the path; hearing what it should sound like makes the first steps easier. */
@@ -171,7 +184,7 @@ export function jumpTo(state: PathState, index: number, ctx: { skill: Skill; ste
 }
 
 /** Saved path per "instrument:skill"; lives in the progress copy so it syncs with the account. */
-export type PathStore = Record<string, PathState & { at?: number }>;
+export type PathStore = Record<string, PathState & { at?: number; v?: number }>;
 
 export const pathKey = (instrument: InstrumentKind, skill: Skill) => `${instrument}:${skill}`;
 
@@ -194,12 +207,20 @@ export function sanitizePaths(raw: unknown): PathStore {
   if (!raw || typeof raw !== "object") return out;
   for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
     if (!/^(piano|guitar|violin):(new|some|good)$/.test(k) || !v || typeof v !== "object") continue;
-    const s = v as Partial<PathState & { at: number }>;
+    const s = v as Partial<PathState & { at: number; v: number }>;
     if (typeof s.step !== "number" || !Number.isFinite(s.step)) continue;
+    const [instrument, skill] = k.split(":") as [InstrumentKind, Skill];
+    const move =
+      instrument !== "piano" && s.v !== PATH_LAYOUT
+        ? (step: number) => remapStep(step, FRETTED_V1[skill], stagesFor(instrument, skill))
+        : (step: number) => step;
     const stars: Record<number, number> = {};
-    for (const [i, n] of Object.entries(s.stars ?? {})) if (typeof n === "number") stars[Number(i)] = Math.max(0, Math.min(5, n));
+    for (const [i, n] of Object.entries(s.stars ?? {})) {
+      if (typeof n === "number") stars[move(Math.max(0, Math.round(Number(i))))] = Math.max(0, Math.min(5, n));
+    }
     out[k] = {
-      step: Math.max(0, Math.round(s.step)),
+      v: PATH_LAYOUT,
+      step: move(Math.max(0, Math.round(s.step))),
       speed: typeof s.speed === "number" ? s.speed : 0.5,
       wait: s.wait === true,
       tries: typeof s.tries === "number" ? s.tries : 0,

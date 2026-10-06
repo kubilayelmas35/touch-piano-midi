@@ -19,7 +19,7 @@ import {
   type RunRecord,
 } from "./progress";
 import { saveProgress as save } from "./storage";
-import type { PathState } from "../coach/path";
+import { PATH_LAYOUT, type PathState } from "../coach/path";
 
 const categories = new Map(BUILTIN_SONGS.map((s) => [s.id, s.category]));
 
@@ -62,7 +62,7 @@ function commit(next: Progress, run: RunRecord | null, announce: boolean): strin
 /** Stores a learning-path state; it travels with the progress copy to the account. */
 export function savePathState(key: string, state: PathState): void {
   const p = useApp.getState().progress;
-  commit({ ...p, path: { ...p.path, [key]: { ...state, at: Date.now() } } }, null, false);
+  commit({ ...p, path: { ...p.path, [key]: { ...state, at: Date.now(), v: PATH_LAYOUT } } }, null, false);
 }
 
 /** Finished (or abandoned) run: counts notes, completion, stars; returns newly unlocked achievement ids. */

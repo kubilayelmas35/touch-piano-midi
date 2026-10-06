@@ -1,5 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { freshState, goalSpeed, judgeRun, jumpTo, partCount, partSeconds, pathSongs, pathSteps, SPEEDS, type PathState } from "./path";
+import {
+  freshState,
+  goalSpeed,
+  judgeRun,
+  jumpTo,
+  partCount,
+  partSeconds,
+  PATH_LAYOUT,
+  pathSongs,
+  pathSteps,
+  sanitizePaths,
+  SPEEDS,
+  type PathState,
+} from "./path";
 
 const steps = pathSteps("piano", "new");
 const ctx = { skill: "new" as const, steps };
@@ -11,7 +24,7 @@ describe("learning path", () => {
     expect(new Set(steps.slice(0, 3).map((s) => s.song)).size).toBe(1);
     expect(freshState("new").speed).toBe(0.5);
     expect(pathSteps("piano", "good")[0].stage).toBe("both");
-    expect(pathSteps("guitar", "new").slice(0, 2).map((s) => s.stage)).toEqual(["right", "both"]);
+    expect(pathSteps("guitar", "new").slice(0, 3).map((s) => s.stage)).toEqual(["right", "left", "both"]);
     expect(pathSongs()[0]).toBe("twinkle");
     expect(new Set(pathSongs()).size).toBe(pathSongs().length);
     expect(pathSongs().indexOf("twinkle")).toBeLessThan(pathSongs().indexOf("minuet-g"));
@@ -98,5 +111,22 @@ describe("song parts", () => {
     expect(jumpTo(s, 3, ctx)).toMatchObject({ step: 3, part: 0, speed: goalSpeed("new", steps[3].lesson) });
     expect(jumpTo(s, 1, ctx)).toMatchObject({ step: 1, part: 0 });
     expect(jumpTo(s, -5, ctx).step).toBe(0);
+  });
+
+  it("moves guitar / violin paths saved before the fret-only step onto the same lesson and stage", () => {
+    const old = (step: number, stars: Record<number, number> = {}) => ({ step, speed: 0.6, wait: false, tries: 0, stars, part: 0 });
+    const p = sanitizePaths({
+      "guitar:new": old(3, { 0: 4, 1: 5, 2: 3 }),
+      "violin:some": old(2),
+      "piano:new": old(3),
+      "guitar:good": { ...old(4), v: PATH_LAYOUT },
+    });
+    // Old guitar "new": [right, both] per lesson; step 3 = lesson 1 "both" = step 5 of [right, left, both].
+    expect(p["guitar:new"]).toMatchObject({ step: 5, stars: { 0: 4, 2: 5, 3: 3 }, v: PATH_LAYOUT });
+    // Old "some": [both]; step 2 = lesson 2 "both" = step 5 of [right, both].
+    expect(p["violin:some"].step).toBe(5);
+    expect(p["piano:new"].step).toBe(3);
+    expect(p["guitar:good"].step).toBe(4);
+    expect(sanitizePaths(p)).toEqual(p);
   });
 });

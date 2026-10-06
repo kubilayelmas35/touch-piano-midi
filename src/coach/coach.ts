@@ -58,10 +58,10 @@ function applyStage(stage: Stage): void {
     setHand(stage);
     return;
   }
-  // Guitar / violin play the melody only; "right" = strike while the frets are pressed for you.
+  // Guitar / violin play the melody only; "right" = strike while the frets are pressed for you, "left" = fret while the strings are played.
   const ht = handTracks(song);
   if (ht) updateSession({ playTracks: [ht.right], mutedTracks: [] });
-  updateSettings({ autoFret: stage === "right", tapToPlay: false });
+  updateSettings({ autoFret: stage === "right", tapToPlay: stage === "left" });
 }
 
 /** Opens the current learning-path step with its hand, speed, wait mode and part of the song. */
