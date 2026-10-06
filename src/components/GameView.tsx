@@ -15,7 +15,7 @@ import { BLACK_KEY_RATIO, FretboardRenderer, KeyboardRenderer } from "../render/
 import { toast, useApp } from "../state/store";
 import { updateSettings } from "../state/actions";
 import { useT } from "../i18n";
-import { platform } from "../lib/platform";
+import { isNativeApp, platform } from "../lib/platform";
 import { Hud } from "./Hud";
 import { RecordingBar } from "./RecordingUI";
 import { EmptyState } from "./EmptyState";
@@ -24,11 +24,6 @@ import { KEY_STRIP_H, KeyStrip } from "./KeyStrip";
 const COMPACT_TIP_KEY = "sonatrio-compact-tip";
 const MIN_WHITE = 15;
 const MAX_WHITE = 46;
-/**
- * Phone apps: the instrument stops this far above the screen edge, so a finger sliding up off a key doesn't start
- * the system's home swipe (iOS and Android only let apps delay it, never block it).
- */
-const HOME_GAP = platform === "ios" ? 20 : platform === "android" ? 18 : 0;
 
 /** Touch force, or 0 when it means nothing: iPhones without 3D Touch report a small fixed value for a finger. */
 function pressureOf(e: React.PointerEvent): number {
@@ -76,7 +71,9 @@ export function GameView() {
   const hwRef = useRef<HTMLCanvasElement>(null);
   const instRef = useRef<HTMLCanvasElement>(null);
   const staffRef = useRef<HTMLCanvasElement>(null);
-  const [size, setSize] = useState({ w: 0, h: 0 });
+  const [box, setBox] = useState({ w: 0, h: 0 });
+  const edgeGap = useApp((s) => (isNativeApp && s.settings.edgeGap ? s.settings.edgeGapPx : 0));
+  const size = useMemo(() => ({ w: box.w, h: Math.max(0, box.h - edgeGap) }), [box, edgeGap]);
   const [notesRev, setNotesRev] = useState(0);
 
   // Re-layout when the player's notes change (song, tracks, hand, instrument).
@@ -95,7 +92,7 @@ export function GameView() {
     if (!el) return;
     const ro = new ResizeObserver(() => {
       const r = el.getBoundingClientRect();
-      setSize({ w: Math.floor(r.width), h: Math.max(0, Math.floor(r.height) - HOME_GAP) });
+      setBox({ w: Math.floor(r.width), h: Math.floor(r.height) });
     });
     ro.observe(el);
     return () => ro.disconnect();
@@ -468,7 +465,7 @@ export function GameView() {
           <KeyStrip piano={layout.piano} used={used} />
         </div>
       )}
-      <div className="absolute inset-x-0" style={{ height: instH, bottom: HOME_GAP }}>
+      <div className="absolute inset-x-0" style={{ height: instH, bottom: edgeGap }}>
         <canvas
           ref={instRef}
           role="application"

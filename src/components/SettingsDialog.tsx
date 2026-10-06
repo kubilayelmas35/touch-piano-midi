@@ -6,7 +6,7 @@ import { MicDevicePicker, MicSensitivity } from "./MicChip";
 import { startMidi } from "../input/midi";
 import { useFullscreen } from "../lib/fullscreen";
 import { updateSettings } from "../state/actions";
-import { INSTRUMENT_HEIGHT_RANGE, KEY_ZOOM_MAX, defaultSettings, hasKeyboard } from "../state/settings";
+import { EDGE_GAP_RANGE, INSTRUMENT_HEIGHT_RANGE, KEY_ZOOM_MAX, defaultSettings, hasKeyboard } from "../state/settings";
 import { openVideo, setPanel, useApp } from "../state/store";
 import { isNativeApp, platform } from "../lib/platform";
 import { IconChevronDown, IconCrown, IconMessage, IconMic, IconPlug, IconSparkles, IconVideo } from "../ui/icons";
@@ -548,6 +548,22 @@ export function SettingsDialog() {
               format={pct}
             />
             <Switch label={t("lockHeight")} hint={t("lockHeightHint")} checked={s.lockHeight} onChange={(v) => updateSettings({ lockHeight: v })} />
+            {isNativeApp && (
+              <>
+                <Switch label={t("edgeGap")} hint={t("edgeGapHint")} checked={s.edgeGap} onChange={(v) => updateSettings({ edgeGap: v })} />
+                {s.edgeGap && (
+                  <Slider
+                    label={t("edgeGapSize")}
+                    value={s.edgeGapPx}
+                    min={EDGE_GAP_RANGE[0]}
+                    max={EDGE_GAP_RANGE[1]}
+                    step={2}
+                    onChange={(v) => updateSettings({ edgeGapPx: v })}
+                    format={(v) => `${Math.round(v)} px`}
+                  />
+                )}
+              </>
+            )}
           </Section>
         )}
         {tab === "gameplay" && (

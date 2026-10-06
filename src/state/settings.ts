@@ -89,6 +89,12 @@ export interface Settings {
   instrumentHeight: number;
   /** Hides the drag handle so the panel can't be resized by accident while playing. */
   lockHeight: boolean;
+  /**
+   * Phone apps: the instrument stops `edgeGapPx` above the bottom edge, so a finger sliding up off a key doesn't
+   * start the system's home swipe (iOS and Android only let apps delay it, never block it).
+   */
+  edgeGap: boolean;
+  edgeGapPx: number;
   /** Piano width as a multiple of the screen (1–3); wider keys, the rest scrolls off screen. */
   keyZoom: number;
   /** Piano shows only the keys the song uses. */
@@ -129,6 +135,7 @@ export interface Settings {
 }
 
 export const INSTRUMENT_HEIGHT_RANGE: [number, number] = [0.16, 0.65];
+export const EDGE_GAP_RANGE: [number, number] = [4, 60];
 export const KEY_ZOOM_MAX = 3;
 
 const KEY = "staveflow-settings-v2";
@@ -188,6 +195,8 @@ export function defaultSettings(): Settings {
     duetSound: "auto",
     instrumentHeight: 0.3,
     lockHeight: false,
+    edgeGap: isNativeApp,
+    edgeGapPx: 20,
     keyZoom: 1,
     compactKeys: false,
     dailyGoalMin: 10,
@@ -301,6 +310,8 @@ function sanitize(s: Settings): Settings {
     columnPress: s.columnPress === true,
     instrumentHeight: num(s.instrumentHeight, ...INSTRUMENT_HEIGHT_RANGE, d.instrumentHeight),
     lockHeight: s.lockHeight === true,
+    edgeGap: typeof s.edgeGap === "boolean" ? s.edgeGap : d.edgeGap,
+    edgeGapPx: Math.round(num(s.edgeGapPx, ...EDGE_GAP_RANGE, d.edgeGapPx)),
     keyZoom: num(s.keyZoom, 1, KEY_ZOOM_MAX, d.keyZoom),
     compactKeys: s.compactKeys === true,
     dailyGoalMin: Math.round(num(s.dailyGoalMin, 5, 60, d.dailyGoalMin)),
