@@ -600,6 +600,14 @@ export function SettingsDialog() {
           </Section>
         )}
         {tab === "gameplay" && (
+          <Section title={t("neckView")}>
+            <Switch label={t("hideNut")} hint={t("hideNutHint")} checked={s.hideNut} onChange={(v) => updateSettings({ hideNut: v })} />
+            <Switch label={t("compactFrets")} hint={t("compactFretsHint")} checked={s.compactFrets} onChange={(v) => updateSettings({ compactFrets: v })} />
+            <Switch label={t("compactStrings")} hint={t("compactStringsHint")} checked={s.compactStrings} onChange={(v) => updateSettings({ compactStrings: v })} />
+            <Switch label={t("handFocus")} hint={t("handFocusHint")} checked={s.handFocus} onChange={(v) => updateSettings({ handFocus: v })} />
+          </Section>
+        )}
+        {tab === "gameplay" && (
           <Section title={t("glideSection")}>
             <p className="text-xs leading-relaxed text-mist-400">{t("glideIntro")}</p>
             <Switch label={t("glidePiano")} hint={t("glidePianoHint")} checked={s.glidePiano} onChange={(v) => setFretless({ glidePiano: v })} />

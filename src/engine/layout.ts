@@ -126,49 +126,126 @@ export class PianoLayout {
   }
 }
 
+export interface FretLayoutOptions {
+  /** Highest fret shown when `frets` isn't given (0 through it). */
+  lastFret?: number;
+  /** Exactly these frets, low → high, side by side (0 = the open string at the nut). */
+  frets?: number[];
+  /** Only these strings (0 = lowest), as equal rows; default all. */
+  strings?: number[];
+  /** Strike-zone width; the whole width leaves no neck, 0 no strike zone. */
+  pluckW?: number;
+}
+
 /**
- * Fretboard geometry: the neck (one uniform column per fret, fret 0 = open string at the nut) on the left
- * and the strike zone (where strings are plucked or bowed) on the right.
+ * Fretboard geometry: the neck (one uniform column per shown fret, fret 0 = open string at the nut) on the left
+ * and the strike zone (where strings are plucked or bowed) on the right; one row per shown string, highest on top.
  */
 export class FretLayout {
+  /** Frets shown, low → high. */
+  readonly frets: readonly number[];
+  /** Strings shown, low → high. */
+  readonly strings: readonly number[];
   readonly columns: number;
   readonly colW: number;
-  /** Highest fret shown; narrow screens show only the frets a song needs. */
+  /** Highest fret shown. */
   readonly lastFret: number;
   /** Width of the neck; the strike zone spans neckW..totalW. */
   readonly width: number;
   readonly pluckX: number;
   readonly pluckW: number;
+  private readonly colOf = new Map<number, number>();
+  private readonly rowIdx = new Map<number, number>();
 
   constructor(
     readonly spec: FrettedSpec,
     readonly totalW: number,
-    lastFret = spec.maxFret,
-    pluckW = 0
+    opts: FretLayoutOptions = {}
   ) {
-    this.pluckW = Math.max(0, Math.min(totalW * 0.5, pluckW));
+    this.pluckW = Math.max(0, Math.min(totalW, opts.pluckW ?? 0));
     this.width = totalW - this.pluckW;
     this.pluckX = this.width;
-    this.lastFret = Math.max(1, Math.min(spec.maxFret, Math.round(lastFret)));
-    this.columns = this.lastFret + 1;
+    const last = Math.max(1, Math.min(spec.maxFret, Math.round(opts.lastFret ?? spec.maxFret)));
+    const frets = opts.frets?.filter((f) => f >= 0 && f <= spec.maxFret) ?? [];
+    this.frets = frets.length ? [...new Set(frets)].sort((a, b) => a - b) : Array.from({ length: last + 1 }, (_, f) => f);
+    this.frets.forEach((f, i) => this.colOf.set(f, i));
+    this.lastFret = this.frets[this.frets.length - 1];
+    this.columns = this.frets.length;
     this.colW = this.width / this.columns;
+    const count = spec.tuning.length;
+    const strings = opts.strings?.filter((s) => s >= 0 && s < count) ?? [];
+    this.strings = strings.length ? [...new Set(strings)].sort((a, b) => a - b) : Array.from({ length: count }, (_, s) => s);
+    this.strings.forEach((s, i) => this.rowIdx.set(s, this.strings.length - 1 - i));
+  }
+
+  /** The open strings have their own column at the nut. */
+  get hasNut(): boolean {
+    return this.width > 0 && this.colOf.get(0) === 0;
+  }
+
+  get rows(): number {
+    return this.strings.length;
   }
 
   inPluckZone(x: number): boolean {
     return this.pluckW > 0 && x >= this.pluckX;
   }
 
-  column(fret: number): Lane {
-    return { x: fret * this.colW, w: this.colW, black: false };
+  /** A shown fret's column, null for a fret left out. */
+  column(fret: number): Lane | null {
+    const i = this.colOf.get(fret);
+    return i === undefined || !this.width ? null : { x: i * this.colW, w: this.colW, black: false };
   }
 
   fretAt(x: number): number {
-    return Math.max(0, Math.min(this.lastFret, Math.floor(x / this.colW)));
+    return this.frets[Math.max(0, Math.min(this.columns - 1, Math.floor(x / this.colW)))];
   }
 
-  /** Exact position in frets (column centres are whole frets), for fretless play. */
+  /** Exact position in frets (column centres are the shown frets, in between is a slide), for fretless play. */
   posAt(x: number): number {
-    return Math.max(0, Math.min(this.lastFret, x / this.colW - 0.5));
+    const c = Math.max(0, Math.min(this.columns - 1, x / this.colW - 0.5));
+    const i = Math.min(this.columns - 2, Math.floor(c));
+    if (i < 0) return this.frets[0];
+    return this.frets[i] + (c - i) * (this.frets[i + 1] - this.frets[i]);
+  }
+
+  /** x of a (fractional) fret position, the inverse of posAt; clamped to the shown frets. */
+  xOf(pos: number): number {
+    const f = this.frets;
+    if (pos <= f[0]) return this.colW / 2;
+    for (let i = 0; i < f.length - 1; i++) {
+      if (pos <= f[i + 1]) return (i + 0.5 + (pos - f[i]) / (f[i + 1] - f[i])) * this.colW;
+    }
+    return (f.length - 0.5) * this.colW;
+  }
+
+  /** Row (0 = top) of a shown string, -1 for one left out. */
+  rowOf(string: number): number {
+    return this.rowIdx.get(string) ?? -1;
+  }
+
+  /** String of the row at height `y` of a panel `h` tall. */
+  stringAt(y: number, h: number): number {
+    const row = Math.max(0, Math.min(this.rows - 1, Math.floor((y / h) * this.rows)));
+    return this.strings[this.rows - 1 - row];
+  }
+
+  /** Strings whose rows a band `y ± r` of a panel `h` tall touches. */
+  stringsIn(y: number, r: number, h: number): number[] {
+    const rowH = h / this.rows;
+    const out: number[] = [];
+    for (let row = 0; row < this.rows; row++) {
+      if (y + r >= row * rowH && y - r < (row + 1) * rowH) out.push(this.strings[this.rows - 1 - row]);
+    }
+    return out;
+  }
+
+  /** Strike-zone lane (above the zone, one per shown string, low → high left to right). */
+  stringLane(string: number): { x: number; w: number } | null {
+    const i = this.strings.indexOf(string);
+    if (i < 0 || this.pluckW <= 0) return null;
+    const sw = this.pluckW / this.rows;
+    return { x: this.pluckX + i * sw, w: sw };
   }
 }
 
@@ -181,4 +258,39 @@ export function pluckWidth(totalW: number): number {
 export function visibleFrets(spec: FrettedSpec, width: number, highestUsed: number): number {
   const comfortable = Math.floor(width / 52) - 1;
   return Math.min(spec.maxFret, Math.max(highestUsed + 1, comfortable, 5));
+}
+
+export interface FretViewOptions {
+  /** Frets the song's notes use. */
+  usedFrets: number[];
+  /** Strings the song's notes use. */
+  usedStrings: number[];
+  /** Leave out the open-string column (open notes still fall into the strike-zone lanes). */
+  hideNut: boolean;
+  /** Only the frets the song uses. */
+  compactFrets: boolean;
+  /** Only the strings the song uses. */
+  compactStrings: boolean;
+  /** Neck only (no strike zone) / strike zone only (no neck). */
+  part: "both" | "neck" | "strings";
+}
+
+/** The fretboard for a song and the view settings. */
+export function fretView(spec: FrettedSpec, totalW: number, o: FretViewOptions): FretLayout {
+  const pluckW = o.part === "neck" ? 0 : o.part === "strings" ? totalW : pluckWidth(totalW);
+  // Without a strike zone, open notes have nowhere else to fall, so the nut column stays.
+  const hideNut = o.hideNut && pluckW > 0;
+  const highest = o.usedFrets.reduce((m, f) => Math.max(m, f), 0);
+  let frets: number[] | undefined;
+  if (o.compactFrets && o.usedFrets.some((f) => f > 0)) frets = [...new Set(o.usedFrets)];
+  if (hideNut) {
+    frets ??= Array.from({ length: visibleFrets(spec, totalW - pluckW, highest) + 1 }, (_, f) => f);
+    frets = frets.filter((f) => f > 0);
+  }
+  return new FretLayout(spec, totalW, {
+    lastFret: visibleFrets(spec, totalW - pluckW, highest),
+    frets,
+    strings: o.compactStrings && o.usedStrings.length ? o.usedStrings : undefined,
+    pluckW,
+  });
 }

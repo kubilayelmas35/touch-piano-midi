@@ -207,7 +207,9 @@ export class Highway {
       this.backdrop = g.canvas;
     }
     const key = `${size}|${view.piano ? `p${view.piano.sig}:${view.hideFrets ? 1 : 0}` : ""}|${
-      view.fret ? `f${view.fret.columns}:${view.fret.pluckW}:${view.fret.spec.tuning.length}:${view.naming}:${view.hideFrets ? 1 : 0}` : ""
+      view.fret
+        ? `f${view.fret.frets.join(",")}:${view.fret.strings.join(",")}:${view.fret.pluckW}:${view.fret.spec.tuning.length}:${view.naming}:${view.hideFrets ? 1 : 0}`
+        : ""
     }`;
     if (key === this.lanesKey && this.lanes) return;
     this.lanesKey = key;
@@ -231,35 +233,40 @@ export class Highway {
       }
     } else if (view.fret) {
       const f = view.fret;
-      for (let i = 0; i <= f.columns; i++) {
-        if (view.hideFrets && i > 1 && i < f.columns) continue;
-        g.fillStyle = i === 1 ? "rgba(255,255,255,0.16)" : COLORS.laneLine;
-        g.fillRect(Math.round(i * f.colW), 0, i === 1 ? 2 : 1, this.h);
-      }
-      for (const fret of view.hideFrets ? [] : [3, 5, 7, 9, 12, 15]) {
-        if (fret >= f.columns) continue;
-        g.fillStyle = COLORS.lane;
-        g.fillRect(fret * f.colW, 0, f.colW, this.h);
+      if (f.width > 0) {
+        for (let i = 0; i <= f.columns; i++) {
+          const nut = i === 1 && f.hasNut;
+          if (view.hideFrets && !nut && i > 0 && i < f.columns) continue;
+          const x = Math.round(i * f.colW);
+          g.fillStyle = nut ? "rgba(255,255,255,0.16)" : COLORS.laneLine;
+          g.fillRect(x, 0, nut ? 2 : 1, this.h);
+          // Frets left out between two columns: a double line.
+          if (i > 0 && i < f.columns && f.frets[i] - f.frets[i - 1] > 1 && !(i === 1 && f.frets[0] === 0)) g.fillRect(x + 3, 0, 1, this.h);
+        }
+        for (const fret of view.hideFrets ? [] : [3, 5, 7, 9, 12, 15]) {
+          const col = f.column(fret);
+          if (!col) continue;
+          g.fillStyle = COLORS.lane;
+          g.fillRect(col.x, 0, col.w, this.h);
+        }
       }
       // Above the strike zone: one thin lane per string, showing which strings to strike.
       if (f.pluckW > 0) {
-        const count = f.spec.tuning.length;
-        const colors = count === 4 ? VIOLIN_STRING_COLORS : GUITAR_STRING_COLORS;
+        const colors = f.spec.tuning.length === 4 ? VIOLIN_STRING_COLORS : GUITAR_STRING_COLORS;
         g.fillStyle = "rgba(0,0,0,0.28)";
         g.fillRect(f.pluckX, 0, f.pluckW, this.h);
         g.fillStyle = "rgba(255,255,255,0.1)";
         g.fillRect(f.pluckX, 0, 2, this.h);
-        const sw = f.pluckW / count;
         g.textAlign = "center";
         g.textBaseline = "bottom";
         g.font = "800 11px system-ui, sans-serif";
-        for (let s = 0; s < count; s++) {
-          const x = f.pluckX + s * sw;
+        for (const s of f.strings) {
+          const lane = f.stringLane(s)!;
           g.fillStyle = withAlpha(colors[s], 0.05);
-          g.fillRect(x + 1, 0, sw - 2, this.h);
+          g.fillRect(lane.x + 1, 0, lane.w - 2, this.h);
           g.fillStyle = withAlpha(colors[s], 0.7);
           const name = view.naming === "solfege" ? noteName(f.spec.tuning[s], "solfege") : f.spec.labels[s];
-          g.fillText(name, x + sw / 2, this.h - 8);
+          g.fillText(name, lane.x + lane.w / 2, this.h - 8);
         }
       }
     }
@@ -268,11 +275,10 @@ export class Highway {
 
   /** Thin lane above the strike zone for a note's string. */
   private stringLaneOf(n: { string: number }, view: HighwayView): { x: number; w: number } | null {
-    const f = view.fret;
-    if (!f || f.pluckW <= 0 || n.string < 0) return null;
-    const sw = f.pluckW / f.spec.tuning.length;
-    const pad = Math.max(2, sw * 0.18);
-    return { x: f.pluckX + n.string * sw + pad, w: sw - pad * 2 };
+    const lane = view.fret && n.string >= 0 ? view.fret.stringLane(n.string) : null;
+    if (!lane) return null;
+    const pad = Math.max(2, Math.min(lane.w * 0.18, 14));
+    return { x: lane.x + pad, w: lane.w - pad * 2 };
   }
 
   /** Hand/track or string colour, before the colour palette is applied. */
@@ -347,8 +353,8 @@ export class Highway {
 
   private laneOf(n: PlayNote, view: HighwayView, slot?: [number, number]): { x: number; w: number } | null {
     if (view.fret) {
-      if (n.fret < 0) return null;
-      const col = view.fret.column(n.fret);
+      const col = n.fret < 0 ? null : view.fret.column(n.fret);
+      if (!col) return null;
       const pad = Math.min(6, col.w * 0.12);
       if (slot && slot[1] > 1) {
         const inner = col.w - pad * 2;
@@ -448,7 +454,10 @@ export class Highway {
     const holdingLanes: SprayLane[] = [];
     for (let i = i0; i < i1; i++) {
       const n = notes[i];
-      const lane = this.laneOf(n, view, slots?.get(n.id));
+      const col = this.laneOf(n, view, slots?.get(n.id));
+      // A note with no fret column shown (open string at a hidden nut, or no neck) falls only in its string lane.
+      const sl = this.stringLaneOf(n, view);
+      const lane = col ?? sl;
       if (!lane) continue;
       const sounding = n.time <= t && t < n.time + n.duration;
       const isLong = n.holdSrc !== null || n.duration * pps > Math.max(36, lane.w * 1.4);
@@ -498,8 +507,7 @@ export class Highway {
       if (holdingNow) holdingLanes.push({ x: lane.x, w: lane.w, top: Math.max(0, yTop), color: fill });
 
       // Matching marker in the string lane above the strike zone, in the same style.
-      const sl = this.stringLaneOf(n, view);
-      if (sl) {
+      if (sl && col) {
         drawNote(ctx, view.noteStyle, { ...draw, lane: sl, alpha: alpha * (brokenHold ? 0.6 : 1), target: false });
         if (holdingNow) holdingLanes.push({ x: sl.x, w: sl.w, top: Math.max(0, yTop), color: fill });
       }
@@ -706,9 +714,8 @@ export class Highway {
 
   private fxLane(fx: { midi: number; string: number; fret: number }, view: HighwayView): { x: number; w: number } | null {
     if (view.fret) {
-      if (fx.fret < 0) return null;
-      const col = view.fret.column(fx.fret);
-      return { x: col.x, w: col.w };
+      const col = fx.fret < 0 ? null : view.fret.column(fx.fret);
+      return col ? { x: col.x, w: col.w } : null;
     }
     const lane = view.piano?.lane(fx.midi);
     return lane ? { x: lane.x, w: lane.w } : null;
@@ -875,11 +882,13 @@ export class Highway {
     const list = this.engine.fx;
     for (const fx of list) {
       if (fx.at <= this.lastFxAt) continue;
-      const lane = this.fxLane(fx, view);
+      const col = this.fxLane(fx, view);
+      const strLane = this.stringLaneOf(fx, view);
+      const lane = col ?? strLane;
       if (!lane) continue;
       const x = lane.x + lane.w / 2;
       const color = JUDGEMENT_COLORS[fx.judgement] ?? "#ffffff";
-      const sl = this.stringLaneOf(fx, view);
+      const sl = col ? strLane : null;
       if (fx.judgement !== "wrong" && !fx.auto) {
         // Guitar / violin: shown over the fret and over the struck string, so each hand sees how it did.
         for (const px of sl ? [x, sl.x + sl.w / 2] : [x]) {

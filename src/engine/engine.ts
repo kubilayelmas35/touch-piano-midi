@@ -654,6 +654,12 @@ export class Engine {
     this.resetScheduling(t);
   }
 
+  /** Moves the running song clock by `sec` real seconds, keeping every judgement (live duet clock alignment). */
+  shiftClock(sec: number): void {
+    if (this.status !== "playing" || !sec) return;
+    this.seekInternalKeepNotes(Math.max(this.startTime, Math.min(this.endTime, this.time + sec * this.config.speed)));
+  }
+
   setLoop(loop: EngineConfig["loop"]): void {
     this.config = { ...this.config, loop: { ...loop } };
     this.emit();

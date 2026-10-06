@@ -333,6 +333,11 @@ export function DuetHud() {
           >
             {sound === "off" ? <IconSpeakerOff size={15} /> : <IconSpeaker size={15} />}
             {sound === "live" && <span className="font-bold">{t("duetSoundLive")}</span>}
+            {sound === "live" && room.lag !== null && (
+              <span className="tabular-nums text-fuchsia-200">
+                {t("duetLag", { s: room.lag.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) })}
+              </span>
+            )}
           </button>
         </div>
       ) : (

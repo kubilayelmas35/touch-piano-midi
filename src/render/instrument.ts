@@ -317,16 +317,6 @@ export interface FretboardView {
 }
 
 export class FretboardRenderer extends CanvasSurface {
-  /** Row index (0 = top) for a string (0 = lowest pitch). Highest string is drawn on top. */
-  rowOf(string: number, count: number): number {
-    return count - 1 - string;
-  }
-
-  stringAt(y: number, count: number): number {
-    const row = Math.max(0, Math.min(count - 1, Math.floor((y / this.h) * count)));
-    return count - 1 - row;
-  }
-
   /** Auto-play: strings the song is sounding right now (string → fret and 0–1 energy). */
   private autoStrings(t: number, violin: boolean): Map<number, { fret: number; e: number; start: number }> {
     const out = new Map<number, { fret: number; e: number; start: number }>();
@@ -357,9 +347,11 @@ export class FretboardRenderer extends CanvasSurface {
     if (!w || !h) return;
     const L = view.layout;
     const spec = L.spec;
-    const count = spec.tuning.length;
+    const total = spec.tuning.length;
+    const count = L.rows;
     const rowH = h / count;
     const neckW = L.width;
+    const nutX = L.hasNut ? L.colW : 0;
     const marks = collectMarks(this.engine, view.t);
     const auto = this.autoStrings(view.t, view.violin);
     let fingers = view.fingers;
@@ -387,24 +379,26 @@ export class FretboardRenderer extends CanvasSurface {
     ctx.fillStyle = wood;
     ctx.fillRect(0, 0, neckW, h);
     ctx.fillStyle = "rgba(0,0,0,0.35)";
-    ctx.fillRect(0, 0, L.colW, h);
+    ctx.fillRect(0, 0, nutX, h);
 
     // Inlays / position markers.
     const bare = !!view.hideFrets;
     const inlays = bare ? [] : view.violin ? [2, 4, 5, 7, 9, 12] : [3, 5, 7, 9, 15];
     for (const f of inlays) {
-      if (f >= L.columns) continue;
-      const cx = f * L.colW + L.colW / 2;
+      const col = L.column(f);
+      if (!col) continue;
+      const cx = col.x + col.w / 2;
       ctx.fillStyle = view.violin ? "rgba(255,255,255,0.05)" : "rgba(235,225,205,0.22)";
-      if (view.violin) ctx.fillRect(f * L.colW, 0, L.colW, h);
+      if (view.violin) ctx.fillRect(col.x, 0, col.w, h);
       else {
         ctx.beginPath();
         ctx.arc(cx, h / 2, Math.min(7, L.colW * 0.16), 0, Math.PI * 2);
         ctx.fill();
       }
     }
-    if (!bare && !view.violin && 12 < L.columns) {
-      const cx = 12 * L.colW + L.colW / 2;
+    const col12 = L.column(12);
+    if (!bare && !view.violin && col12) {
+      const cx = col12.x + col12.w / 2;
       ctx.fillStyle = "rgba(235,225,205,0.22)";
       for (const y of [h * 0.3, h * 0.7]) {
         ctx.beginPath();
@@ -414,9 +408,9 @@ export class FretboardRenderer extends CanvasSurface {
     }
 
     // Frets + nut.
-    for (let f = 1; f <= L.columns; f++) {
-      const x = Math.round(f * L.colW);
-      if (f === 1) {
+    for (let i = 1; neckW > 0 && i <= L.columns; i++) {
+      const x = Math.round(i * L.colW);
+      if (i === 1 && L.hasNut) {
         ctx.fillStyle = "#e8e0cc";
         ctx.fillRect(x - 2, 0, 4, h);
       } else if (bare) {
@@ -424,6 +418,8 @@ export class FretboardRenderer extends CanvasSurface {
       } else if (!view.violin) {
         ctx.fillStyle = "rgba(200,200,215,0.55)";
         ctx.fillRect(x - 1, 0, 2, h);
+        // Frets left out in between: a double wire.
+        if (i < L.columns && L.frets[i] - L.frets[i - 1] > 1) ctx.fillRect(x + 3, 0, 2, h);
       } else {
         ctx.fillStyle = "rgba(255,255,255,0.05)";
         ctx.fillRect(x, 0, 1, h);
@@ -432,9 +428,10 @@ export class FretboardRenderer extends CanvasSurface {
 
     // Fret numbers, plus the fret key when it differs from the number.
     ctx.textBaseline = "top";
-    for (let f = 1; f < (bare ? 0 : L.columns); f++) {
-      if (L.colW < 22 && f % 2 === 0 && f !== 12) continue;
-      const cx = f * L.colW + L.colW / 2;
+    for (let i = 0; i < (bare || neckW <= 0 ? 0 : L.columns); i++) {
+      const f = L.frets[i];
+      if (f === 0 || (L.colW < 22 && f % 2 === 0 && f !== 12)) continue;
+      const cx = i * L.colW + L.colW / 2;
       ctx.font = "600 9px system-ui, sans-serif";
       ctx.fillStyle = "rgba(255,255,255,0.35)";
       ctx.fillText(String(f), cx, 2);
@@ -490,8 +487,8 @@ export class FretboardRenderer extends CanvasSurface {
       // Strings to strike now, and strings just struck.
       const targetStrings = new Map<number, string>();
       for (const [pos, c] of marks.targetPos) targetStrings.set(Number(pos.split(":")[0]), c);
-      for (let s = 0; s < count; s++) {
-        const top = this.rowOf(s, count) * rowH;
+      for (const s of L.strings) {
+        const top = L.rowOf(s) * rowH;
         const e = this.energy(view, s, auto);
         const target = targetStrings.get(s);
         if (target) {
@@ -511,17 +508,17 @@ export class FretboardRenderer extends CanvasSurface {
     }
 
     // Strings; the part between the finger and the bridge vibrates after a strike.
-    for (let s = 0; s < count; s++) {
-      const y = this.rowOf(s, count) * rowH + rowH / 2;
-      const thick = view.violin ? 1.2 + (count - 1 - s) * 0.45 : 1 + (count - 1 - s) * 0.5;
+    for (const s of L.strings) {
+      const y = L.rowOf(s) * rowH + rowH / 2;
+      const thick = view.violin ? 1.2 + (total - 1 - s) * 0.45 : 1 + (total - 1 - s) * 0.5;
       const e = this.energy(view, s, auto);
       const finger = fingers.get(s) ?? 0;
-      const xv = finger > 0 ? Math.min(neckW, (finger + 1) * L.colW) : L.colW;
+      const xv = finger > 0 ? Math.min(neckW, L.xOf(finger) + L.colW / 2) : nutX;
       // Each string in its own colour (the one its notes fall in); full strength while it sounds.
       const rest = withAlpha(colors[s], 0.85);
       const color = e > 0.03 ? colors[s] : rest;
       ctx.fillStyle = rest;
-      if (xv > L.colW) ctx.fillRect(L.colW, y - thick / 2, xv - L.colW, thick);
+      if (xv > nutX) ctx.fillRect(nutX, y - thick / 2, xv - nutX, thick);
       if (e > 0.008) {
         const amp = e * rowH * 0.16;
         const phase = Math.sin(now * (view.violin ? 0.11 : 0.09) + s * 1.7);
@@ -548,7 +545,8 @@ export class FretboardRenderer extends CanvasSurface {
       const name = view.naming === "solfege" ? noteName(spec.tuning[s], "solfege") : spec.labels[s];
       ctx.font = `800 ${Math.max(10, Math.min(15, rowH * 0.5))}px system-ui, sans-serif`;
       ctx.fillStyle = colors[s];
-      ctx.fillText(name, L.colW / 2, y);
+      // Without a nut column the name moves into the strike zone, past the bridge.
+      ctx.fillText(name, L.hasNut ? L.colW / 2 : pw > 0 ? px + 26 : 12, y);
       if (pw > 0) {
         const key = view.keyLabels?.strings[s];
         if (key && rowH >= 18) {
@@ -571,9 +569,10 @@ export class FretboardRenderer extends CanvasSurface {
     // Markers.
     const radius = Math.max(7, Math.min(rowH * 0.36, L.colW * 0.34));
     const drawDot = (s: number, f: number, fill: string, ring: string | null, glow: boolean, text: string) => {
-      if (f >= L.columns) return;
-      const cx = f * L.colW + L.colW / 2;
-      const cy = this.rowOf(s, count) * rowH + rowH / 2;
+      const row = L.rowOf(s);
+      if (neckW <= 0 || row < 0 || f < L.frets[0] - 0.5 || f > L.lastFret + 0.5) return;
+      const cx = L.xOf(f);
+      const cy = row * rowH + rowH / 2;
       if (glow) {
         ctx.globalCompositeOperation = "lighter";
         ctx.drawImage(glowSprite(fill, 64), cx - radius * 2.2, cy - radius * 2.2, radius * 4.4, radius * 4.4);

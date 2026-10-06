@@ -33,6 +33,8 @@ export interface DuetRoom {
   startAt: number | null;
   /** Guest: loading the song and syncing clocks. */
   preparing: boolean;
+  /** Measured one-way delay (s) between the two devices while playing together. */
+  lag: number | null;
 }
 
 export const DUET_SPEEDS = [0.5, 0.75, 1];
@@ -43,6 +45,10 @@ const LIVE_EVERY_MS = 500;
 const NOTES_EVERY_MS = 25;
 /** Partner notes sound this long after their song time, so network jitter doesn't shake their rhythm. */
 const NOTES_BUFFER_SEC = 0.12;
+/** Clock messages kept for the lateness estimate; the quickest of them is the least delayed by the network. */
+const CLOCK_SAMPLES = 6;
+/** The guest moves its song clock once the two song clocks differ by more than this (s). */
+const CLOCK_TOLERANCE = 0.03;
 
 const clientId = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 let channel: RealtimeChannel | null = null;
@@ -64,6 +70,14 @@ let partnerListens = false;
 let outbox: number[][] = [];
 let flushTimer = 0;
 const keyIds = new Map<string, number>();
+/** How late (s) the partner's recent clock messages arrived on my song clock: network delay plus clock mismatch. */
+let lateness: number[] = [];
+/** The partner's lateness figure for my clock messages, for the current alignment round. */
+let partnerLate: number | null = null;
+/** Alignment round, bumped by the guest each time it moves its clock; figures from older rounds no longer apply. */
+let epoch = 0;
+/** One-way network delay (s) between the two devices, once measured. */
+let netLag: number | null = null;
 
 const room = () => useApp.getState().duet;
 const myName = () => useApp.getState().account.username;
@@ -110,8 +124,63 @@ function receiveNotes(p: Record<string, unknown>): void {
     if (!Array.isArray(e) || e.length !== 4 || !e.every((v) => typeof v === "number" && Number.isFinite(v))) continue;
     const [id, midi, velocity, t] = e as number[];
     const on = midi >= 21 && midi <= 108;
-    engine.remoteNote(`duet:${id}`, on ? Math.round(midi) : null, Math.min(1, Math.max(0.05, velocity)), t, NOTES_BUFFER_SEC);
+    engine.remoteNote(`duet:${id}`, on ? Math.round(midi) : null, Math.min(1, Math.max(0.05, velocity)), t, noteBuffer());
   }
+}
+
+/** Just enough delay for the partner's notes to arrive in time, so they keep their rhythm without lagging more. */
+function noteBuffer(): number {
+  return netLag === null ? NOTES_BUFFER_SEC : Math.min(0.4, Math.max(0.06, netLag + 0.04));
+}
+
+function myLateness(): number | null {
+  return lateness.length >= 3 ? Math.min(...lateness) : null;
+}
+
+function sendClock(): void {
+  send("clk", { t: Math.round(engine.time * 1000) / 1000, late: myLateness(), e: epoch });
+}
+
+/**
+ * Both devices send their song time; each measures how late the other's arrive. The guest's lag minus the host's
+ * is twice the gap between their song clocks (the network delay cancels out), which the guest then closes.
+ */
+function receiveClock(p: Record<string, unknown>): void {
+  const r = room();
+  if (!r || !together || engine.status !== "playing" || typeof p.t !== "number" || !Number.isFinite(p.t)) return;
+  const e = typeof p.e === "number" ? p.e : 0;
+  if (r.role === "host") {
+    if (e < epoch) return;
+    if (e > epoch) {
+      epoch = e;
+      lateness = [];
+      partnerLate = null;
+    }
+  }
+  lateness.push((engine.time - p.t) / engine.config.speed);
+  if (lateness.length > CLOCK_SAMPLES) lateness.shift();
+  if (e === epoch && typeof p.late === "number" && Number.isFinite(p.late)) partnerLate = p.late;
+  const mine = myLateness();
+  if (mine === null || partnerLate === null) return;
+  const lag = Math.max(0, (mine + partnerLate) / 2);
+  if (netLag === null || Math.abs(lag - netLag) > 0.01) {
+    netLag = lag;
+    patch({ lag: Math.round(lag * 100) / 100 });
+  }
+  if (r.role !== "guest") return;
+  const behind = (partnerLate - mine) / 2;
+  if (Math.abs(behind) <= CLOCK_TOLERANCE) return;
+  engine.shiftClock(behind);
+  epoch++;
+  lateness = [];
+  partnerLate = null;
+}
+
+function resetClockSync(): void {
+  lateness = [];
+  partnerLate = null;
+  epoch = 0;
+  netLag = null;
 }
 
 export function duetAvailable(): boolean {
@@ -163,6 +232,7 @@ export function hostDuet(): DuetRoom | null {
     live: null,
     startAt: null,
     preparing: false,
+    lag: null,
   };
   useApp.setState({ duet: r, panel: "duet" });
   applySession();
@@ -193,6 +263,7 @@ export function joinDuet(input: string): boolean {
     live: null,
     startAt: null,
     preparing: false,
+    lag: null,
   };
   useApp.setState({ duet: r, panel: "duet" });
   connect(r);
@@ -328,6 +399,9 @@ function onMessage(event: string, p: Record<string, unknown>): void {
     case "notes":
       receiveNotes(p);
       break;
+    case "clk":
+      receiveClock(p);
+      break;
   }
 }
 
@@ -411,13 +485,15 @@ function begin(pos: number, at: number): void {
   partnerFinal = null;
   lastLive = "";
   keyIds.clear();
+  resetClockSync();
   sendSound();
-  useApp.setState({ results: null, panel: null, duet: { ...r, phase: "live", startAt: at, live: null } });
+  useApp.setState({ results: null, panel: null, duet: { ...r, phase: "live", startAt: at, live: null, lag: null } });
   engine.configure(engineConfig());
   void engine.startAt(pos, at);
   window.clearInterval(liveTimer);
   liveTimer = window.setInterval(() => {
     if (engine.status !== "playing") return;
+    sendClock();
     const s = engine.stats;
     const msg = { s: s.score, a: Math.round(accuracyOf(s) * 1000) / 1000, c: s.combo };
     const key = `${msg.s}|${msg.a}|${msg.c}`;

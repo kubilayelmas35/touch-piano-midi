@@ -78,6 +78,14 @@ export interface Settings {
   multiNote: boolean;
   /** Guitar/violin touch: a finger presses its whole fret column (barre). */
   columnPress: boolean;
+  /** Guitar/violin: no open-string column at the nut (open notes fall only into the strike-zone lanes). */
+  hideNut: boolean;
+  /** Guitar/violin: the neck shows only the frets the song uses. */
+  compactFrets: boolean;
+  /** Guitar/violin: only the strings the song uses. */
+  compactStrings: boolean;
+  /** Guitar/violin one-handed: right hand shows only the strike zone, left hand only the neck. */
+  handFocus: boolean;
   midiInput: string;
   /** Microphone listening: 0 only loud notes … 1 picks up quiet playing. */
   micSensitivity: number;
@@ -191,6 +199,10 @@ export function defaultSettings(): Settings {
     tapToPlay: false,
     multiNote: false,
     columnPress: false,
+    hideNut: false,
+    compactFrets: false,
+    compactStrings: false,
+    handFocus: false,
     midiInput: "all",
     micSensitivity: 0.5,
     micDevice: "",
@@ -311,6 +323,10 @@ function sanitize(s: Settings): Settings {
     tapToPlay: s.tapToPlay === true,
     multiNote: s.multiNote === true,
     columnPress: s.columnPress === true,
+    hideNut: s.hideNut === true,
+    compactFrets: s.compactFrets === true,
+    compactStrings: s.compactStrings === true,
+    handFocus: s.handFocus === true,
     instrumentHeight: num(s.instrumentHeight, ...INSTRUMENT_HEIGHT_RANGE, d.instrumentHeight),
     lockHeight: s.lockHeight === true,
     edgeGap: typeof s.edgeGap === "boolean" ? s.edgeGap : d.edgeGap,

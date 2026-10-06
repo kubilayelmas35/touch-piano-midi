@@ -179,7 +179,7 @@ describe("fretted string physics", () => {
     }
   });
 
-  it("keeps a violin string ringing when the finger leaves the fret, but damps a guitar string", () => {
+  it("keeps a plucked or bowed string ringing when the finger leaves the fret", () => {
     const afterLift = (instrument: "guitar" | "violin") => {
       fretted.reset();
       fake.engine.config.instrument = instrument;
@@ -192,7 +192,7 @@ describe("fretted string physics", () => {
       return fake.ringing.has(KEY);
     };
     expect(afterLift("violin")).toBe(true);
-    expect(afterLift("guitar")).toBe(false);
+    expect(afterLift("guitar")).toBe(true);
   });
 
   it("lets a violin string ring on after a strong bow stroke longer than after a gentle one", () => {

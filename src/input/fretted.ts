@@ -271,20 +271,15 @@ class FrettedController {
         engine.press(key, midiAt(spec, s, fret), this.violin ? 0.75 : 0.5, { string: s, fret });
         engine.setLevel(key, this.violin ? (this.energy[s] ?? 0.85) / 0.85 : this.energy[s] ?? 1);
       } else if (engine.isRinging(key)) {
-        if (this.violin) {
-          // Nothing bows a ringing violin string, so lifting or moving a finger neither damps nor re-sounds it.
-          this.sounding[s] = fret;
-        } else if (fret > before) {
+        if (!this.violin && fret > before) {
           // Hammer-on: the ringing string jumps to the new fret.
           this.sounding[s] = fret;
           engine.press(key, midiAt(spec, s, fret), 0.45, { string: s, fret });
           engine.release(key, true);
           engine.setLevel(key, this.energy[s] ?? 0.6);
         } else {
-          // Lifting the finger damps the string.
-          engine.mute(key);
+          // Lifting or moving the finger off a ringing string lets it ring out at its note.
           this.sounding[s] = fret;
-          this.struckAt[s] = -Infinity;
         }
       } else {
         this.sounding[s] = fret;
