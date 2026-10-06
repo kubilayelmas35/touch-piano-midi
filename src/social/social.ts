@@ -118,10 +118,15 @@ export function scoreable(songId: string | null): songId is string {
   return !!songId && isBuiltin(songId);
 }
 
+let overviewSeq = 0;
+
 export async function loadSocial(): Promise<SocialOverview | null> {
   if (!socialEnabled()) return null;
+  const seq = ++overviewSeq;
   useApp.setState({ socialLoading: true });
   const { data, error } = await supabase!.rpc("social_overview");
+  // A slower, older request (panel open, app back in focus) must not undo a block or unblock made since.
+  if (seq !== overviewSeq) return useApp.getState().social;
   useApp.setState({ socialLoading: false });
   if (error) {
     console.warn("[social] overview failed", error);
@@ -173,12 +178,28 @@ export async function reportUser(id: string, reason: ReportReason, details: stri
 
 export async function blockUser(id: string) {
   const r = await call<null>("block_user", { p_user: id });
+  const s = useApp.getState().social;
+  if (r.ok && s) {
+    const ref = [...s.incoming, ...s.outgoing, ...s.board].find((f) => f.id === id);
+    const others = <T extends { id: string }>(list: T[]) => list.filter((f) => f.id !== id);
+    useApp.setState({
+      social: {
+        ...s,
+        incoming: others(s.incoming),
+        outgoing: others(s.outgoing),
+        board: others(s.board),
+        blocked: ref ? [...others(s.blocked ?? []), { id, username: ref.username, avatar: ref.avatar }] : s.blocked,
+      },
+    });
+  }
   void loadSocial();
   return r;
 }
 
 export async function unblockUser(id: string) {
   const r = await call<null>("unblock_user", { p_user: id });
+  const s = useApp.getState().social;
+  if (r.ok && s) useApp.setState({ social: { ...s, blocked: (s.blocked ?? []).filter((f) => f.id !== id) } });
   void loadSocial();
   return r;
 }
