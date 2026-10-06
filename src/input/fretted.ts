@@ -190,7 +190,7 @@ class FrettedController {
         this.drive[s] = d;
       }
       // A string sounds while it is kept moving; the pauses where a back-and-forth turns around don't count as stopping.
-      const moving = now - (this.fedAt[s] ?? -Infinity) < 140;
+      const moving = held && now - (this.fedAt[s] ?? -Infinity) < 140;
       if (moving) {
         const target = violin ? Math.min(1, 0.45 + d) : Math.min(1, 0.6 + d * 0.5);
         if (target > e) e += (target - e) * (1 - Math.exp(-dt / (violin ? 0.08 : 0.15)));
@@ -210,10 +210,16 @@ class FrettedController {
     }
   }
 
-  /** Seconds a left-alone string takes to fade by 1/e: longer with the sustain setting, a harder pluck or a stronger bow. */
+  /**
+   * Seconds a left-alone string takes to fade by 1/e: longer with the sustain setting, a harder pluck or a stronger bow.
+   * Sustain at 0 damps the string at once.
+   */
   private ringTime(string: number, violin: boolean): number {
-    if (violin) return 0.45 * 4 ** this.sustain * (0.4 + 1.2 * (this.drive[string] ?? 0));
-    return 0.45 * 6 ** this.sustain * (0.7 + 0.6 * (this.hit[string] ?? 0.8));
+    const damp = Math.min(1, this.sustain / 0.25);
+    const t = violin
+      ? 0.45 * 4 ** this.sustain * (0.4 + 1.2 * (this.drive[string] ?? 0))
+      : 0.45 * 6 ** this.sustain * (0.7 + 0.6 * (this.hit[string] ?? 0.8));
+    return Math.max(0.03, t * damp);
   }
 
   /** Length of the bow stroke a held computer key or tap draws on violin, longer with the sustain setting. */

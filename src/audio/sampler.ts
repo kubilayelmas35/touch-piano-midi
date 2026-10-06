@@ -497,9 +497,9 @@ export function stopAllVoices(): void {
 /** Fade of a held piano key in dB a second; set from the sustain setting. */
 let holdFadeDb = sustainFadeDb(0.7);
 
-/** 0 short … 1 long → how fast a held piano key fades (dB a second; 0 = it never fades). */
+/** 0 none … 1 endless → how fast a held piano key fades (dB a second; 0 = it never fades). */
 export function sustainFadeDb(sustain: number): number {
-  return 3 * (1 - Math.max(0, Math.min(1, sustain))) ** 2;
+  return 40 * (1 - Math.max(0, Math.min(1, sustain))) ** 4;
 }
 
 export function setPianoSustain(sustain: number): void {

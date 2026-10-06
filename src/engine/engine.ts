@@ -66,8 +66,8 @@ export const DEFAULT_CONFIG: EngineConfig = {
   segmentEnd: 0,
 };
 
-/** Fade of a key let go with the piano pedal mode on (seconds to silence), from shortest to longest sustain. */
-const PEDAL_TAIL = [1.5, 7.5];
+/** Fade of a key let go with the piano pedal mode on at the longest sustain (seconds to silence); none at 0. */
+const PEDAL_TAIL = 7.5;
 /** A gliding note bends its sample at most this many semitones, then carries on from a sample nearer the pitch. */
 const GLIDE_RANGE = 6;
 /** Where the carried-on sample starts, past its attack (seconds). */
@@ -1044,7 +1044,7 @@ export class Engine {
   }
 
   private get pedalTail(): number {
-    return PEDAL_TAIL[0] + (PEDAL_TAIL[1] - PEDAL_TAIL[0]) * this.config.pianoSustain;
+    return PEDAL_TAIL * this.config.pianoSustain ** 0.75;
   }
 
   /** Sustain pedal from one source; the pedal is down while any source holds it. */

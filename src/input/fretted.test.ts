@@ -118,6 +118,19 @@ describe("fretted string physics", () => {
     expect(long).toBeGreaterThan(normal * 1.8);
   });
 
+  it("damps a string at once with the sustain setting at 0", () => {
+    fretted.sustain = 0;
+    fretted.strikeSync("p", [1], 1);
+    fretted.strikeEnd("p");
+    expect(ringSeconds()).toBeLessThan(0.25);
+    fake.engine.config.instrument = "violin";
+    fretted.reset();
+    fretted.strikeSync("p", [1], 1);
+    run(500, () => fretted.stroke("p", 1));
+    fretted.strikeEnd("p");
+    expect(ringSeconds()).toBeLessThan(0.25);
+  });
+
   it("rings longer after a harder pluck", () => {
     const ring = (velocity: number) => {
       fretted.reset();
