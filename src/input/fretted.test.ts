@@ -123,6 +123,22 @@ describe("fretted string physics", () => {
     expect(ring(1)).toBeGreaterThan(ring(0.45) * 1.2);
   });
 
+  it("keeps a violin string ringing when the finger leaves the fret, but damps a guitar string", () => {
+    const afterLift = (instrument: "guitar" | "violin") => {
+      fretted.reset();
+      fake.engine.config.instrument = instrument;
+      fretted.fretKeyDown("KeyQ", 3);
+      fretted.stringKeyDown("KeyA", 1);
+      run(300);
+      fretted.stringKeyUp("KeyA");
+      fretted.fretKeyUp("KeyQ");
+      run(200);
+      return fake.ringing.has(KEY);
+    };
+    expect(afterLift("violin")).toBe(true);
+    expect(afterLift("guitar")).toBe(false);
+  });
+
   it("lets a violin string ring on after a strong bow stroke longer than after a gentle one", () => {
     fake.engine.config.instrument = "violin";
     const ring = (speed: number) => {
