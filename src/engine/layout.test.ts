@@ -47,6 +47,13 @@ describe("fretView", () => {
     expect(L.pluckW).toBe(pluckWidth(1000));
   });
 
+  it("widens or narrows the strike zone with the setting, always leaving some neck", () => {
+    expect(pluckWidth(1000, 1)).toBe(240);
+    expect(fretView(GUITAR, 1000, { ...base, strikeZone: 2 }).pluckW).toBe(480);
+    expect(fretView(GUITAR, 1000, { ...base, strikeZone: 0.5 }).pluckW).toBe(120);
+    expect(pluckWidth(400, 3)).toBe(250);
+  });
+
   it("keeps the open-string column with no strike zone, where open notes would have nowhere to fall", () => {
     const L = fretView(GUITAR, 1000, { ...base, hideNut: true, part: "neck" });
     expect(L.hasNut).toBe(true);

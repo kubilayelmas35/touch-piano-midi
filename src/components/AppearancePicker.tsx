@@ -11,7 +11,7 @@ import {
   type NoteStyle,
 } from "../render/appearance";
 import { HAND_INK, STAFF_THEMES, type StaffStyle } from "../render/staffThemes";
-import type { FretSkin, PianoSkin } from "../render/instrumentSkins";
+import { pastelKey, type FretSkin, type PianoSkin } from "../render/instrumentSkins";
 import { GUITAR_STRING_COLORS, VIOLIN_STRING_COLORS, withAlpha } from "../render/theme";
 import { cx } from "../ui/primitives";
 
@@ -398,6 +398,7 @@ const DUST_PREVIEW: Record<DustStyle, string> = {
   plume:
     "radial-gradient(ellipse 22% 26% at 46% 30%, rgba(167,139,250,0.45), transparent 75%), radial-gradient(ellipse 26% 30% at 56% 55%, rgba(139,92,246,0.4), transparent 75%), radial-gradient(ellipse 30% 25% at 50% 85%, rgba(124,58,237,0.35), transparent 75%)",
   rays: "radial-gradient(ellipse 30% 20% at 50% 100%, rgba(196,181,253,0.35), transparent 75%)",
+  snow: "radial-gradient(ellipse 45% 50% at 50% 80%, rgba(226,232,255,0.16), transparent 75%)",
 };
 
 /** [angle from vertical (deg), length %, opacity] of the streaks drawn for the jet styles. */
@@ -411,6 +412,14 @@ export function DustSwatch({ style }: { style: DustStyle }) {
   return (
     <div className="absolute inset-0 bg-[#05030c]">
       <div className="absolute inset-0" style={{ background: DUST_PREVIEW[style] }} />
+      {style === "snow" &&
+        SCATTER.map(([left, top, size], i) => (
+          <span
+            key={i}
+            className="absolute rounded-full bg-white"
+            style={{ left: `${left}%`, top: `${top * 0.8}%`, width: size - 1, height: size - 1, opacity: 0.55 + (i % 3) * 0.15, boxShadow: "0 0 4px #e0e7ff" }}
+          />
+        ))}
       {style === "stardust" &&
         SCATTER.slice(0, 7).map(([left, top, size], i) => (
           <span key={i} className="absolute text-white" style={{ left: `${left}%`, top: `${top}%`, fontSize: size + 3, textShadow: "0 0 5px #c4b5fd" }}>
@@ -453,8 +462,12 @@ export function PianoSkinSwatch({ skin }: { skin: PianoSkin }) {
   return (
     <div className="absolute inset-0 flex gap-px px-px pt-1" style={{ background: skin.bg }}>
       {skin.felt && <div className="absolute inset-x-0 top-0 h-1" style={{ background: skin.felt }} />}
-      {Array.from({ length: 7 }, (_, i) => (
-        <div key={i} className="relative flex-1 rounded-b-[3px]" style={{ background: grad3(skin.white), ...edge(skin.edge) }}>
+      {[60, 62, 64, 65, 67, 69, 71].map((m) => (
+        <div
+          key={m}
+          className="relative flex-1 rounded-b-[3px]"
+          style={{ background: skin.pastel ? `linear-gradient(#fff, ${pastelKey(m)})` : grad3(skin.white), ...edge(skin.edge) }}
+        >
           {skin.gloss && <div className="absolute top-0.5 left-[18%] h-1/2 w-[22%] rounded-sm bg-white/30" />}
         </div>
       ))}
@@ -547,6 +560,25 @@ export function ApproachSwatch({ style }: { style: ApproachStyle }) {
       {style === "ring" && <div className="absolute bottom-0 left-1/2 h-3 w-10 -translate-x-1/2 rounded-[50%] border-2" style={{ borderColor: c }} />}
       {style === "keyglow" && (
         <div className="absolute inset-x-0 bottom-0 h-1/2" style={{ background: `radial-gradient(ellipse 22% 70% at 50% 100%, ${c}, transparent 80%)` }} />
+      )}
+      {style === "rails" &&
+        [40, 59].map((left) => <div key={left} className="absolute bottom-1 h-[56%] w-[2px]" style={{ left: `${left}%`, background: `linear-gradient(transparent, ${c})` }} />)}
+      {style === "dots" &&
+        [48, 62, 76].map((top, i) => (
+          <span key={top} className="absolute left-1/2 -translate-x-1/2 rounded-full" style={{ top: `${top}%`, width: 3 + i, height: 3 + i, background: c, opacity: 0.4 + i * 0.25 }} />
+        ))}
+      {style === "wave" && (
+        <svg viewBox="0 0 100 56" preserveAspectRatio="none" className="absolute inset-0 h-full w-full" aria-hidden="true">
+          <path d="M50 24 Q 44 30 50 36 T 50 48 T 50 55" fill="none" stroke={c} strokeWidth="1.6" opacity="0.85" />
+        </svg>
+      )}
+      {style === "target" && (
+        <svg viewBox="0 0 100 56" preserveAspectRatio="none" className="absolute inset-0 h-full w-full" aria-hidden="true">
+          <path d="M33 44 h-5 v5 M67 44 h5 v5 M33 55 h-5 v-5 M67 55 h5 v-5" fill="none" stroke={c} strokeWidth="1.6" />
+        </svg>
+      )}
+      {style === "shadow" && (
+        <div className="absolute bottom-0.5 left-1/2 h-2 w-9 -translate-x-1/2 rounded-[50%]" style={{ background: `radial-gradient(${c}, ${c}55 60%, transparent)` }} />
       )}
       <div className="absolute left-[40%] top-[22%] h-[22%] w-[20%] rounded-md" style={{ background: `linear-gradient(#bdf3ff, ${c})`, boxShadow: `0 0 8px ${c}` }} />
     </div>

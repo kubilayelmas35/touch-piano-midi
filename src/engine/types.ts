@@ -1,7 +1,7 @@
 import type { SongNote } from "../midi/song";
 
 export type InstrumentKind = "piano" | "guitar" | "violin";
-export type GuitarTone = "steel" | "nylon";
+export type GuitarTone = "steel" | "nylon" | "electric";
 export type Judgement = "perfect" | "great" | "good" | "miss";
 
 export const NoteState = {

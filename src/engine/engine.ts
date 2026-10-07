@@ -78,7 +78,7 @@ export function fretSpecFor(kind: EngineConfig["instrument"]): FrettedSpec | nul
 }
 
 export function instrumentIdFor(cfg: Pick<EngineConfig, "instrument" | "guitarTone">): InstrumentId {
-  if (cfg.instrument === "guitar") return cfg.guitarTone === "nylon" ? "guitar-nylon" : "guitar-steel";
+  if (cfg.instrument === "guitar") return cfg.guitarTone === "nylon" ? "guitar-nylon" : cfg.guitarTone === "electric" ? "guitar-electric" : "guitar-steel";
   return cfg.instrument === "violin" ? "violin" : "piano";
 }
 

@@ -26,7 +26,12 @@ export interface MidiFileSpec {
   tracks: MidiTrackSpec[];
 }
 
-export const PROGRAMS = { piano: 0, guitarNylon: 24, guitarSteel: 25, violin: 40 } as const;
+export const PROGRAMS = { piano: 0, guitarNylon: 24, guitarSteel: 25, guitarElectric: 29, violin: 40 } as const;
+
+/** General MIDI program for the guitar sound chosen in the settings. */
+export function guitarProgram(tone: "steel" | "nylon" | "electric"): number {
+  return tone === "nylon" ? PROGRAMS.guitarNylon : tone === "electric" ? PROGRAMS.guitarElectric : PROGRAMS.guitarSteel;
+}
 
 /** Writes a standard MIDI file (format 1); times stay in seconds through the tempo map. */
 export function writeMidi(spec: MidiFileSpec): ArrayBuffer {

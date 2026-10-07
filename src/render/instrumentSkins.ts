@@ -1,11 +1,13 @@
+import { hslHex } from "./theme";
+
 /** Looks for the on-screen instruments; the first of each list is the original design. */
-export const PIANO_SKINS = ["standard", "ebony", "ivory", "neon", "glass"] as const;
+export const PIANO_SKINS = ["standard", "ebony", "ivory", "neon", "glass", "retro", "gold", "pastel", "wood", "midnight"] as const;
 export type PianoSkinId = (typeof PIANO_SKINS)[number];
 
-export const GUITAR_SKINS = ["standard", "maple", "ebony", "electric", "neon"] as const;
+export const GUITAR_SKINS = ["standard", "maple", "ebony", "electric", "neon", "classical", "blue", "white", "jazz", "metal"] as const;
 export type GuitarSkinId = (typeof GUITAR_SKINS)[number];
 
-export const VIOLIN_SKINS = ["standard", "amber", "baroque", "white", "neon"] as const;
+export const VIOLIN_SKINS = ["standard", "amber", "baroque", "white", "neon", "antique", "cherry", "blonde", "blue", "gold"] as const;
 export type ViolinSkinId = (typeof VIOLIN_SKINS)[number];
 
 export interface PianoSkin {
@@ -24,6 +26,13 @@ export interface PianoSkin {
   gloss?: boolean;
   /** A felt strip along the top edge. */
   felt?: string;
+  /** White keys tinted a pastel colour per note name. */
+  pastel?: boolean;
+}
+
+/** Pastel tint of a white key (C, D, E … each its own hue). */
+export function pastelKey(midi: number): string {
+  return hslHex(((midi % 12) * 30 + 340) % 360, 0.75, 0.84);
 }
 
 export const PIANO_SKIN: Record<PianoSkinId, PianoSkin> = {
@@ -69,6 +78,48 @@ export const PIANO_SKIN: Record<PianoSkinId, PianoSkin> = {
     edge: "#eaf3ff",
     blackEdge: "#7fa6ff",
     gloss: true,
+  },
+  retro: {
+    bg: "#1b1714",
+    white: ["#ece6da", "#ddd5c4", "#c4baa5"],
+    black: ["#3a2f27", "#2b221c", "#1e1814"],
+    whiteInk: "#7c4a1e",
+    blackInk: "#f3d9b1",
+    felt: "#f97316",
+  },
+  gold: {
+    bg: "#0a0805",
+    white: ["#fffbeb", "#fdf1c7", "#e9d48f"],
+    black: ["#0b0906", "#17130b", "#241d10"],
+    whiteInk: "#7c5a10",
+    blackInk: "#facc15",
+    edge: "#c9a227",
+    blackEdge: "#facc15",
+  },
+  pastel: {
+    bg: "#120f1f",
+    white: ["#ffffff", "#f6f2ff", "#e6def8"],
+    black: ["#3b2f5c", "#2e2449", "#231b38"],
+    whiteInk: "#4c3d7a",
+    blackInk: "#ede9fe",
+    pastel: true,
+  },
+  wood: {
+    bg: "#2a170c",
+    white: ["#f1d7ad", "#e2c08c", "#c99d63"],
+    black: ["#3b2112", "#2c180c", "#1f1008"],
+    whiteInk: "#6b3f17",
+    blackInk: "#f1d7ad",
+    edge: "#a87a45",
+  },
+  midnight: {
+    bg: "#02040d",
+    white: ["#1e2a4a", "#16203a", "#0f172b"],
+    black: ["#05070f", "#0a0e1c", "#10162a"],
+    whiteInk: "#c7d2fe",
+    blackInk: "#94a3b8",
+    edge: "#94a3b8",
+    blackEdge: "#475569",
   },
 };
 
@@ -168,6 +219,70 @@ export const GUITAR_SKIN: Record<GuitarSkinId, FretSkin> = {
     zone: ["#0d0924", "#05030f"],
     detail: "rgba(232,121,249,0.5)",
   },
+  classical: {
+    ...GUITAR_BASE,
+    wood: ["#1c120c", "#28190f", "#160e09"],
+    fret: "#d8d4c8",
+    inlay: "#ebe1cd",
+    inlayAlpha: 0,
+    zone: ["#c9a466", "#e7cc92", "#dcbd7e"],
+    detail: "rgba(120,62,20,0.75)",
+    stringShadow: "rgba(70,40,10,0.45)",
+  },
+  blue: {
+    ...GUITAR_BASE,
+    wood: ["#1e130e", "#2c1c15", "#18100b"],
+    fret: "#e8ecf4",
+    fretAlpha: 0.85,
+    inlay: "#f2f2f2",
+    inlayAlpha: 0.32,
+    zone: ["#0b1d4a", "#1d4ed8", "#0f2c7a"],
+    body: "pickups",
+    detail: "#dbe4f5",
+  },
+  white: {
+    ...GUITAR_BASE,
+    wood: ["#d4b07c", "#e4c792", "#c39f69"],
+    nut: "#faf6ea",
+    fret: "#6e6a66",
+    fretAlpha: 0.8,
+    inlay: "#1a120a",
+    inlayAlpha: 0.7,
+    numbers: "rgba(70,45,20,0.65)",
+    accent: "rgba(91,33,182,0.85)",
+    zone: ["#d9d9de", "#f7f7f9", "#e4e4ea"],
+    body: "pickups",
+    detail: "#6b7280",
+    stringShadow: "rgba(30,30,40,0.45)",
+  },
+  jazz: {
+    ...GUITAR_BASE,
+    wood: ["#140c08", "#1f140e", "#100a06"],
+    fret: "#e6dcc8",
+    fretAlpha: 0.65,
+    inlay: "#f5ecd8",
+    inlayAlpha: 0.3,
+    inlayShape: "block",
+    zone: ["#1a0802", "#6b2a0a", "#c2741c"],
+    body: "bridge",
+    detail: "rgba(245,226,190,0.7)",
+    fholes: true,
+  },
+  metal: {
+    ...GUITAR_BASE,
+    wood: ["#050505", "#0e0e0e", "#040404"],
+    nut: "#d4d4d8",
+    fret: "#e5e7eb",
+    fretAlpha: 0.8,
+    inlay: "#ef4444",
+    inlayAlpha: 0.38,
+    inlayShape: "block",
+    numbers: "rgba(248,113,113,0.7)",
+    accent: "rgba(254,202,202,0.9)",
+    zone: ["#020202", "#141414", "#050505"],
+    body: "pickups",
+    detail: "#ef4444",
+  },
 };
 
 const VIOLIN_BASE = {
@@ -229,5 +344,47 @@ export const VIOLIN_SKIN: Record<ViolinSkinId, FretSkin> = {
     accent: "rgba(245,208,254,0.9)",
     zone: ["#140b2c", "#07041a"],
     detail: "#e879f9",
+  },
+  antique: {
+    ...VIOLIN_BASE,
+    wood: ["#0c0907", "#15100c", "#0a0705"],
+    zone: ["#5a3416", "#3a210e", "#1c1007"],
+    detail: "rgba(212,175,55,0.75)",
+    fholes: true,
+  },
+  cherry: {
+    ...VIOLIN_BASE,
+    wood: ["#15100e", "#211915", "#120d0b"],
+    zone: ["#dc2626", "#991b1b", "#4c0a0a"],
+    detail: "rgba(250,232,196,0.85)",
+    fholes: true,
+  },
+  blonde: {
+    ...VIOLIN_BASE,
+    wood: ["#15100e", "#211915", "#120d0b"],
+    zone: ["#f6dfae", "#dcb26a", "#a8752e"],
+    detail: "rgba(90,52,18,0.7)",
+    fholes: true,
+    stringShadow: "rgba(70,40,10,0.45)",
+  },
+  blue: {
+    ...VIOLIN_BASE,
+    wood: ["#0f0f12", "#1a1a1f", "#0c0c0f"],
+    nut: "#e0e7ff",
+    zone: ["#3b82f6", "#1d4ed8", "#0c2a6b"],
+    detail: "rgba(224,231,255,0.8)",
+  },
+  gold: {
+    ...VIOLIN_BASE,
+    wood: ["#0d0b08", "#17130e", "#0a0806"],
+    nut: "#facc15",
+    fret: "#facc15",
+    fretAlpha: 0.12,
+    inlay: "#facc15",
+    inlayAlpha: 0.05,
+    numbers: "rgba(250,204,21,0.6)",
+    zone: ["#fde68a", "#d4a017", "#7a5a0a"],
+    detail: "rgba(60,40,5,0.75)",
+    fholes: true,
   },
 };

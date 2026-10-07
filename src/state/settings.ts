@@ -2,6 +2,7 @@ import type { NoteNaming } from "../lib/notes";
 import type { GuitarTone, InstrumentKind } from "../engine/types";
 import { readLegacySettings } from "../storage/migrate";
 import { isNativeApp } from "../lib/platform";
+import { STRIKE_ZONE_RANGE } from "../engine/layout";
 import { STAFF_STYLES, type StaffStyle } from "../render/staffThemes";
 import {
   GUITAR_SKINS,
@@ -64,6 +65,9 @@ export interface Settings {
   pianoSkin: PianoSkinId;
   guitarSkin: GuitarSkinId;
   violinSkin: ViolinSkinId;
+  /** Strike-zone (pick / bow area) width relative to the automatic one; the neck gets the rest. */
+  strikeZoneGuitar: number;
+  strikeZoneViolin: number;
   noteStyle: NoteStyle;
   noteColor: NoteColor;
   /** The "one colour" palette's colour. */
@@ -201,6 +205,8 @@ export function defaultSettings(): Settings {
     pianoSkin: "standard",
     guitarSkin: "standard",
     violinSkin: "standard",
+    strikeZoneGuitar: 1,
+    strikeZoneViolin: 1,
     noteStyle: "gem",
     noteColor: "auto",
     solidColor: "#8b5cf6",
@@ -331,7 +337,7 @@ function sanitize(s: Settings): Settings {
     language: s.language === "tr" || s.language === "en" ? s.language : d.language,
     noteNaming: s.noteNaming === "solfege" ? "solfege" : "letters",
     instrument: ["piano", "guitar", "violin"].includes(s.instrument) ? s.instrument : "piano",
-    guitarTone: s.guitarTone === "nylon" ? "nylon" : "steel",
+    guitarTone: s.guitarTone === "nylon" || s.guitarTone === "electric" ? s.guitarTone : "steel",
     volume: num(s.volume, 0, 1, d.volume),
     reverb: num(s.reverb, 0, 0.6, d.reverb),
     accompVolume: num(s.accompVolume, 0, 1, d.accompVolume),
@@ -348,6 +354,8 @@ function sanitize(s: Settings): Settings {
     pianoSkin: oneOf(PIANO_SKINS, s.pianoSkin, d.pianoSkin),
     guitarSkin: oneOf(GUITAR_SKINS, s.guitarSkin, d.guitarSkin),
     violinSkin: oneOf(VIOLIN_SKINS, s.violinSkin, d.violinSkin),
+    strikeZoneGuitar: num(s.strikeZoneGuitar, ...STRIKE_ZONE_RANGE, d.strikeZoneGuitar),
+    strikeZoneViolin: num(s.strikeZoneViolin, ...STRIKE_ZONE_RANGE, d.strikeZoneViolin),
     noteColor: (s.noteColor as string) === "violet" ? "solid" : oneOf(NOTE_COLORS, s.noteColor, d.noteColor),
     solidColor: hex(s.solidColor, d.solidColor),
     gradFrom: hex(s.gradFrom, d.gradFrom),

@@ -249,9 +249,17 @@ export class FretLayout {
   }
 }
 
-/** Strike-zone width: wide enough for a thumb, never more than about a quarter of the board. */
-export function pluckWidth(totalW: number): number {
-  return Math.round(Math.max(92, Math.min(240, totalW * 0.24)));
+/** Range of the strike-zone size setting, as a multiple of the automatic width. */
+export const STRIKE_ZONE_RANGE: [number, number] = [0.5, 3];
+
+/**
+ * Strike-zone width: wide enough for a thumb, never more than about a quarter of the board; `scale` (the
+ * setting) widens or narrows it, always leaving room for some neck.
+ */
+export function pluckWidth(totalW: number, scale = 1): number {
+  const auto = Math.max(92, Math.min(240, totalW * 0.24));
+  if (scale === 1) return Math.round(auto);
+  return Math.round(Math.max(60, Math.min(totalW - 150, auto * scale)));
 }
 
 /** Frets to show: everything the song uses, padded to fill the width with comfortably wide columns. */
@@ -273,11 +281,13 @@ export interface FretViewOptions {
   compactStrings: boolean;
   /** Neck only (no strike zone) / strike zone only (no neck). */
   part: "both" | "neck" | "strings";
+  /** Strike-zone size relative to the automatic width (1). */
+  strikeZone?: number;
 }
 
 /** The fretboard for a song and the view settings. */
 export function fretView(spec: FrettedSpec, totalW: number, o: FretViewOptions): FretLayout {
-  const pluckW = o.part === "neck" ? 0 : o.part === "strings" ? totalW : pluckWidth(totalW);
+  const pluckW = o.part === "neck" ? 0 : o.part === "strings" ? totalW : pluckWidth(totalW, o.strikeZone);
   // Without a strike zone, open notes have nowhere else to fall, so the nut column stays.
   const hideNut = o.hideNut && pluckW > 0;
   const highest = o.usedFrets.reduce((m, f) => Math.max(m, f), 0);

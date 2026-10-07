@@ -1,4 +1,4 @@
-export type InstrumentId = "piano" | "guitar-steel" | "guitar-nylon" | "violin";
+export type InstrumentId = "piano" | "guitar-steel" | "guitar-nylon" | "guitar-electric" | "violin";
 
 export interface InstrumentDef {
   id: InstrumentId;
@@ -69,6 +69,17 @@ export const INSTRUMENTS: Record<InstrumentId, InstrumentDef> = {
     pluckSustain: { decay: 1.3 },
     maxRing: 6,
     velocityTone: true,
+  },
+  "guitar-electric": {
+    id: "guitar-electric",
+    notes: range(40, 88),
+    gain: 0.55,
+    attack: 0.002,
+    minRelease: 0.1,
+    sustained: false,
+    pluckSustain: { decay: 1.8 },
+    maxRing: 6,
+    velocityTone: false,
   },
   violin: {
     id: "violin",

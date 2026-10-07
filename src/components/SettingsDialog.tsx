@@ -7,6 +7,7 @@ import { startMidi } from "../input/midi";
 import { useFullscreen } from "../lib/fullscreen";
 import { updateSettings } from "../state/actions";
 import { EDGE_GAP_RANGE, INSTRUMENT_HEIGHT_RANGE, KEY_ZOOM_MAX, defaultSettings, hasKeyboard } from "../state/settings";
+import { STRIKE_ZONE_RANGE } from "../engine/layout";
 import { openVideo, setPanel, useApp } from "../state/store";
 import { isNativeApp, platform } from "../lib/platform";
 import { IconChevronDown, IconCrown, IconMessage, IconMic, IconPlug, IconSparkles, IconVideo } from "../ui/icons";
@@ -62,6 +63,13 @@ const STAFF_LABEL: Record<StaffStyle, DictKey> = {
   night: "staffNight",
   paper: "staffPaper",
   neon: "staffNeon",
+  chalk: "staffChalk",
+  blueprint: "staffBlueprint",
+  sepia: "staffSepia",
+  rose: "staffRose",
+  ocean: "staffOcean",
+  sunset: "staffSunset",
+  gold: "staffGold",
 };
 const BG_LABEL: Record<Background, DictKey> = {
   night: "bgNight",
@@ -114,6 +122,7 @@ const COLOR_LABEL: Record<NoteColor, DictKey> = {
   pastel: "ncPastel",
   gold: "ncGold",
   silver: "ncSilver",
+  forest: "ncForest",
 };
 const DUST_LABEL: Record<DustStyle, DictKey> = {
   smoke: "duSmoke",
@@ -125,6 +134,7 @@ const DUST_LABEL: Record<DustStyle, DictKey> = {
   fog: "duFog",
   embers: "duEmbers",
   stardust: "duStardust",
+  snow: "duSnow",
 };
 const APPROACH_LABEL: Record<ApproachStyle, DictKey> = {
   beam: "apBeam",
@@ -132,6 +142,11 @@ const APPROACH_LABEL: Record<ApproachStyle, DictKey> = {
   comet: "apComet",
   arrows: "apArrows",
   keyglow: "apKeyglow",
+  rails: "apRails",
+  dots: "apDots",
+  wave: "apWave",
+  target: "apTarget",
+  shadow: "apShadow",
 };
 const PIANO_SKIN_LABEL: Record<PianoSkinId, DictKey> = {
   standard: "skStandard",
@@ -139,6 +154,11 @@ const PIANO_SKIN_LABEL: Record<PianoSkinId, DictKey> = {
   ivory: "skIvory",
   neon: "skNeon",
   glass: "skGlass",
+  retro: "skRetro",
+  gold: "skGold",
+  pastel: "skPastel",
+  wood: "skWood",
+  midnight: "skMidnight",
 };
 const GUITAR_SKIN_LABEL: Record<GuitarSkinId, DictKey> = {
   standard: "skStandard",
@@ -146,6 +166,11 @@ const GUITAR_SKIN_LABEL: Record<GuitarSkinId, DictKey> = {
   ebony: "skEbony",
   electric: "skElectric",
   neon: "skNeon",
+  classical: "skClassical",
+  blue: "skBlueElectric",
+  white: "skWhite",
+  jazz: "skJazz",
+  metal: "skMetal",
 };
 const VIOLIN_SKIN_LABEL: Record<ViolinSkinId, DictKey> = {
   standard: "skStandard",
@@ -153,6 +178,11 @@ const VIOLIN_SKIN_LABEL: Record<ViolinSkinId, DictKey> = {
   baroque: "skBaroque",
   white: "skWhite",
   neon: "skNeon",
+  antique: "skAntique",
+  cherry: "skCherry",
+  blonde: "skBlonde",
+  blue: "skBlueElectric",
+  gold: "skGold",
 };
 
 type Tab = "general" | "look" | "sound" | "gameplay" | "input";
@@ -595,6 +625,7 @@ export function SettingsDialog() {
                 options={[
                   { value: "steel", label: t("guitarSteel") },
                   { value: "nylon", label: t("guitarNylon") },
+                  { value: "electric", label: t("guitarElectric") },
                 ]}
               />
             </Row>
@@ -681,6 +712,25 @@ export function SettingsDialog() {
             <Switch label={t("compactFrets")} hint={t("compactFretsHint")} checked={s.compactFrets} onChange={(v) => updateSettings({ compactFrets: v })} />
             <Switch label={t("compactStrings")} hint={t("compactStringsHint")} checked={s.compactStrings} onChange={(v) => updateSettings({ compactStrings: v })} />
             <Switch label={t("handFocus")} hint={t("handFocusHint")} checked={s.handFocus} onChange={(v) => updateSettings({ handFocus: v })} />
+            <Slider
+              label={t("strikeZoneGuitar")}
+              hint={t("strikeZoneHint")}
+              value={s.strikeZoneGuitar}
+              min={STRIKE_ZONE_RANGE[0]}
+              max={STRIKE_ZONE_RANGE[1]}
+              step={0.1}
+              onChange={(v) => updateSettings({ strikeZoneGuitar: v })}
+              format={pct}
+            />
+            <Slider
+              label={t("strikeZoneViolin")}
+              value={s.strikeZoneViolin}
+              min={STRIKE_ZONE_RANGE[0]}
+              max={STRIKE_ZONE_RANGE[1]}
+              step={0.1}
+              onChange={(v) => updateSettings({ strikeZoneViolin: v })}
+              format={pct}
+            />
           </Section>
         )}
         {tab === "gameplay" && (

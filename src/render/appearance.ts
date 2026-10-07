@@ -25,6 +25,7 @@ export const NOTE_COLORS = [
   "pastel",
   "gold",
   "silver",
+  "forest",
 ] as const;
 export type NoteColor = (typeof NOTE_COLORS)[number];
 
@@ -85,6 +86,8 @@ export function paletteColor(p: NoteColor, base: string, midi: number, black: bo
       return black ? "#d97706" : "#fbbf24";
     case "silver":
       return black ? "#94a3b8" : "#e2e8f0";
+    case "forest":
+      return mixHex("#d9f99d", "#059669", k);
     default:
       return base;
   }
@@ -94,11 +97,11 @@ export const EFFECT_STYLES = ["sparks", "stars", "fire", "glow", "notes", "confe
 export type EffectStyle = (typeof EFFECT_STYLES)[number];
 
 /** Clouds left floating behind the notes after hits and around held notes. */
-export const DUST_STYLES = ["smoke", "fountain", "plume", "rays", "sparkle", "nebula", "fog", "embers", "stardust"] as const;
+export const DUST_STYLES = ["smoke", "fountain", "plume", "rays", "sparkle", "nebula", "fog", "embers", "stardust", "snow"] as const;
 export type DustStyle = (typeof DUST_STYLES)[number];
 
 /** What happens in a note's lane while it falls towards its key. */
-export const APPROACH_STYLES = ["beam", "ring", "comet", "arrows", "keyglow"] as const;
+export const APPROACH_STYLES = ["beam", "ring", "comet", "arrows", "keyglow", "rails", "dots", "wave", "target", "shadow"] as const;
 export type ApproachStyle = (typeof APPROACH_STYLES)[number];
 
 export function oneOf<T extends string>(list: readonly T[], v: unknown, d: T): T {

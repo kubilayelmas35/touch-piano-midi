@@ -37,6 +37,12 @@ const INSTRUMENTS = [
       `https://gleitz.github.io/midi-js-soundfonts/MusyngKite/acoustic_guitar_nylon-mp3/${FLAT_NAMES[m % 12]}${octave(m)}.mp3`,
   },
   {
+    id: "guitar-electric",
+    notes: range(40, 88),
+    url: (m) =>
+      `https://gleitz.github.io/midi-js-soundfonts/MusyngKite/overdriven_guitar-mp3/${FLAT_NAMES[m % 12]}${octave(m)}.mp3`,
+  },
+  {
     id: "violin",
     notes: range(55, 100),
     url: (m) =>

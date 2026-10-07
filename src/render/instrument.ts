@@ -3,8 +3,8 @@ import type { FretLayout, PianoLayout } from "../engine/layout";
 import { NoteState, type PlayNote } from "../engine/types";
 import { HAND_SPLIT } from "../midi/song";
 import { isBlack, noteName, octaveOf, type NoteNaming } from "../lib/notes";
-import { GUITAR_SKIN, PIANO_SKIN, VIOLIN_SKIN, type FretSkin, type PianoSkin } from "./instrumentSkins";
-import { GUITAR_STRING_COLORS, TRACK_COLORS, VIOLIN_STRING_COLORS, glowSprite, roundRect, withAlpha } from "./theme";
+import { GUITAR_SKIN, PIANO_SKIN, VIOLIN_SKIN, pastelKey, type FretSkin, type PianoSkin } from "./instrumentSkins";
+import { GUITAR_STRING_COLORS, TRACK_COLORS, VIOLIN_STRING_COLORS, glowSprite, mixHex, roundRect, withAlpha } from "./theme";
 
 export const BLACK_KEY_RATIO = 0.62;
 
@@ -157,6 +157,11 @@ export class KeyboardRenderer extends CanvasSurface {
         const c = sound ?? "#a78bfa";
         grad.addColorStop(0, withAlpha(c, 0.75));
         grad.addColorStop(1, c);
+      } else if (k.pastel) {
+        const tint = pastelKey(m);
+        grad.addColorStop(0, mixHex(tint, "#ffffff", 0.45));
+        grad.addColorStop(0.85, tint);
+        grad.addColorStop(1, mixHex(tint, "#000000", 0.14));
       } else {
         grad.addColorStop(0, k.white[0]);
         grad.addColorStop(0.85, k.white[1]);

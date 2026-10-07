@@ -4,7 +4,7 @@ import { useT, type DictKey } from "../i18n";
 import { formatTime } from "../lib/notes";
 import { addUserMidi } from "../state/actions";
 import { setPanel, toast, useApp } from "../state/store";
-import { PROGRAMS, midiFileName, writeMidi } from "../studio/midiFile";
+import { PROGRAMS, guitarProgram, midiFileName, writeMidi } from "../studio/midiFile";
 import {
   LETTER_NAMES,
   SOLFEGE_NAMES,
@@ -259,7 +259,7 @@ function NotesTab() {
   };
 
   const program =
-    instrument === "piano" ? PROGRAMS.piano : instrument === "violin" ? PROGRAMS.violin : guitarTone === "nylon" ? PROGRAMS.guitarNylon : PROGRAMS.guitarSteel;
+    instrument === "piano" ? PROGRAMS.piano : instrument === "violin" ? PROGRAMS.violin : guitarProgram(guitarTone);
   const build = () => {
     const title = n.title.trim() || t("notesTitleDefault");
     const spec = notationToMidi({

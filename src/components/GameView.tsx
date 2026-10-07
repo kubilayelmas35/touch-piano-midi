@@ -73,6 +73,8 @@ export function GameView() {
   const hideNut = useApp((s) => s.settings.hideNut);
   const compactFrets = useApp((s) => s.settings.compactFrets);
   const compactStrings = useApp((s) => s.settings.compactStrings);
+  const strikeZoneGuitar = useApp((s) => s.settings.strikeZoneGuitar);
+  const strikeZoneViolin = useApp((s) => s.settings.strikeZoneViolin);
   const neckPart = useApp((s) => {
     const { handFocus, autoFret, tapToPlay } = s.settings;
     if (!handFocus || autoFret === tapToPlay) return "both";
@@ -156,10 +158,11 @@ export function GameView() {
       compactFrets,
       compactStrings,
       part: neckPart,
+      strikeZone: instrument === "violin" ? strikeZoneViolin : strikeZoneGuitar,
     });
     return { piano: null, fret };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [size.w, instrument, notesRev, fretSpec, range, keyZoom, keyPan, only, hideNut, compactFrets, compactStrings, neckPart]);
+  }, [size.w, instrument, notesRev, fretSpec, range, keyZoom, keyPan, only, hideNut, compactFrets, compactStrings, neckPart, strikeZoneGuitar, strikeZoneViolin]);
 
   useEffect(() => {
     fretted.reset();

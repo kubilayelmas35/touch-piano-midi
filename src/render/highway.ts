@@ -667,6 +667,67 @@ export class Highway {
         ctx.globalAlpha = 1;
         ctx.fillStyle = withAlpha(color, 0.25 + 0.65 * p);
         ctx.fillRect(lane.x, hitY - 4, lane.w, 3);
+      } else if (back && style === "rails") {
+        const g = ctx.createLinearGradient(0, y, 0, hitY);
+        g.addColorStop(0, withAlpha(color, 0));
+        g.addColorStop(1, withAlpha(color, 0.25 + 0.6 * p));
+        ctx.fillStyle = g;
+        ctx.fillRect(lane.x + 1, y, 2, hitY - y);
+        ctx.fillRect(lane.x + lane.w - 3, y, 2, hitY - y);
+      } else if (back && style === "dots") {
+        const gap = 13;
+        const off = (now * 0.09) % gap;
+        for (let yy = y + 8 + off; yy < hitY - 3; yy += gap) {
+          const k = (yy - y) / Math.max(1, hitY - y);
+          ctx.fillStyle = withAlpha(color, (0.2 + 0.6 * p) * k);
+          ctx.beginPath();
+          ctx.arc(cx, yy, 1.4 + 2 * k, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      } else if (back && style === "wave") {
+        const amp = Math.min(lane.w * 0.32, 12);
+        ctx.beginPath();
+        for (let yy = y + 4; yy <= hitY; yy += 4) {
+          const xx = cx + Math.sin(yy * 0.07 - now * 0.008) * amp * ((yy - y) / Math.max(1, hitY - y));
+          if (yy === y + 4) ctx.moveTo(xx, yy);
+          else ctx.lineTo(xx, yy);
+        }
+        ctx.strokeStyle = withAlpha(color, 0.2 + 0.6 * p);
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      } else if (!back && style === "target") {
+        // Corner brackets closing in on the key as the note arrives.
+        const hw = lane.w * (0.5 + 1.1 * (1 - p));
+        const hh = 8 + 18 * (1 - p);
+        const cy = hitY - 6;
+        const arm = Math.max(5, Math.min(10, hw * 0.4));
+        ctx.strokeStyle = withAlpha(color, 0.3 + 0.65 * p);
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for (const [sx, sy] of [
+          [-1, -1],
+          [1, -1],
+          [-1, 1],
+          [1, 1],
+        ]) {
+          const x0 = cx + sx * hw;
+          const y0 = cy + sy * hh;
+          ctx.moveTo(x0 - sx * arm, y0);
+          ctx.lineTo(x0, y0);
+          ctx.lineTo(x0, y0 - sy * arm);
+        }
+        ctx.stroke();
+      } else if (!back && style === "shadow") {
+        // The note's shadow on the key, darkening and sharpening as it comes down.
+        const rw = lane.w * (0.35 + 0.5 * p);
+        ctx.fillStyle = withAlpha(color, 0.12 + 0.5 * p);
+        ctx.beginPath();
+        ctx.ellipse(cx, hitY - 2, rw, 3 + 3 * p, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = `rgba(255,255,255,${0.35 * p})`;
+        ctx.beginPath();
+        ctx.ellipse(cx, hitY - 2, rw * 0.4, 1.5 + p, 0, 0, Math.PI * 2);
+        ctx.fill();
       }
     }
     ctx.globalAlpha = 1;
@@ -798,13 +859,16 @@ export class Highway {
         this.emit({ kind: "jet", x: lane.x + r() * lane.w, y: y0 - 4 - r() * 6, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, g: -5, drag: 1.5, wander: 15, max: 1.2 + r(), size: 0.7 + r() * 0.9, trail: 0.16, peak: 0.7, color: r() < 0.5 ? light : color });
       } else if (style === "stardust") {
         this.emit({ kind: "twinkle", x: cx + (r() - 0.5) * lane.w * 1.8, y: yAt(), vx: (r() - 0.5) * 16, vy: -(5 + r() * 18), g: 0, drag: 0.3, wander: 8, max: 2 + r() * 1.8, size: 1.6 + r() * 2.8, color: r() < 0.5 ? "#ffffff" : light });
+      } else if (style === "snow") {
+        // Soft flakes drifting up and swaying, tinted towards white.
+        this.emit({ kind: "mote", x: cx + (r() - 0.5) * lane.w * 2, y: yAt(), vx: (r() - 0.5) * 20, vy: -(8 + r() * 16), g: 0, drag: 0.4, wander: 60, max: 2.6 + r() * 2.2, size: 1.8 + r() * 2.2, color: mixHex(color, "#ffffff", 0.7 + r() * 0.3) });
       }
     }
   }
 
   /** Clouds keep gathering around held notes, from the hit line up their column. */
   private dustHold(lanes: SprayLane[], hitY: number, dt: number, style: DustStyle, level: number): void {
-    const rate: Record<DustStyle, number> = { smoke: 7, fountain: 22, plume: 6, rays: 12, sparkle: 16, nebula: 3, fog: 3, embers: 18, stardust: 10 };
+    const rate: Record<DustStyle, number> = { smoke: 7, fountain: 22, plume: 6, rays: 12, sparkle: 16, nebula: 3, fog: 3, embers: 18, stardust: 10, snow: 14 };
     for (const l of lanes) this.cloud(l, l.color, hitY, Math.max(l.top, hitY - 260), rate[style] * level * dt, style);
   }
 
@@ -915,7 +979,7 @@ export class Highway {
       const lanes = [lane];
       if (sl) lanes.push(sl);
       if (view.dust !== "off") {
-        const burst: Record<DustStyle, number> = { smoke: 5, fountain: 18, plume: 5, rays: 12, sparkle: 10, nebula: 4, fog: 3, embers: 12, stardust: 10 };
+        const burst: Record<DustStyle, number> = { smoke: 5, fountain: 18, plume: 5, rays: 12, sparkle: 10, nebula: 4, fog: 3, embers: 12, stardust: 10, snow: 10 };
         const tint = this.fxColor(fx);
         const reach = view.dust === "smoke" || view.dust === "nebula" ? 90 : 40;
         for (const l of lanes) this.cloud(l, tint, hitY, hitY - reach, burst[view.dust] * scale * view.dustLevel * 2, view.dust);
