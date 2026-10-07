@@ -136,7 +136,7 @@ export const tr: Dict = {
   fingerNumbers: "Parmak numaraları",
   fingerNumbersHint: "Piyanoda her notada önerilen parmak: 1 başparmak … 5 serçe parmak.",
   staffView: "Kayan porte",
-  staffViewHint: "Piyanoda düşen notaların üstünde notaları porte üzerinde de gösterir.",
+  staffViewHint: "Düşen notaların üstünde notaları porte üzerinde de gösterir. Gitar, gitar notasındaki gibi bir oktav yukarıda (sekizli sol anahtarı), keman sol anahtarında yazılır.",
   staffStyle: "Porte görünümü",
   staffNight: "Gece",
   staffPaper: "Kâğıt",

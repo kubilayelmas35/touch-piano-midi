@@ -18,6 +18,19 @@ describe("staff", () => {
     expect(staffMetrics([43, 76], 10).gap).toBe(4.5);
   });
 
+  it("keeps guitar and violin on the treble clef, guitar written an octave up", () => {
+    const guitar = staffMetrics([40, 52, 64], 1000, { clefs: "treble", transpose: 12 });
+    expect(guitar.clefs).toBe("treble");
+    expect(guitar.transpose).toBe(12);
+    // Low E (written E3) still fits, under three ledger lines.
+    expect(guitar.lo).toBeLessThan(diatonic(52));
+    const violin = staffMetrics([55, 76], 1000, { clefs: "treble" });
+    expect(violin.clefs).toBe("treble");
+    expect(violin.lo).toBeLessThan(diatonic(55));
+    // High guitar parts still leave room for the 8 under the clef.
+    expect(staffMetrics([72, 76], 1000, { clefs: "treble", transpose: 12 }).lo).toBeLessThanOrEqual(31);
+  });
+
   it("draws ledger lines outside the staves and for middle C", () => {
     expect(ledgersFor(diatonic(60), "treble")).toEqual([35]);
     expect(ledgersFor(diatonic(57), "treble")).toEqual([35, 33]);

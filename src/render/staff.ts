@@ -26,21 +26,31 @@ export interface StaffMetrics {
   /** Space between staff lines (px). */
   gap: number;
   height: number;
+  /** Semitones the notes are written above their sound (12 for guitar, read from an octave treble clef). */
+  transpose: number;
+}
+
+export interface StaffOptions {
+  /** Always these staves (guitar and violin read from the treble clef alone). */
+  clefs?: Clefs;
+  transpose?: number;
 }
 
 /** Which staves the song needs, and the line spacing that fits them in `maxHeight` px. */
-export function staffMetrics(midis: readonly number[], maxHeight: number): StaffMetrics {
-  const ds = midis.map(diatonic);
+export function staffMetrics(midis: readonly number[], maxHeight: number, opts: StaffOptions = {}): StaffMetrics {
+  const transpose = opts.transpose ?? 0;
+  const ds = midis.map((m) => diatonic(m + transpose));
   const min = ds.length ? Math.min(...ds) : MIDDLE_C;
   const max = ds.length ? Math.max(...ds) : MIDDLE_C;
-  const clefs: Clefs = min >= 33 ? "treble" : max <= 37 ? "bass" : "grand";
+  const clefs: Clefs = opts.clefs ?? (min >= 33 ? "treble" : max <= 37 ? "bass" : "grand");
   const lines = staffLines(clefs);
   const top = lines[lines.length - 1];
   const bottom = lines[0];
   const hi = Math.min(top + MAX_LEDGER, Math.max(top, max)) + 2;
-  const lo = Math.max(bottom - MAX_LEDGER, Math.min(bottom, min)) - 2;
+  // Room under the octave treble clef for its 8.
+  const lo = Math.max(bottom - MAX_LEDGER, Math.min(bottom - (transpose === 12 ? 4 : 0), min)) - 2;
   const gap = Math.max(4.5, Math.min(8, maxHeight / ((hi - lo) / 2 + 1)));
-  return { clefs, lo, hi, gap, height: Math.round(((hi - lo) * gap) / 2 + gap) };
+  return { clefs, lo, hi, gap, height: Math.round(((hi - lo) * gap) / 2 + gap), transpose };
 }
 
 function staffLines(clefs: Clefs): number[] {
@@ -207,7 +217,7 @@ export class StaffRenderer {
       const x = xOf(n.time);
       const xEnd = xOf(n.time + n.duration);
       if (xEnd < clefW || x > w + headW * 2) continue;
-      const d = Math.max(m.lo + 1, Math.min(m.hi - 1, diatonic(n.midi)));
+      const d = Math.max(m.lo + 1, Math.min(m.hi - 1, diatonic(n.midi + m.transpose)));
       const done = n.state === NoteState.Hit || (n.state === NoteState.Missed && n.rejoined);
       const hand = tracks.length > 1 ? Math.max(0, tracks.indexOf(n.track)) % 2 : n.midi >= HAND_SPLIT ? 0 : 1;
       const color =
@@ -217,7 +227,7 @@ export class StaffRenderer {
             ? th.judged[n.judgement ?? "good"]
             : n.state === NoteState.Skipped
               ? th.skipped
-              : th.handColors
+              : th.handColors && n.string < 0
                 ? HAND_INK[hand]
                 : th.ink;
       // Played notes step back; the next ones swell a little as they reach the playhead.
@@ -374,6 +384,11 @@ export class StaffRenderer {
       }
     };
     if (m.clefs !== "bass") clef("\u{1D11E}", "G", 40.5, g * 6.4);
+    if (m.transpose === 12) {
+      // Octave treble clef: a small 8 under the G clef.
+      ctx.font = `800 ${Math.round(g * 1.3)}px Georgia, serif`;
+      ctx.fillText("8", clefW * 0.45, yOf(lines[0]) + g * 2.6);
+    }
     if (m.clefs !== "treble") clef("\u{1D122}", "F", 30, g * 3.6);
     if (m.clefs === "grand") {
       ctx.fillRect(2, top, 2, bottom - top);

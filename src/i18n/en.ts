@@ -141,7 +141,7 @@ export const en = {
   fingerNumbers: "Finger numbers",
   fingerNumbersHint: "On the piano, each note shows the suggested finger: 1 thumb … 5 little finger.",
   staffView: "Scrolling staff",
-  staffViewHint: "On the piano, also shows the notes on a staff above the falling notes.",
+  staffViewHint: "Also shows the notes on a staff above the falling notes. Guitar is written an octave up as in guitar music (octave treble clef), violin on the treble clef.",
   staffStyle: "Staff look",
   staffNight: "Night",
   staffPaper: "Paper",

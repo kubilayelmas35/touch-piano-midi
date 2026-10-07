@@ -172,9 +172,14 @@ export function GameView() {
   }, [size.h, instrumentHeight, instrument]);
   const showStrip = !!layout?.piano && (keyZoom > 1 || compactKeys || size.w < 760);
   const stripH = showStrip ? KEY_STRIP_H : 0;
-  const staffOn = useApp((s) => s.settings.staffView) && instrument === "piano" && hasSong && used.length > 0;
+  const staffOn = useApp((s) => s.settings.staffView) && hasSong && used.length > 0;
   const room = size.h - instH - stripH;
-  const staff = useMemo(() => (staffOn && room > 0 ? staffMetrics(used, room * 0.32) : null), [staffOn, used, room]);
+  const staff = useMemo(() => {
+    if (!staffOn || room <= 0) return null;
+    // Guitar is written an octave above its sound on an octave treble clef; violin reads from the treble clef alone.
+    const opts = instrument === "guitar" ? { clefs: "treble" as const, transpose: 12 } : instrument === "violin" ? { clefs: "treble" as const } : {};
+    return staffMetrics(used, room * 0.32, opts);
+  }, [staffOn, used, room, instrument]);
   const staffH = staff && room - staff.height >= 110 ? staff.height : 0;
   const hwH = Math.max(0, size.h - instH - stripH - staffH);
 
