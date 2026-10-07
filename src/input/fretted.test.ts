@@ -195,6 +195,23 @@ describe("fretted string physics", () => {
     expect(afterLift("guitar")).toBe(true);
   });
 
+  it("moves a still-vibrating violin string to the note of a finger pressed after the bow left it", () => {
+    fake.engine.config.instrument = "violin";
+    fretted.strikeSync("p", [1], 0.8);
+    run(600, backAndForth);
+    fretted.strikeEnd("p");
+    run(100);
+    expect(fake.ringing.has(KEY)).toBe(true);
+    const press = vi.spyOn(fake.engine, "press");
+    fretted.neckDown("n", 1, 4);
+    expect(press).toHaveBeenCalledWith(KEY, 45 + 4, expect.any(Number), { string: 1, fret: 4 });
+    expect(fake.ringing.has(KEY)).toBe(true);
+    expect(fake.levels.get(KEY)).toBeGreaterThan(0.2);
+    press.mockClear();
+    fretted.neckUp("n");
+    expect(press).toHaveBeenCalledWith(KEY, 45, expect.any(Number), { string: 1, fret: 0 });
+  });
+
   it("lets a violin string ring on after a strong bow stroke longer than after a gentle one", () => {
     fake.engine.config.instrument = "violin";
     const ring = (speed: number) => {
