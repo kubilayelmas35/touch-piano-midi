@@ -1,4 +1,5 @@
 import { APPROACH_STYLES, BACKGROUNDS, DUST_STYLES, EFFECT_STYLES, NOTE_COLORS, NOTE_STYLES } from "../render/appearance";
+import { GUITAR_SKINS, PIANO_SKINS, VIOLIN_SKINS } from "../render/instrumentSkins";
 import { STAFF_STYLES } from "../render/staffThemes";
 import { defaultSettings, type Settings } from "./settings";
 
@@ -13,6 +14,9 @@ const LISTS = {
   dust: DUST_STYLES,
   approach: APPROACH_STYLES,
   staffStyle: STAFF_STYLES,
+  pianoSkin: PIANO_SKINS,
+  guitarSkin: GUITAR_SKINS,
+  violinSkin: VIOLIN_SKINS,
 } as const;
 
 export type DesignKind = keyof typeof LISTS;

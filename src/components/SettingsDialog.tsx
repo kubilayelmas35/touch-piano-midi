@@ -23,11 +23,24 @@ import {
   ColorSwatch,
   DustSwatch,
   EffectSwatch,
+  FretSkinSwatch,
   NoteSwatch,
+  PianoSkinSwatch,
   ProTag,
   StaffSwatch,
 } from "./AppearancePicker";
 import { STAFF_STYLES, type StaffStyle } from "../render/staffThemes";
+import {
+  GUITAR_SKIN,
+  GUITAR_SKINS,
+  PIANO_SKIN,
+  PIANO_SKINS,
+  VIOLIN_SKIN,
+  VIOLIN_SKINS,
+  type GuitarSkinId,
+  type PianoSkinId,
+  type ViolinSkinId,
+} from "../render/instrumentSkins";
 import {
   APPROACH_STYLES,
   BACKGROUNDS,
@@ -103,7 +116,6 @@ const COLOR_LABEL: Record<NoteColor, DictKey> = {
   silver: "ncSilver",
 };
 const DUST_LABEL: Record<DustStyle, DictKey> = {
-  off: "duOff",
   smoke: "duSmoke",
   fountain: "duFountain",
   plume: "duPlume",
@@ -115,12 +127,32 @@ const DUST_LABEL: Record<DustStyle, DictKey> = {
   stardust: "duStardust",
 };
 const APPROACH_LABEL: Record<ApproachStyle, DictKey> = {
-  off: "apOff",
   beam: "apBeam",
   ring: "apRing",
   comet: "apComet",
   arrows: "apArrows",
   keyglow: "apKeyglow",
+};
+const PIANO_SKIN_LABEL: Record<PianoSkinId, DictKey> = {
+  standard: "skStandard",
+  ebony: "skEbony",
+  ivory: "skIvory",
+  neon: "skNeon",
+  glass: "skGlass",
+};
+const GUITAR_SKIN_LABEL: Record<GuitarSkinId, DictKey> = {
+  standard: "skStandard",
+  maple: "skMaple",
+  ebony: "skEbony",
+  electric: "skElectric",
+  neon: "skNeon",
+};
+const VIOLIN_SKIN_LABEL: Record<ViolinSkinId, DictKey> = {
+  standard: "skStandard",
+  amber: "skAmber",
+  baroque: "skBaroque",
+  white: "skWhite",
+  neon: "skNeon",
 };
 
 type Tab = "general" | "look" | "sound" | "gameplay" | "input";
@@ -453,32 +485,76 @@ export function SettingsDialog() {
               )}
             </Section>
             <Section>
-              <ChoiceCards
-                label={t("dust")}
-                value={look.dust}
-                onChange={(v) => updateSettings({ dust: v })}
-                onLocked={toPro}
-                options={DUST_STYLES.map((d) => ({ value: d, label: t(DUST_LABEL[d]), preview: <DustSwatch style={d} />, locked: designLocked("dust", d, pro) }))}
-              />
-              {look.dust !== "off" && (
-                <Slider
-                  label={t("dustLevel")}
-                  value={s.dustLevel}
-                  min={0.1}
-                  max={1}
-                  step={0.05}
-                  onChange={(v) => updateSettings({ dustLevel: v })}
-                  format={pct}
-                />
+              <Switch label={t("dust")} checked={s.dustOn} onChange={(v) => updateSettings({ dustOn: v })} />
+              {s.dustOn && (
+                <>
+                  <Slider
+                    label={t("dustLevel")}
+                    value={s.dustLevel}
+                    min={0.1}
+                    max={1}
+                    step={0.05}
+                    onChange={(v) => updateSettings({ dustLevel: v })}
+                    format={pct}
+                  />
+                  <ChoiceCards
+                    label={t("dustStyle")}
+                    value={look.dust}
+                    onChange={(v) => updateSettings({ dust: v })}
+                    onLocked={toPro}
+                    options={DUST_STYLES.map((d) => ({ value: d, label: t(DUST_LABEL[d]), preview: <DustSwatch style={d} />, locked: designLocked("dust", d, pro) }))}
+                  />
+                </>
               )}
             </Section>
             <Section>
+              <Switch label={t("approach")} checked={s.approachOn} onChange={(v) => updateSettings({ approachOn: v })} />
+              {s.approachOn && (
+                <ChoiceCards
+                  label={t("approachStyle")}
+                  value={look.approach}
+                  onChange={(v) => updateSettings({ approach: v })}
+                  onLocked={toPro}
+                  options={APPROACH_STYLES.map((a) => ({ value: a, label: t(APPROACH_LABEL[a]), preview: <ApproachSwatch style={a} />, locked: designLocked("approach", a, pro) }))}
+                />
+              )}
+            </Section>
+            <Section title={t("instrumentLook")}>
               <ChoiceCards
-                label={t("approach")}
-                value={look.approach}
-                onChange={(v) => updateSettings({ approach: v })}
+                label={t("piano")}
+                value={look.pianoSkin}
+                onChange={(v) => updateSettings({ pianoSkin: v })}
                 onLocked={toPro}
-                options={APPROACH_STYLES.map((a) => ({ value: a, label: t(APPROACH_LABEL[a]), preview: <ApproachSwatch style={a} />, locked: designLocked("approach", a, pro) }))}
+                options={PIANO_SKINS.map((k) => ({
+                  value: k,
+                  label: t(PIANO_SKIN_LABEL[k]),
+                  preview: <PianoSkinSwatch skin={PIANO_SKIN[k]} />,
+                  locked: designLocked("pianoSkin", k, pro),
+                }))}
+              />
+              <ChoiceCards
+                label={t("guitar")}
+                value={look.guitarSkin}
+                onChange={(v) => updateSettings({ guitarSkin: v })}
+                onLocked={toPro}
+                options={GUITAR_SKINS.map((k) => ({
+                  value: k,
+                  label: t(GUITAR_SKIN_LABEL[k]),
+                  preview: <FretSkinSwatch skin={GUITAR_SKIN[k]} violin={false} />,
+                  locked: designLocked("guitarSkin", k, pro),
+                }))}
+              />
+              <ChoiceCards
+                label={t("violin")}
+                value={look.violinSkin}
+                onChange={(v) => updateSettings({ violinSkin: v })}
+                onLocked={toPro}
+                options={VIOLIN_SKINS.map((k) => ({
+                  value: k,
+                  label: t(VIOLIN_SKIN_LABEL[k]),
+                  preview: <FretSkinSwatch skin={VIOLIN_SKIN[k]} violin />,
+                  locked: designLocked("violinSkin", k, pro),
+                }))}
               />
             </Section>
           </>

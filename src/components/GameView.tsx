@@ -7,6 +7,7 @@ import { keyLabel, keyLabelMap, keyLabelRevision } from "../input/keyboard";
 import { pianoKeyMap } from "../input/keyboardBase";
 import { INSTRUMENT_HEIGHT_RANGE } from "../state/settings";
 import { visibleLook } from "../state/designs";
+import { GUITAR_SKIN, PIANO_SKIN, VIOLIN_SKIN } from "../render/instrumentSkins";
 import { hasPro } from "../auth/account";
 import { niceKeyboardRange } from "../lib/notes";
 import { Highway } from "../render/highway";
@@ -258,9 +259,9 @@ export function GameView() {
         effects: s.effects,
         effectLevel: s.effectLevel,
         effectStyle: s.effectStyle,
-        dust: s.dust,
+        dust: s.dustOn ? s.dust : "off",
         dustLevel: s.dustLevel,
-        approach: s.approach,
+        approach: s.approachOn ? s.approach : "off",
         noteStyle: s.noteStyle,
         noteColor: s.noteColor,
         colors: { solid: s.solidColor, from: s.gradFrom, to: s.gradTo },
@@ -281,6 +282,7 @@ export function GameView() {
           keyLabels: s.showKeyLabels ? pianoLabels.map : null,
           bare: hideFrets,
           fingers: hideFrets ? [...pointers.current.values()].filter((p) => p.zone === "keys").map((p) => p.lastX) : undefined,
+          skin: PIANO_SKIN[s.pianoSkin],
         });
       } else if (v.layout.fret) {
         const km = s.instrument === "violin" ? s.keymaps.violin : s.keymaps.guitar;
@@ -299,6 +301,7 @@ export function GameView() {
           energyOf: (str) => fretted.energyOf(str),
           keyLabels: s.showKeyLabels && s.fretKeyMode === "strings" ? fretLabels : null,
           hideFrets,
+          skin: s.instrument === "violin" ? VIOLIN_SKIN[s.violinSkin] : GUITAR_SKIN[s.guitarSkin],
         });
       }
     };

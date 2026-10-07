@@ -11,6 +11,8 @@ import {
   type NoteStyle,
 } from "../render/appearance";
 import { HAND_INK, STAFF_THEMES, type StaffStyle } from "../render/staffThemes";
+import type { FretSkin, PianoSkin } from "../render/instrumentSkins";
+import { GUITAR_STRING_COLORS, VIOLIN_STRING_COLORS, withAlpha } from "../render/theme";
 import { cx } from "../ui/primitives";
 
 /** A bit of the scrolling staff in the given look: five lines, a few notes, the playhead. */
@@ -382,7 +384,6 @@ export function ColorPicker({ label, value, onChange }: { label: string; value: 
 }
 
 const DUST_PREVIEW: Record<DustStyle, string> = {
-  off: "none",
   smoke:
     "radial-gradient(1px 1px at 30% 30%, #c4b5fd 50%, transparent), radial-gradient(1px 1px at 66% 22%, #a78bfa 50%, transparent), radial-gradient(1px 1px at 72% 62%, #c4b5fd 50%, transparent), radial-gradient(1px 1px at 26% 70%, #a78bfa 50%, transparent), radial-gradient(ellipse 30% 55% at 42% 60%, rgba(139,92,246,0.4), transparent 75%), radial-gradient(ellipse 28% 50% at 60% 35%, rgba(124,58,237,0.32), transparent 75%)",
   sparkle:
@@ -439,6 +440,89 @@ export function DustSwatch({ style }: { style: DustStyle }) {
           style === "fountain" || style === "plume" || style === "rays" ? "h-[38%]" : "h-[70%]"
         )}
       />
+    </div>
+  );
+}
+
+const grad3 = (c: readonly string[]) => `linear-gradient(${c[0]}, ${c[1]} 85%, ${c[2]})`;
+
+/** An octave of keys in the given piano look. */
+export function PianoSkinSwatch({ skin }: { skin: PianoSkin }) {
+  const edge = (c: string | undefined) =>
+    c ? { boxShadow: skin.glow ? `inset 0 0 0 1px ${c}, 0 0 5px ${withAlpha(c, 0.6)}` : `inset 0 0 0 1px ${withAlpha(c, 0.6)}` } : {};
+  return (
+    <div className="absolute inset-0 flex gap-px px-px pt-1" style={{ background: skin.bg }}>
+      {skin.felt && <div className="absolute inset-x-0 top-0 h-1" style={{ background: skin.felt }} />}
+      {Array.from({ length: 7 }, (_, i) => (
+        <div key={i} className="relative flex-1 rounded-b-[3px]" style={{ background: grad3(skin.white), ...edge(skin.edge) }}>
+          {skin.gloss && <div className="absolute top-0.5 left-[18%] h-1/2 w-[22%] rounded-sm bg-white/30" />}
+        </div>
+      ))}
+      {[1, 2, 4, 5, 6].map((i) => (
+        <div
+          key={`b${i}`}
+          className="absolute top-1 h-[58%] w-[8%] -translate-x-1/2 rounded-b-[2px]"
+          style={{ left: `${(i / 7) * 100}%`, background: grad3(skin.black), ...edge(skin.blackEdge) }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/** A bit of neck (fingerboard, frets, strings) and body in the given guitar / violin look. */
+export function FretSkinSwatch({ skin, violin }: { skin: FretSkin; violin: boolean }) {
+  const strings = violin ? VIOLIN_STRING_COLORS : GUITAR_STRING_COLORS;
+  const frets = violin ? [] : [14, 28, 41, 53];
+  const zone = `linear-gradient(90deg, ${skin.zone.join(", ")})`;
+  return (
+    <div className="absolute inset-0 flex">
+      <div className="relative h-full w-[64%] overflow-hidden" style={{ background: grad3(skin.wood) }}>
+        <div className="absolute inset-y-0 left-[8%] w-[3px]" style={{ background: skin.nut }} />
+        {skin.inlayShape === "band" && <div className="absolute inset-y-0 left-[36%] w-[18%]" style={{ background: withAlpha(skin.inlay, skin.inlayAlpha * 2) }} />}
+        {skin.inlayShape === "dot" && (
+          <div className="absolute top-1/2 left-[34%] h-1.5 w-1.5 -translate-y-1/2 rounded-full" style={{ background: withAlpha(skin.inlay, skin.inlayAlpha * 1.5) }} />
+        )}
+        {skin.inlayShape === "block" && (
+          <div className="absolute top-1/2 left-[31%] h-[55%] w-[10%] -translate-y-1/2 rounded-[1px]" style={{ background: withAlpha(skin.inlay, skin.inlayAlpha * 1.5) }} />
+        )}
+        {frets.map((x) => (
+          <div
+            key={x}
+            className="absolute inset-y-0 w-[2px]"
+            style={{ left: `${x + 8}%`, background: withAlpha(skin.fret, skin.fretAlpha), boxShadow: skin.glow ? `0 0 4px ${skin.fret}` : undefined }}
+          />
+        ))}
+        {violin &&
+          [26, 46].map((x) => (
+            <div
+              key={x}
+              className="absolute inset-y-0 w-px"
+              style={{ left: `${x}%`, background: withAlpha(skin.fret, Math.max(0.12, skin.fretAlpha)), boxShadow: skin.glow ? `0 0 3px ${skin.fret}` : undefined }}
+            />
+          ))}
+      </div>
+      <div className="relative h-full flex-1 overflow-hidden" style={{ background: zone }}>
+        {skin.body === "hole" && (
+          <div className="absolute top-1/2 left-[30%] h-9 w-9 -translate-y-1/2 rounded-full bg-black/45" style={{ boxShadow: `0 0 0 2px ${skin.detail}` }} />
+        )}
+        {skin.body === "pickups" &&
+          [30, 62].map((x) => <div key={x} className="absolute inset-y-1 w-[14%] rounded-sm bg-[#0b0b0f]" style={{ left: `${x}%`, border: `1px solid ${withAlpha(skin.detail, 0.4)}` }} />)}
+        {skin.body === "bridge" && <div className="absolute inset-y-0 left-[8%] w-[4px]" style={{ background: skin.detail }} />}
+        {skin.fholes &&
+          [40, 72].map((x) => <div key={x} className="absolute inset-y-[18%] w-[2px] rounded-full bg-black/60" style={{ left: `${x}%`, transform: `skewX(${x < 50 ? 12 : -12}deg)` }} />)}
+      </div>
+      {strings.map((c, i) => (
+        <div
+          key={i}
+          className="absolute inset-x-0"
+          style={{
+            top: `${((i + 0.5) / strings.length) * 100}%`,
+            height: violin ? 1.5 : 1 + (strings.length - 1 - i) * 0.25,
+            background: withAlpha(c, 0.85),
+            boxShadow: skin.stringShadow ? `0 1px 0 ${skin.stringShadow}` : undefined,
+          }}
+        />
+      ))}
     </div>
   );
 }

@@ -35,10 +35,10 @@ export interface HighwayView {
   /** 0.1–1 intensity of particles and glows. */
   effectLevel: number;
   effectStyle: EffectStyle;
-  dust: DustStyle;
+  dust: DustStyle | "off";
   /** 0.1–1 density of the dust cloud. */
   dustLevel: number;
-  approach: ApproachStyle;
+  approach: ApproachStyle | "off";
   noteStyle: NoteStyle;
   noteColor: NoteColor;
   colors: ColorChoice;
@@ -610,7 +610,7 @@ export class Highway {
   /** Lane effects leading a falling note to its key; `back` is the part drawn under the notes. */
   private drawApproach(
     list: { lane: { x: number; w: number }; y: number; p: number; color: string }[],
-    style: ApproachStyle,
+    style: ApproachStyle | "off",
     hitY: number,
     now: number,
     dt: number,
@@ -804,7 +804,7 @@ export class Highway {
 
   /** Clouds keep gathering around held notes, from the hit line up their column. */
   private dustHold(lanes: SprayLane[], hitY: number, dt: number, style: DustStyle, level: number): void {
-    const rate: Record<DustStyle, number> = { off: 0, smoke: 7, fountain: 22, plume: 6, rays: 12, sparkle: 16, nebula: 3, fog: 3, embers: 18, stardust: 10 };
+    const rate: Record<DustStyle, number> = { smoke: 7, fountain: 22, plume: 6, rays: 12, sparkle: 16, nebula: 3, fog: 3, embers: 18, stardust: 10 };
     for (const l of lanes) this.cloud(l, l.color, hitY, Math.max(l.top, hitY - 260), rate[style] * level * dt, style);
   }
 
@@ -915,7 +915,7 @@ export class Highway {
       const lanes = [lane];
       if (sl) lanes.push(sl);
       if (view.dust !== "off") {
-        const burst: Record<DustStyle, number> = { off: 0, smoke: 5, fountain: 18, plume: 5, rays: 12, sparkle: 10, nebula: 4, fog: 3, embers: 12, stardust: 10 };
+        const burst: Record<DustStyle, number> = { smoke: 5, fountain: 18, plume: 5, rays: 12, sparkle: 10, nebula: 4, fog: 3, embers: 12, stardust: 10 };
         const tint = this.fxColor(fx);
         const reach = view.dust === "smoke" || view.dust === "nebula" ? 90 : 40;
         for (const l of lanes) this.cloud(l, tint, hitY, hitY - reach, burst[view.dust] * scale * view.dustLevel * 2, view.dust);

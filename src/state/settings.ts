@@ -3,6 +3,14 @@ import type { GuitarTone, InstrumentKind } from "../engine/types";
 import { readLegacySettings } from "../storage/migrate";
 import { isNativeApp } from "../lib/platform";
 import { STAFF_STYLES, type StaffStyle } from "../render/staffThemes";
+import {
+  GUITAR_SKINS,
+  PIANO_SKINS,
+  VIOLIN_SKINS,
+  type GuitarSkinId,
+  type PianoSkinId,
+  type ViolinSkinId,
+} from "../render/instrumentSkins";
 import type { Goal, Skill } from "../coach/path";
 import { defaultKeymaps, isPianoPreset, PIANO_PRESETS, sanitizeKeymaps, type FretKeyMode, type Keymaps } from "../input/keyboard";
 import {
@@ -47,10 +55,15 @@ export interface Settings {
   effectLevel: number;
   effectStyle: EffectStyle;
   /** Cloud left floating behind the notes after hits and around held notes. */
+  dustOn: boolean;
   dust: DustStyle;
   /** 0.1–1 density of the dust cloud. */
   dustLevel: number;
+  approachOn: boolean;
   approach: ApproachStyle;
+  pianoSkin: PianoSkinId;
+  guitarSkin: GuitarSkinId;
+  violinSkin: ViolinSkinId;
   noteStyle: NoteStyle;
   noteColor: NoteColor;
   /** The "one colour" palette's colour. */
@@ -180,9 +193,14 @@ export function defaultSettings(): Settings {
     effects: true,
     effectLevel: 0.5,
     effectStyle: "sparks",
+    dustOn: true,
     dust: "smoke",
     dustLevel: 0.5,
+    approachOn: true,
     approach: "beam",
+    pianoSkin: "standard",
+    guitarSkin: "standard",
+    violinSkin: "standard",
     noteStyle: "gem",
     noteColor: "auto",
     solidColor: "#8b5cf6",
@@ -268,8 +286,10 @@ const KEYMAP_REV = 3;
  * Anyone still on an earlier default piano keymap moves to the current one. Rev 3: computer-key labels used to be
  * on everywhere; devices without a keyboard turn them off once.
  */
-function migrate(s: Partial<Settings>): Partial<Settings> {
-  if (!s || typeof s !== "object" || (s.keymapRev ?? 0) >= KEYMAP_REV) return s;
+function migrate(raw: Partial<Settings>): Partial<Settings> {
+  if (!raw || typeof raw !== "object") return raw;
+  const s = offToSwitch(raw);
+  if ((s.keymapRev ?? 0) >= KEYMAP_REV) return s;
   const piano = s.keymaps?.piano;
   const rev = s.keymapRev ?? 0;
   const old =
@@ -283,6 +303,22 @@ function migrate(s: Partial<Settings>): Partial<Settings> {
     ...(old && s.keymaps ? { keymaps: { ...s.keymaps, piano: { ...PIANO_PRESETS.home } } } : {}),
     ...(rev < 3 && !hasKeyboard() ? { showKeyLabels: false, noteKeyLabels: false } : {}),
   };
+}
+
+/** Dust cloud and approach effect used to be turned off with an "off" style; now that is a switch next to the style. */
+function offToSwitch(s: Partial<Settings>): Partial<Settings> {
+  const old = s as { dust?: unknown; approach?: unknown };
+  if (old.dust !== "off" && old.approach !== "off") return s;
+  const out: Partial<Settings> = { ...s };
+  if (old.dust === "off") {
+    delete out.dust;
+    out.dustOn = false;
+  }
+  if (old.approach === "off") {
+    delete out.approach;
+    out.approachOn = false;
+  }
+  return out;
 }
 
 function sanitize(s: Settings): Settings {
@@ -304,9 +340,14 @@ function sanitize(s: Settings): Settings {
     fallSeconds: num(s.fallSeconds, 1, 8, d.fallSeconds),
     effectLevel: num(s.effectLevel, 0.1, 1, d.effectLevel),
     effectStyle: oneOf(EFFECT_STYLES, s.effectStyle, d.effectStyle),
+    dustOn: s.dustOn !== false,
     dust: oneOf(DUST_STYLES, s.dust, d.dust),
     dustLevel: num(s.dustLevel, 0.1, 1, d.dustLevel),
+    approachOn: s.approachOn !== false,
     approach: oneOf(APPROACH_STYLES, s.approach, d.approach),
+    pianoSkin: oneOf(PIANO_SKINS, s.pianoSkin, d.pianoSkin),
+    guitarSkin: oneOf(GUITAR_SKINS, s.guitarSkin, d.guitarSkin),
+    violinSkin: oneOf(VIOLIN_SKINS, s.violinSkin, d.violinSkin),
     noteColor: (s.noteColor as string) === "violet" ? "solid" : oneOf(NOTE_COLORS, s.noteColor, d.noteColor),
     solidColor: hex(s.solidColor, d.solidColor),
     gradFrom: hex(s.gradFrom, d.gradFrom),

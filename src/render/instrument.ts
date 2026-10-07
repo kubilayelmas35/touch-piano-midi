@@ -3,6 +3,7 @@ import type { FretLayout, PianoLayout } from "../engine/layout";
 import { NoteState, type PlayNote } from "../engine/types";
 import { HAND_SPLIT } from "../midi/song";
 import { isBlack, noteName, octaveOf, type NoteNaming } from "../lib/notes";
+import { GUITAR_SKIN, PIANO_SKIN, VIOLIN_SKIN, type FretSkin, type PianoSkin } from "./instrumentSkins";
 import { GUITAR_STRING_COLORS, TRACK_COLORS, VIOLIN_STRING_COLORS, glowSprite, roundRect, withAlpha } from "./theme";
 
 export const BLACK_KEY_RATIO = 0.62;
@@ -104,6 +105,7 @@ export interface KeyboardView {
   bare?: boolean;
   /** x of each finger on the surface (bare mode). */
   fingers?: number[];
+  skin?: PianoSkin;
 }
 
 export class KeyboardRenderer extends CanvasSurface {
@@ -112,14 +114,26 @@ export class KeyboardRenderer extends CanvasSurface {
     if (!w || !h) return;
     const marks = collectMarks(this.engine, view.t);
     const L = view.layout;
+    const k = view.skin ?? PIANO_SKIN.standard;
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = "#05060f";
+    ctx.fillStyle = k.bg;
     ctx.fillRect(0, 0, w, h);
     if (view.bare) {
-      this.drawBare(view, marks);
+      this.drawBare(view, marks, k);
       return;
     }
+    const outline = (color: string | undefined, lw: number) => {
+      if (!color) return;
+      if (k.glow) {
+        ctx.lineWidth = lw + 4;
+        ctx.strokeStyle = withAlpha(color, 0.22);
+        ctx.stroke();
+      }
+      ctx.lineWidth = lw;
+      ctx.strokeStyle = withAlpha(color, k.glow ? 0.9 : 0.6);
+      ctx.stroke();
+    };
 
     const blackH = h * BLACK_KEY_RATIO;
     const now = performance.now();
@@ -144,13 +158,19 @@ export class KeyboardRenderer extends CanvasSurface {
         grad.addColorStop(0, withAlpha(c, 0.75));
         grad.addColorStop(1, c);
       } else {
-        grad.addColorStop(0, "#f4f6ff");
-        grad.addColorStop(0.85, "#e3e7f7");
-        grad.addColorStop(1, "#c9cee4");
+        grad.addColorStop(0, k.white[0]);
+        grad.addColorStop(0.85, k.white[1]);
+        grad.addColorStop(1, k.white[2]);
       }
       ctx.fillStyle = grad;
       roundRect(ctx, x, top - 6, kw, h - top + 6 - 1, Math.min(6, kw * 0.18));
       ctx.fill();
+      if (!sound && !pressed) outline(k.edge, 1);
+      if (k.gloss) {
+        ctx.fillStyle = "rgba(255,255,255,0.28)";
+        roundRect(ctx, x + kw * 0.18, top + 2, kw * 0.22, h * 0.5, kw * 0.1);
+        ctx.fill();
+      }
       if (target && !sound && !pressed) {
         ctx.fillStyle = withAlpha(target, 0.25 + 0.3 * pulse);
         roundRect(ctx, x + 2, blackH * 0.6, kw - 4, h - blackH * 0.6 - 4, 4);
@@ -162,13 +182,13 @@ export class KeyboardRenderer extends CanvasSurface {
       const keyLabel = view.keyLabels?.get(m);
       if (keyLabel && kw >= 16) {
         ctx.font = `700 ${fs}px system-ui, sans-serif`;
-        ctx.fillStyle = sound || pressed ? "rgba(255,255,255,0.95)" : "rgba(60,64,110,0.75)";
+        ctx.fillStyle = sound || pressed ? "rgba(255,255,255,0.95)" : withAlpha(k.whiteInk, 0.8);
         ctx.fillText(keyLabel.toUpperCase(), x + kw / 2, ly);
         ly -= fs + 4;
       }
       if ((view.showAllNames || L.compact || m % 12 === 0) && kw >= 11) {
         ctx.font = `${m % 12 === 0 ? 700 : 600} ${fs}px system-ui, sans-serif`;
-        ctx.fillStyle = sound || pressed ? "rgba(255,255,255,0.9)" : m % 12 === 0 ? "#4b4f86" : "rgba(75,79,134,0.7)";
+        ctx.fillStyle = sound || pressed ? "rgba(255,255,255,0.9)" : m % 12 === 0 ? k.whiteInk : withAlpha(k.whiteInk, 0.7);
         ctx.fillText(this.keyName(m, view, kw), x + kw / 2, ly);
       }
     }
@@ -191,13 +211,14 @@ export class KeyboardRenderer extends CanvasSurface {
         grad.addColorStop(0, withAlpha(c, 0.7));
         grad.addColorStop(1, c);
       } else {
-        grad.addColorStop(0, "#1d2033");
-        grad.addColorStop(0.8, "#2b2f48");
-        grad.addColorStop(1, "#3a3f5e");
+        grad.addColorStop(0, k.black[0]);
+        grad.addColorStop(0.8, k.black[1]);
+        grad.addColorStop(1, k.black[2]);
       }
       ctx.fillStyle = grad;
       roundRect(ctx, lane.x, -4, lane.w, bh + 4, Math.min(4, lane.w * 0.2));
       ctx.fill();
+      if (!sound && !pressed) outline(k.blackEdge, 1);
       if (target && !sound && !pressed) {
         ctx.fillStyle = withAlpha(target, 0.4 + 0.4 * pulse);
         roundRect(ctx, lane.x + 2, bh * 0.45, lane.w - 4, bh * 0.5, 3);
@@ -210,24 +231,33 @@ export class KeyboardRenderer extends CanvasSurface {
         let ly = h - 7;
         if (keyLabel && lane.w >= 16) {
           ctx.font = `700 ${fs}px system-ui, sans-serif`;
-          ctx.fillStyle = sound || pressed ? "rgba(255,255,255,0.95)" : "rgba(225,229,255,0.85)";
+          ctx.fillStyle = sound || pressed ? "rgba(255,255,255,0.95)" : withAlpha(k.blackInk, 0.85);
           ctx.fillText(keyLabel.toUpperCase(), lane.x + lane.w / 2, ly);
           ly -= fs + 4;
         }
         if (lane.w >= 11) {
           ctx.font = `600 ${fs}px system-ui, sans-serif`;
-          ctx.fillStyle = sound || pressed ? "rgba(255,255,255,0.9)" : "rgba(200,205,240,0.6)";
+          ctx.fillStyle = sound || pressed ? "rgba(255,255,255,0.9)" : withAlpha(k.blackInk, 0.6);
           ctx.fillText(this.keyName(m, view, lane.w), lane.x + lane.w / 2, ly);
         }
       } else if (keyLabel && lane.w >= 12) {
         const fs = Math.max(8, Math.min(11, lane.w * 0.45));
         ctx.font = `700 ${fs}px system-ui, sans-serif`;
-        ctx.fillStyle = "rgba(220,224,255,0.8)";
+        ctx.fillStyle = withAlpha(k.blackInk, 0.8);
         ctx.fillText(keyLabel.toUpperCase(), lane.x + lane.w / 2, bh - 6);
       }
     }
 
     this.topShade();
+    this.felt(k);
+  }
+
+  private felt(k: PianoSkin): void {
+    if (!k.felt) return;
+    this.ctx.fillStyle = k.felt;
+    this.ctx.fillRect(0, 0, this.w, 5);
+    this.ctx.fillStyle = "rgba(0,0,0,0.35)";
+    this.ctx.fillRect(0, 5, this.w, 1);
   }
 
   /** Note name for a key; with only the song's keys shown neighbours can be octaves apart, so it carries the octave when it fits. */
@@ -238,7 +268,7 @@ export class KeyboardRenderer extends CanvasSurface {
     return m % 12 === 0 || this.ctx.measureText(full).width <= width - 4 ? full : base;
   }
 
-  private drawBare(view: KeyboardView, marks: Marks): void {
+  private drawBare(view: KeyboardView, marks: Marks, k: PianoSkin): void {
     const { ctx, w, h } = this;
     const L = view.layout;
     const first = L.lane(L.keys[0])!;
@@ -246,9 +276,9 @@ export class KeyboardRenderer extends CanvasSurface {
     const x0 = Math.max(0, first.x) + 0.5;
     const x1 = Math.min(w, last.x + last.w) - 0.5;
     const grad = ctx.createLinearGradient(0, 0, 0, h);
-    grad.addColorStop(0, "#f4f6ff");
-    grad.addColorStop(0.85, "#e3e7f7");
-    grad.addColorStop(1, "#c9cee4");
+    grad.addColorStop(0, k.white[0]);
+    grad.addColorStop(0.85, k.white[1]);
+    grad.addColorStop(1, k.white[2]);
     ctx.fillStyle = grad;
     roundRect(ctx, x0, -6, x1 - x0, h + 5, 6);
     ctx.fill();
@@ -286,6 +316,7 @@ export class KeyboardRenderer extends CanvasSurface {
       ctx.fillRect(fx - 1, 0, 2, h - 4);
     }
     this.topShade();
+    this.felt(k);
   }
 
   /** Top shadow to separate from the highway. */
@@ -314,6 +345,7 @@ export interface FretboardView {
   keyLabels: { strings: string[]; frets: string[] } | null;
   /** Fretless: no fret wires, numbers or inlays (the nut stays). */
   hideFrets?: boolean;
+  skin?: FretSkin;
 }
 
 export class FretboardRenderer extends CanvasSurface {
@@ -365,17 +397,13 @@ export class FretboardRenderer extends CanvasSurface {
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.textAlign = "center";
 
+    const sk = view.skin ?? (view.violin ? VIOLIN_SKIN.standard : GUITAR_SKIN.standard);
+
     // Neck wood.
     const wood = ctx.createLinearGradient(0, 0, 0, h);
-    if (view.violin) {
-      wood.addColorStop(0, "#15110f");
-      wood.addColorStop(0.5, "#221a16");
-      wood.addColorStop(1, "#120e0c");
-    } else {
-      wood.addColorStop(0, "#2a1a12");
-      wood.addColorStop(0.5, "#3a2418");
-      wood.addColorStop(1, "#24160f");
-    }
+    wood.addColorStop(0, sk.wood[0]);
+    wood.addColorStop(0.5, sk.wood[1]);
+    wood.addColorStop(1, sk.wood[2]);
     ctx.fillStyle = wood;
     ctx.fillRect(0, 0, neckW, h);
     ctx.fillStyle = "rgba(0,0,0,0.35)";
@@ -383,27 +411,25 @@ export class FretboardRenderer extends CanvasSurface {
 
     // Inlays / position markers.
     const bare = !!view.hideFrets;
-    const inlays = bare ? [] : view.violin ? [2, 4, 5, 7, 9, 12] : [3, 5, 7, 9, 15];
+    const inlays = bare ? [] : view.violin ? [2, 4, 5, 7, 9, 12] : [3, 5, 7, 9, 12, 15];
+    const dotR = Math.min(7, L.colW * 0.16);
+    ctx.fillStyle = withAlpha(sk.inlay, sk.inlayAlpha);
     for (const f of inlays) {
       const col = L.column(f);
       if (!col) continue;
       const cx = col.x + col.w / 2;
-      ctx.fillStyle = view.violin ? "rgba(255,255,255,0.05)" : "rgba(235,225,205,0.22)";
-      if (view.violin) ctx.fillRect(col.x, 0, col.w, h);
-      else {
-        ctx.beginPath();
-        ctx.arc(cx, h / 2, Math.min(7, L.colW * 0.16), 0, Math.PI * 2);
+      if (sk.inlayShape === "band") ctx.fillRect(col.x, 0, col.w, h);
+      else if (sk.inlayShape === "block") {
+        const bw = col.w * (f === 12 ? 0.42 : 0.32);
+        const bh = h * (f === 12 ? 0.7 : 0.5);
+        roundRect(ctx, cx - bw / 2, (h - bh) / 2, bw, bh, 2);
         ctx.fill();
-      }
-    }
-    const col12 = L.column(12);
-    if (!bare && !view.violin && col12) {
-      const cx = col12.x + col12.w / 2;
-      ctx.fillStyle = "rgba(235,225,205,0.22)";
-      for (const y of [h * 0.3, h * 0.7]) {
-        ctx.beginPath();
-        ctx.arc(cx, y, Math.min(7, L.colW * 0.16), 0, Math.PI * 2);
-        ctx.fill();
+      } else {
+        for (const y of f === 12 ? [h * 0.3, h * 0.7] : [h / 2]) {
+          ctx.beginPath();
+          ctx.arc(cx, y, dotR, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
     }
 
@@ -411,17 +437,26 @@ export class FretboardRenderer extends CanvasSurface {
     for (let i = 1; neckW > 0 && i <= L.columns; i++) {
       const x = Math.round(i * L.colW);
       if (i === 1 && L.hasNut) {
-        ctx.fillStyle = "#e8e0cc";
+        ctx.fillStyle = sk.nut;
         ctx.fillRect(x - 2, 0, 4, h);
       } else if (bare) {
         continue;
       } else if (!view.violin) {
-        ctx.fillStyle = "rgba(200,200,215,0.55)";
-        ctx.fillRect(x - 1, 0, 2, h);
         // Frets left out in between: a double wire.
-        if (i < L.columns && L.frets[i] - L.frets[i - 1] > 1) ctx.fillRect(x + 3, 0, 2, h);
+        const double = i < L.columns && L.frets[i] - L.frets[i - 1] > 1;
+        if (sk.glow) {
+          ctx.fillStyle = withAlpha(sk.fret, 0.18);
+          ctx.fillRect(x - 3, 0, double ? 10 : 6, h);
+        }
+        ctx.fillStyle = withAlpha(sk.fret, sk.fretAlpha);
+        ctx.fillRect(x - 1, 0, 2, h);
+        if (double) ctx.fillRect(x + 3, 0, 2, h);
       } else {
-        ctx.fillStyle = "rgba(255,255,255,0.05)";
+        if (sk.glow) {
+          ctx.fillStyle = withAlpha(sk.fret, sk.fretAlpha * 0.35);
+          ctx.fillRect(x - 2, 0, 5, h);
+        }
+        ctx.fillStyle = withAlpha(sk.fret, sk.fretAlpha);
         ctx.fillRect(x, 0, 1, h);
       }
     }
@@ -433,12 +468,12 @@ export class FretboardRenderer extends CanvasSurface {
       if (f === 0 || (L.colW < 22 && f % 2 === 0 && f !== 12)) continue;
       const cx = i * L.colW + L.colW / 2;
       ctx.font = "600 9px system-ui, sans-serif";
-      ctx.fillStyle = "rgba(255,255,255,0.35)";
+      ctx.fillStyle = sk.numbers;
       ctx.fillText(String(f), cx, 2);
       const key = view.keyLabels?.frets[f - 1];
       if (key && key !== String(f)) {
         ctx.font = "700 9px system-ui, sans-serif";
-        ctx.fillStyle = "rgba(196,181,253,0.8)";
+        ctx.fillStyle = sk.accent;
         ctx.fillText(key, cx, 12);
       }
     }
@@ -448,24 +483,37 @@ export class FretboardRenderer extends CanvasSurface {
     const pw = L.pluckW;
     if (pw > 0) {
       const zone = ctx.createLinearGradient(px, 0, px + pw, 0);
-      if (view.violin) {
-        zone.addColorStop(0, "#3a2414");
-        zone.addColorStop(0.12, "#24170e");
-        zone.addColorStop(1, "#140d08");
-      } else {
-        zone.addColorStop(0, "#161a2c");
-        zone.addColorStop(1, "#0b0d18");
-      }
+      // Violin bodies keep a lit edge next to the fingerboard, then the varnish.
+      const stops = sk.zone.length === 3 && view.violin ? [0, 0.12, 1] : sk.zone.map((_, i) => i / Math.max(1, sk.zone.length - 1));
+      sk.zone.forEach((c, i) => zone.addColorStop(stops[i], c));
       ctx.fillStyle = zone;
       ctx.fillRect(px, 0, pw, h);
       ctx.save();
       ctx.beginPath();
       ctx.rect(px, 0, pw, h);
       ctx.clip();
-      if (view.violin) {
-        // Bridge.
-        ctx.fillStyle = "rgba(222,190,140,0.55)";
+      if (sk.body === "bridge") {
+        if (sk.fholes && pw > 70) this.fholes(px + pw * 0.55, h, Math.min(pw * 0.2, 46));
+        ctx.fillStyle = sk.detail;
         ctx.fillRect(px + 6, 0, 5, h);
+      } else if (sk.body === "pickups") {
+        // Two pickups with their pole pieces.
+        const pkW = Math.max(10, Math.min(26, pw * 0.13));
+        for (const k of [0.42, 0.72]) {
+          const x = px + pw * k;
+          ctx.fillStyle = "#0b0b0f";
+          roundRect(ctx, x - pkW / 2, h * 0.06, pkW, h * 0.88, 4);
+          ctx.fill();
+          ctx.strokeStyle = withAlpha(sk.detail, 0.35);
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          ctx.fillStyle = withAlpha(sk.detail, 0.75);
+          for (const s of L.strings) {
+            ctx.beginPath();
+            ctx.arc(x, L.rowOf(s) * rowH + rowH / 2, Math.max(1.5, Math.min(3, rowH * 0.1)), 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
       } else {
         // Sound hole with rosette.
         const cx = px + pw * 0.62;
@@ -474,7 +522,7 @@ export class FretboardRenderer extends CanvasSurface {
         ctx.beginPath();
         ctx.arc(cx, h / 2, r, 0, Math.PI * 2);
         ctx.fill();
-        ctx.strokeStyle = "rgba(196,181,253,0.18)";
+        ctx.strokeStyle = sk.detail;
         ctx.lineWidth = 3;
         ctx.beginPath();
         ctx.arc(cx, h / 2, r + 5, 0, Math.PI * 2);
@@ -517,6 +565,10 @@ export class FretboardRenderer extends CanvasSurface {
       // Each string in its own colour (the one its notes fall in); full strength while it sounds.
       const rest = withAlpha(colors[s], 0.85);
       const color = e > 0.03 ? colors[s] : rest;
+      if (sk.stringShadow) {
+        ctx.fillStyle = sk.stringShadow;
+        ctx.fillRect(nutX, y + thick / 2, w - nutX, 1.5);
+      }
       ctx.fillStyle = rest;
       if (xv > nutX) ctx.fillRect(nutX, y - thick / 2, xv - nutX, thick);
       if (e > 0.008) {
@@ -614,5 +666,33 @@ export class FretboardRenderer extends CanvasSurface {
     shade.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = shade;
     ctx.fillRect(0, 0, w, 10);
+  }
+
+  /** A pair of violin f-holes centred at `cx`, `gap` apart. */
+  private fholes(cx: number, h: number, gap: number): void {
+    const ctx = this.ctx;
+    const top = h * 0.14;
+    const bot = h * 0.86;
+    const mid = (top + bot) / 2;
+    ctx.strokeStyle = "rgba(8,4,2,0.85)";
+    ctx.fillStyle = "rgba(8,4,2,0.85)";
+    ctx.lineWidth = 3.5;
+    ctx.lineCap = "round";
+    for (const dir of [-1, 1]) {
+      const x = cx + (dir * gap) / 2;
+      const sway = Math.min(6, gap * 0.18) * dir;
+      ctx.beginPath();
+      ctx.moveTo(x - sway, top);
+      ctx.bezierCurveTo(x + sway * 1.6, mid - (bot - top) * 0.2, x - sway * 1.6, mid + (bot - top) * 0.2, x + sway, bot);
+      ctx.stroke();
+      for (const [px, py] of [
+        [x - sway, top],
+        [x + sway, bot],
+      ]) {
+        ctx.beginPath();
+        ctx.arc(px, py, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
   }
 }
