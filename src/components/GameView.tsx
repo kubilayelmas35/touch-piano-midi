@@ -10,6 +10,8 @@ import { visibleLook } from "../state/designs";
 import { hasPro } from "../auth/account";
 import { niceKeyboardRange } from "../lib/notes";
 import { Highway } from "../render/highway";
+import { COVERED_GAP, FramePacer, IDLE_GAP } from "../render/pacer";
+import { activeVoiceCount } from "../audio/sampler";
 import { StaffRenderer, staffMetrics } from "../render/staff";
 import { BLACK_KEY_RATIO, FretboardRenderer, KeyboardRenderer } from "../render/instrument";
 import { toast, useApp } from "../state/store";
@@ -83,11 +85,14 @@ export function GameView() {
   const edgeGap = useApp((s) => (isNativeApp && s.settings.edgeGap ? s.settings.edgeGapPx : 0));
   const size = useMemo(() => ({ w: box.w, h: Math.max(0, box.h - edgeGap) }), [box, edgeGap]);
   const [notesRev, setNotesRev] = useState(0);
+  /** performance.now() of the last touch or engine change; the game draws at full rate for a moment after. */
+  const lastActivity = useRef(0);
 
   // Re-layout when the player's notes change (song, tracks, hand, instrument).
   useEffect(() => {
     let last = engine.notes;
     return engine.subscribe(() => {
+      lastActivity.current = performance.now();
       if (engine.notes !== last) {
         last = engine.notes;
         setNotesRev((r) => r + 1);
@@ -191,6 +196,7 @@ export function GameView() {
     const labels: Record<string, string> = {};
     let pianoLabels: { src: unknown; rev: number; map: Map<number, string> } | null = null;
     let fretLabels: { src: unknown; rev: number; strings: string[]; frets: string[] } | null = null;
+    const pacer = new FramePacer();
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
       const r = renderers.current;
@@ -199,6 +205,26 @@ export function GameView() {
       const st = useApp.getState();
       const s = visibleLook(st.settings, hasPro());
       const time = engine.frame();
+      const fretless = v.layout.piano ? s.glidePiano : s.instrument === "violin" ? s.glideViolin : s.instrument === "guitar" && s.glideGuitar;
+      if (v.layout.fret) {
+        fretted.autoFret = s.autoFret;
+        fretted.tapToPlay = s.tapToPlay;
+        fretted.multiNote = s.multiNote;
+        fretted.columnPress = s.columnPress;
+        fretted.glide = fretless;
+        fretted.sustain = s.stringSustain;
+        fretted.tick(now);
+      }
+      glider.snap = s.glideSnap;
+      glider.tick(now);
+      if (engine.status === "playing" && now - lastStore > 90) {
+        lastStore = now;
+        useApp.setState({ time });
+      }
+      const busy =
+        engine.status === "playing" || pointers.current.size > 0 || activeVoiceCount() > 0 || r.hw.animating || now - lastActivity.current < 1500;
+      const covered = !!(st.panel || st.welcomeOpen || st.video);
+      if (!pacer.due(now, busy ? 0 : covered ? COVERED_GAP : IDLE_GAP)) return;
       labels.perfect = t("perfect");
       labels.great = t("great");
       labels.good = t("good");
@@ -212,7 +238,6 @@ export function GameView() {
           pianoLabels = { src: keys, rev, map: keyLabelMap(keys) };
         }
       }
-      const fretless = v.layout.piano ? s.glidePiano : s.instrument === "violin" ? s.glideViolin : s.instrument === "guitar" && s.glideGuitar;
       const hideFrets = fretless && s.hideFrets;
       r.hw.resize(v.w, v.hwH);
       r.hw.draw({
@@ -253,13 +278,6 @@ export function GameView() {
           fingers: hideFrets ? [...pointers.current.values()].filter((p) => p.zone === "keys").map((p) => p.lastX) : undefined,
         });
       } else if (v.layout.fret) {
-        fretted.autoFret = s.autoFret;
-        fretted.tapToPlay = s.tapToPlay;
-        fretted.multiNote = s.multiNote;
-        fretted.columnPress = s.columnPress;
-        fretted.glide = fretless;
-        fretted.sustain = s.stringSustain;
-        fretted.tick(now);
         const km = s.instrument === "violin" ? s.keymaps.violin : s.keymaps.guitar;
         if (!fretLabels || fretLabels.src !== km || fretLabels.rev !== rev) {
           fretLabels = { src: km, rev, strings: km.strings.map(keyLabel), frets: km.frets.map(keyLabel) };
@@ -278,15 +296,16 @@ export function GameView() {
           hideFrets,
         });
       }
-      glider.snap = s.glideSnap;
-      glider.tick(now);
-      if (engine.status === "playing" && now - lastStore > 90) {
-        lastStore = now;
-        useApp.setState({ time });
-      }
     };
     raf = requestAnimationFrame(frame);
-    return () => cancelAnimationFrame(raf);
+    const mark = () => (lastActivity.current = performance.now());
+    window.addEventListener("keydown", mark);
+    window.addEventListener("keyup", mark);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("keydown", mark);
+      window.removeEventListener("keyup", mark);
+    };
   }, [t]);
 
   // ----------------------------------------------------------- touch input
@@ -327,6 +346,7 @@ export function GameView() {
   };
 
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    lastActivity.current = performance.now();
     const v = viewRef.current;
     if (!v.layout) return;
     e.preventDefault();
@@ -429,6 +449,7 @@ export function GameView() {
   };
 
   const onPointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    lastActivity.current = performance.now();
     const p = pointers.current.get(e.pointerId);
     if (!p) return;
     pointers.current.delete(e.pointerId);

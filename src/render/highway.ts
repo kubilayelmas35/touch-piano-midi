@@ -180,6 +180,11 @@ export class Highway {
     this.lanesKey = "";
   }
 
+  /** Hit effects or judgement popups are still playing out. */
+  get animating(): boolean {
+    return this.particles.length > 0 || this.popups.length > 0;
+  }
+
   /** Clears effects (e.g. after seeking). */
   resetEffects(): void {
     this.particles = [];
