@@ -581,6 +581,7 @@ function watchInbox(userId: string | null): void {
   inbox = supabase!
     .channel(`inbox:${userId}`)
     .on("broadcast", { event: "duet" }, () => void loadSocial())
+    .on("broadcast", { event: "social" }, () => void loadSocial())
     .subscribe();
 }
 

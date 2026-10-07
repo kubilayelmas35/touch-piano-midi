@@ -382,8 +382,11 @@ function MoreMenu() {
       label={t("more")}
       align="end"
       trigger={({ open, toggle, ref }) => (
-        <IconButton label={t("more")} active={open} onClick={toggle} ref={ref} aria-expanded={open}>
+        <IconButton label={waiting > 0 ? `${t("more")} (${waiting})` : t("more")} active={open} onClick={toggle} ref={ref} aria-expanded={open}>
           <IconMore size={20} />
+          {accountOn && waiting > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 min-w-4 rounded-full bg-rose-500 px-1 text-[10px] leading-4 font-extrabold text-white">{waiting}</span>
+          )}
         </IconButton>
       )}
     >

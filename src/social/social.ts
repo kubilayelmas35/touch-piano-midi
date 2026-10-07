@@ -1,11 +1,13 @@
-import { rememberReferral, supabase } from "../auth/account";
+import { hasPro, rememberReferral, supabase } from "../auth/account";
 import type { InstrumentKind } from "../engine/types";
 import { tNow } from "../i18n";
 import type { DictKey } from "../i18n/en";
 import { SITE_URL } from "../lib/platform";
+import { notifyNow, onNotificationTap } from "../lib/reminders";
 import { handTracks } from "../midi/song";
+import { socialNews } from "./news";
 import { isBuiltin } from "../midi/builtin";
-import { toast, useApp } from "../state/store";
+import { setPanel, toast, useApp } from "../state/store";
 
 export type DuelHand = "both" | "left" | "right";
 
@@ -133,8 +135,22 @@ export async function loadSocial(): Promise<SocialOverview | null> {
     return null;
   }
   const social = data as SocialOverview;
+  const prev = useApp.getState().social;
   useApp.setState({ social });
+  if (prev && prev.me?.id === social.me?.id) announce(socialNews(prev, social));
   return social;
+}
+
+function announce(news: string[]): void {
+  for (const text of news) {
+    if (document.visibilityState === "visible") toast(text, "info", 6000);
+    else void notifyNow(text, "friends");
+  }
+}
+
+/** The friends panel, or the Pro offer for members without it (same as the top bar button). */
+function openFriends(): void {
+  setPanel(hasPro() ? "friends" : "pro");
 }
 
 async function call<T>(fn: string, args: Record<string, unknown>): Promise<{ ok: true; data: T } | { ok: false; error: SocialError }> {
@@ -313,8 +329,10 @@ export function initSocial(): void {
     rememberReferral(invite.slice(0, 24));
     useApp.setState({ friendInvite: invite.slice(0, 24), panel: "friends" });
   }
+  onNotificationTap("friends", openFriends);
+  // Pings arrive live; coming back to the front catches up on any missed while the app slept.
   const refresh = (force = false) => {
-    if (!socialEnabled() || (!force && Date.now() - lastLoad < 60_000)) return;
+    if (!socialEnabled() || (!force && Date.now() - lastLoad < 5_000)) return;
     lastLoad = Date.now();
     void loadSocial();
   };

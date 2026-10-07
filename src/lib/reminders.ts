@@ -79,6 +79,30 @@ export async function askReminderPermission(): Promise<boolean> {
   }
 }
 
+let nextNoticeId = 0;
+
+/** Shows a notification right away (the app is in the background). Never asks for permission. */
+export async function notifyNow(body: string, tag: string): Promise<void> {
+  if (!remindersSupported) return;
+  try {
+    const { ln } = await plugin();
+    if ((await ln.checkPermissions()).display !== "granted") return;
+    await ln.schedule({ notifications: [{ id: 7100 + (nextNoticeId++ % 50), title: "Sonatrio", body, extra: { tag } }] });
+  } catch (err) {
+    console.warn("[notify] failed", err);
+  }
+}
+
+/** Runs `fn` when a notification shown by `notifyNow` with this tag is tapped. */
+export function onNotificationTap(tag: string, fn: () => void): void {
+  if (!remindersSupported) return;
+  void plugin().then(({ ln }) =>
+    ln.addListener("localNotificationActionPerformed", ({ notification }) => {
+      if (notification.extra?.tag === tag) fn();
+    })
+  );
+}
+
 export function initReminders(): void {
   if (!remindersSupported) return;
   void syncReminders();
