@@ -3,7 +3,8 @@ import { engine } from "../engine/engine";
 import { tNow } from "../i18n";
 import { addUserMidi, openFreePlay } from "../state/actions";
 import { setPanel, toast, useApp } from "../state/store";
-import { PROGRAMS, guitarProgram, midiFileName, splitHands, writeMidi, type MidiTrackSpec } from "./midiFile";
+import { soundProgram } from "../audio/instruments";
+import { midiFileName, splitHands, writeMidi, type MidiTrackSpec } from "./midiFile";
 import { Recorder } from "./recorder";
 import { shareMidi } from "./share";
 
@@ -43,8 +44,9 @@ export function stopRecording(): void {
     toast(tNow("recordEmpty"), "info");
     return;
   }
-  const { instrument, guitarTone } = useApp.getState().settings;
-  const program = instrument === "piano" ? PROGRAMS.piano : instrument === "violin" ? PROGRAMS.violin : guitarProgram(guitarTone);
+  const { settings } = useApp.getState();
+  const instrument = settings.instrument;
+  const program = soundProgram(settings);
   const seconds = notes.reduce((m, n) => Math.max(m, n.time + n.duration), 0);
   useApp.setState({ take: { notes, instrument, program, seconds } });
 }

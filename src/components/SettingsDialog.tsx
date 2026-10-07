@@ -14,6 +14,8 @@ import { IconChevronDown, IconCrown, IconMessage, IconMic, IconPlug, IconSparkle
 import { requirePro, useHasPro } from "../auth/account";
 import { FREE_DESIGNS, designLocked, visibleLook } from "../state/designs";
 import { KeyBindings } from "./KeyBindings";
+import { SoundPicker } from "./SoundPicker";
+import { GUITAR_SOUNDS, PIANO_SOUNDS, VIOLIN_SOUNDS, soundIdFor, type GuitarSound, type PianoSound, type ViolinSound } from "../audio/instruments";
 import { LegalLinks } from "./LegalLinks";
 import { ReminderSettings } from "./ReminderToggle";
 import {
@@ -148,6 +150,45 @@ const APPROACH_LABEL: Record<ApproachStyle, DictKey> = {
   target: "apTarget",
   shadow: "apShadow",
 };
+const PIANO_SOUND_LABEL: Record<PianoSound, DictKey> = {
+  grand: "pnGrand",
+  bright: "pnBright",
+  honky: "pnHonky",
+  epiano: "pnEpiano",
+  epiano2: "pnEpiano2",
+  harpsichord: "pnHarpsichord",
+  clavinet: "pnClavinet",
+  musicbox: "pnMusicbox",
+  vibraphone: "pnVibraphone",
+  organ: "pnOrgan",
+  church: "pnChurch",
+  accordion: "pnAccordion",
+};
+
+const GUITAR_SOUND_LABEL: Record<GuitarSound, DictKey> = {
+  steel: "guitarSteel",
+  nylon: "guitarNylon",
+  electric: "guitarElectric",
+  clean: "guitarClean",
+  jazz: "guitarJazz",
+  muted: "guitarMuted",
+  distortion: "guitarDistortion",
+  harmonics: "guitarHarmonics",
+  banjo: "guitarBanjo",
+  sitar: "guitarSitar",
+};
+
+const VIOLIN_SOUND_LABEL: Record<ViolinSound, DictKey> = {
+  classic: "vnClassic",
+  electric: "vnElectric",
+  fiddle: "vnFiddle",
+  viola: "vnViola",
+  cello: "vnCello",
+  tremolo: "vnTremolo",
+  ensemble: "vnEnsemble",
+  synth: "vnSynth",
+};
+
 const PIANO_SKIN_LABEL: Record<PianoSkinId, DictKey> = {
   standard: "skStandard",
   ebony: "skEbony",
@@ -591,6 +632,7 @@ export function SettingsDialog() {
         )}
 
         {tab === "sound" && (
+          <>
           <Section>
             <Slider label={t("volume")} value={s.volume} min={0} max={1} step={0.05} onChange={(v) => updateSettings({ volume: v })} format={pct} />
             <Slider label={t("accompVolume")} value={s.accompVolume} min={0} max={1} step={0.05} onChange={(v) => updateSettings({ accompVolume: v })} format={pct} />
@@ -617,19 +659,35 @@ export function SettingsDialog() {
               onChange={(v) => updateSettings({ stringSustain: v })}
               format={pct}
             />
-            <Row label={t("guitarTone")}>
-              <Segmented
-                label={t("guitarTone")}
-                value={s.guitarTone}
-                onChange={(v) => updateSettings({ guitarTone: v })}
-                options={[
-                  { value: "steel", label: t("guitarSteel") },
-                  { value: "nylon", label: t("guitarNylon") },
-                  { value: "electric", label: t("guitarElectric") },
-                ]}
-              />
-            </Row>
           </Section>
+          <Section>
+            <p className="pt-1 text-xs leading-relaxed text-mist-400">{t("soundPickHint")}</p>
+            <SoundPicker
+              label={t("pianoSound")}
+              kind="piano"
+              value={s.pianoSound}
+              onChange={(v) => updateSettings({ pianoSound: v })}
+              idFor={(v) => soundIdFor({ ...s, instrument: "piano", pianoSound: v })}
+              options={PIANO_SOUNDS.map((v) => ({ value: v, label: t(PIANO_SOUND_LABEL[v]) }))}
+            />
+            <SoundPicker
+              label={t("guitarTone")}
+              kind="guitar"
+              value={s.guitarTone}
+              onChange={(v) => updateSettings({ guitarTone: v })}
+              idFor={(v) => soundIdFor({ ...s, instrument: "guitar", guitarTone: v })}
+              options={GUITAR_SOUNDS.map((v) => ({ value: v, label: t(GUITAR_SOUND_LABEL[v]) }))}
+            />
+            <SoundPicker
+              label={t("violinSound")}
+              kind="violin"
+              value={s.violinSound}
+              onChange={(v) => updateSettings({ violinSound: v })}
+              idFor={(v) => soundIdFor({ ...s, instrument: "violin", violinSound: v })}
+              options={VIOLIN_SOUNDS.map((v) => ({ value: v, label: t(VIOLIN_SOUND_LABEL[v]) }))}
+            />
+          </Section>
+          </>
         )}
 
         {tab === "gameplay" && (

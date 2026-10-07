@@ -1,6 +1,7 @@
 import type { NoteNaming } from "../lib/notes";
 import type { GuitarTone, InstrumentKind } from "../engine/types";
 import { readLegacySettings } from "../storage/migrate";
+import { GUITAR_SOUNDS, PIANO_SOUNDS, VIOLIN_SOUNDS, type PianoSound, type ViolinSound } from "../audio/instruments";
 import { isNativeApp } from "../lib/platform";
 import { STRIKE_ZONE_RANGE } from "../engine/layout";
 import { STAFF_STYLES, type StaffStyle } from "../render/staffThemes";
@@ -41,6 +42,8 @@ export interface Settings {
   noteNaming: NoteNaming;
   instrument: InstrumentKind;
   guitarTone: GuitarTone;
+  pianoSound: PianoSound;
+  violinSound: ViolinSound;
   volume: number;
   reverb: number;
   accompVolume: number;
@@ -184,6 +187,8 @@ export function defaultSettings(): Settings {
     noteNaming: "letters",
     instrument: "piano",
     guitarTone: "steel",
+    pianoSound: "grand",
+    violinSound: "classic",
     volume: 0.9,
     reverb: 0.18,
     accompVolume: 0.65,
@@ -337,7 +342,9 @@ function sanitize(s: Settings): Settings {
     language: s.language === "tr" || s.language === "en" ? s.language : d.language,
     noteNaming: s.noteNaming === "solfege" ? "solfege" : "letters",
     instrument: ["piano", "guitar", "violin"].includes(s.instrument) ? s.instrument : "piano",
-    guitarTone: s.guitarTone === "nylon" || s.guitarTone === "electric" ? s.guitarTone : "steel",
+    guitarTone: oneOf(GUITAR_SOUNDS, s.guitarTone, d.guitarTone),
+    pianoSound: oneOf(PIANO_SOUNDS, s.pianoSound, d.pianoSound),
+    violinSound: oneOf(VIOLIN_SOUNDS, s.violinSound, d.violinSound),
     volume: num(s.volume, 0, 1, d.volume),
     reverb: num(s.reverb, 0, 0.6, d.reverb),
     accompVolume: num(s.accompVolume, 0, 1, d.accompVolume),

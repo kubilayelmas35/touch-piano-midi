@@ -48,6 +48,8 @@ export function engineConfig(): Partial<EngineConfig> {
   return {
     instrument: settings.instrument,
     guitarTone: settings.guitarTone,
+    pianoSound: settings.pianoSound,
+    violinSound: settings.violinSound,
     metronome: settings.metronome,
     countIn: settings.countIn || together,
     timingWindowMs: settings.timingWindowMs,

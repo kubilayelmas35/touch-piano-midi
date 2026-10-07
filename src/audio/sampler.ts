@@ -318,6 +318,19 @@ function nearestSample(inst: LoadedInstrument, midi: number): [number, Sample] {
   return [best, inst.buffers.get(best)!];
 }
 
+const curves = new Map<number, Float32Array<ArrayBuffer>>();
+
+/** Soft clipping: tanh of the boosted signal. */
+function driveCurve(boost: number): Float32Array<ArrayBuffer> {
+  let c = curves.get(boost);
+  if (!c) {
+    c = new Float32Array(2048);
+    for (let i = 0; i < c.length; i++) c[i] = Math.tanh(boost * ((i / (c.length - 1)) * 2 - 1));
+    curves.set(boost, c);
+  }
+  return c;
+}
+
 function velocityGain(v: number): number {
   const x = Math.max(0.05, Math.min(1, v));
   return 0.12 + 0.88 * Math.pow(x, 1.5);
@@ -473,6 +486,23 @@ export function playNote(id: InstrumentId, midi: number, velocity: number, opts:
     tail.connect(filter);
     tail = filter;
     nodes.push(filter);
+  }
+
+  if (def.drive) {
+    const shaper = ctx.createWaveShaper();
+    shaper.curve = driveCurve(def.drive.boost);
+    shaper.oversample = "2x";
+    const cab = ctx.createBiquadFilter();
+    cab.type = "lowpass";
+    cab.frequency.value = def.drive.cutoff;
+    cab.Q.value = 0.9;
+    const out = ctx.createGain();
+    out.gain.value = def.drive.level;
+    tail.connect(shaper);
+    shaper.connect(cab);
+    cab.connect(out);
+    tail = out;
+    nodes.push(shaper, cab, out);
   }
 
   const pan = ctx.createStereoPanner();

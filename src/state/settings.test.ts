@@ -28,3 +28,12 @@ describe("instrument looks", () => {
     expect(s.violinSkin).toBe("amber");
   });
 });
+
+describe("instrument sounds", () => {
+  it("keeps chosen sounds and falls back to the original ones", () => {
+    const s = sanitizeSettings({ pianoSound: "church", guitarTone: "banjo", violinSound: "electric" });
+    expect([s.pianoSound, s.guitarTone, s.violinSound]).toEqual(["church", "banjo", "electric"]);
+    const d = sanitizeSettings({ pianoSound: "kazoo", guitarTone: "ukulele" } as never);
+    expect([d.pianoSound, d.guitarTone, d.violinSound]).toEqual(["grand", "steel", "classic"]);
+  });
+});

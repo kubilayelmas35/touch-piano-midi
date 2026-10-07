@@ -50,6 +50,42 @@ const INSTRUMENTS = [
   },
 ];
 
+/** Other sounds to pick from in the settings: [folder id, MusyngKite name]. */
+const musyng = (id, name, notes) => ({
+  id,
+  notes,
+  url: (m) => `https://gleitz.github.io/midi-js-soundfonts/MusyngKite/${name}-mp3/${FLAT_NAMES[m % 12]}${octave(m)}.mp3`,
+});
+const KEYS = range(21, 108, 3);
+const GUITAR = range(40, 88);
+const BOWED = range(55, 100);
+INSTRUMENTS.push(
+  musyng("piano-bright", "bright_acoustic_piano", KEYS),
+  musyng("piano-honky", "honkytonk_piano", KEYS),
+  musyng("piano-epiano", "electric_piano_1", KEYS),
+  musyng("piano-epiano2", "electric_piano_2", KEYS),
+  musyng("piano-harpsichord", "harpsichord", KEYS),
+  musyng("piano-clavinet", "clavinet", KEYS),
+  musyng("piano-musicbox", "music_box", KEYS),
+  musyng("piano-vibraphone", "vibraphone", KEYS),
+  musyng("piano-organ", "drawbar_organ", KEYS),
+  musyng("piano-church", "church_organ", KEYS),
+  musyng("piano-accordion", "accordion", KEYS),
+  musyng("guitar-clean", "electric_guitar_clean", GUITAR),
+  musyng("guitar-jazz", "electric_guitar_jazz", GUITAR),
+  musyng("guitar-muted", "electric_guitar_muted", GUITAR),
+  musyng("guitar-distortion", "distortion_guitar", GUITAR),
+  musyng("guitar-harmonics", "guitar_harmonics", GUITAR),
+  musyng("guitar-banjo", "banjo", GUITAR),
+  musyng("guitar-sitar", "sitar", GUITAR),
+  musyng("violin-fiddle", "fiddle", BOWED),
+  musyng("violin-viola", "viola", BOWED),
+  musyng("violin-cello", "cello", BOWED),
+  musyng("violin-tremolo", "tremolo_strings", BOWED),
+  musyng("violin-ensemble", "string_ensemble_1", BOWED),
+  musyng("violin-synth", "synth_strings_1", BOWED)
+);
+
 async function exists(path) {
   try {
     await access(path);

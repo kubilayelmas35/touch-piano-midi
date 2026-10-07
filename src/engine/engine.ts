@@ -1,6 +1,6 @@
 import { getBus, unlockAudio } from "../audio/context";
 import { scheduleClick } from "../audio/click";
-import type { InstrumentId } from "../audio/instruments";
+import { INSTRUMENTS, soundIdFor, type InstrumentId } from "../audio/instruments";
 import { isLoaded, loadInstrument, playNote, type Voice } from "../audio/sampler";
 import { HAND_SPLIT, handOfNote, handTracks, selectAccompanimentNotes, selectPlayerNotes, type Song, type SongNote } from "../midi/song";
 import { assignPianoFingers } from "./fingering";
@@ -48,6 +48,8 @@ interface GridBeat {
 export const DEFAULT_CONFIG: EngineConfig = {
   instrument: "piano",
   guitarTone: "steel",
+  pianoSound: "grand",
+  violinSound: "classic",
   playTracks: [],
   mutedTracks: [],
   hand: "both",
@@ -77,9 +79,8 @@ export function fretSpecFor(kind: EngineConfig["instrument"]): FrettedSpec | nul
   return kind === "guitar" ? GUITAR : kind === "violin" ? VIOLIN : null;
 }
 
-export function instrumentIdFor(cfg: Pick<EngineConfig, "instrument" | "guitarTone">): InstrumentId {
-  if (cfg.instrument === "guitar") return cfg.guitarTone === "nylon" ? "guitar-nylon" : cfg.guitarTone === "electric" ? "guitar-electric" : "guitar-steel";
-  return cfg.instrument === "violin" ? "violin" : "piano";
+export function instrumentIdFor(cfg: Pick<EngineConfig, "instrument" | "guitarTone" | "pianoSound" | "violinSound">): InstrumentId {
+  return soundIdFor(cfg);
 }
 
 function lowerBound<T extends { time: number }>(arr: T[], t: number): number {
@@ -947,7 +948,7 @@ export class Engine {
 
   /** Lets go of a note; with `ring` the voice decays naturally (a plucked string) instead of stopping. */
   release(sourceKey: string, ring = false): void {
-    const tail = !ring && !this.sustain && this.config.pianoPedal && this.instrumentId === "piano";
+    const tail = !ring && !this.sustain && this.config.pianoPedal && this.pedalRings;
     if (this.held.delete(sourceKey)) this.emitInput({ type: "off", key: sourceKey, ring: ring || tail });
     const v = this.voices.get(sourceKey);
     if (!v) return;
@@ -1049,6 +1050,11 @@ export class Engine {
     this.judgePress(sourceKey, nearest, pos);
   }
 
+  /** Keyboard sounds whose strings or bars keep ringing after the key is let go (not organs). */
+  private get pedalRings(): boolean {
+    return this.config.instrument === "piano" && !!INSTRUMENTS[this.instrumentId].holdSustain;
+  }
+
   private get pedalTail(): number {
     return PEDAL_TAIL * this.config.pianoSustain ** 0.75;
   }
@@ -1061,7 +1067,7 @@ export class Engine {
     if (this.sustain !== on) this.emitInput({ type: "sustain", on });
     this.sustain = on;
     if (!on) {
-      const fade = this.config.pianoPedal && this.instrumentId === "piano" ? this.pedalTail : 0.35;
+      const fade = this.config.pianoPedal && this.pedalRings ? this.pedalTail : 0.35;
       for (const v of this.sustained) v.stop(fade);
       this.sustained = [];
       this.pedaled.clear();

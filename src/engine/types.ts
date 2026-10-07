@@ -1,7 +1,8 @@
+import type { GuitarSound, PianoSound, ViolinSound } from "../audio/instruments";
 import type { SongNote } from "../midi/song";
 
 export type InstrumentKind = "piano" | "guitar" | "violin";
-export type GuitarTone = "steel" | "nylon" | "electric";
+export type GuitarTone = GuitarSound;
 export type Judgement = "perfect" | "great" | "good" | "miss";
 
 export const NoteState = {
@@ -117,6 +118,8 @@ export interface LoopRange {
 export interface EngineConfig {
   instrument: InstrumentKind;
   guitarTone: GuitarTone;
+  pianoSound: PianoSound;
+  violinSound: ViolinSound;
   playTracks: number[];
   mutedTracks: number[];
   hand: "both" | "right" | "left";
