@@ -1,4 +1,4 @@
-import type { NoteNaming } from "../lib/notes";
+import { PIANO_OCTAVES, type NoteNaming } from "../lib/notes";
 import type { GuitarTone, InstrumentKind } from "../engine/types";
 import { readLegacySettings } from "../storage/migrate";
 import { GUITAR_SOUNDS, PIANO_SOUNDS, VIOLIN_SOUNDS, type PianoSound, type ViolinSound } from "../audio/instruments";
@@ -127,6 +127,10 @@ export interface Settings {
   keyZoom: number;
   /** Piano shows only the keys the song uses. */
   compactKeys: boolean;
+  /** Piano shows the 88-key keyboard (the chosen octaves) instead of fitting the song. */
+  fullPiano: boolean;
+  /** Octaves (C1 … C7) shown when `fullPiano` is on. */
+  pianoOctaves: number[];
   /** Minutes of practice a day that count as the daily goal. */
   dailyGoalMin: number;
   /** App: a notification on days without practice yet, at `reminderAt` (minutes after midnight). */
@@ -242,6 +246,8 @@ export function defaultSettings(): Settings {
     edgeGapPx: 20,
     keyZoom: 1,
     compactKeys: false,
+    fullPiano: false,
+    pianoOctaves: [...PIANO_OCTAVES],
     dailyGoalMin: 10,
     reminder: false,
     reminderAt: 19 * 60,
@@ -332,6 +338,11 @@ function offToSwitch(s: Partial<Settings>): Partial<Settings> {
   return out;
 }
 
+function pianoOctaves(v: unknown, d: number[]): number[] {
+  const pick = Array.isArray(v) ? PIANO_OCTAVES.filter((o) => v.includes(o)) : [];
+  return pick.length ? pick : d;
+}
+
 function sanitize(s: Settings): Settings {
   const num = (v: unknown, lo: number, hi: number, d: number) =>
     typeof v === "number" && Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : d;
@@ -389,6 +400,8 @@ function sanitize(s: Settings): Settings {
     edgeGapPx: Math.round(num(s.edgeGapPx, ...EDGE_GAP_RANGE, d.edgeGapPx)),
     keyZoom: num(s.keyZoom, 1, KEY_ZOOM_MAX, d.keyZoom),
     compactKeys: s.compactKeys === true,
+    fullPiano: s.fullPiano === true,
+    pianoOctaves: pianoOctaves(s.pianoOctaves, d.pianoOctaves),
     dailyGoalMin: Math.round(num(s.dailyGoalMin, 5, 60, d.dailyGoalMin)),
     reminder: s.reminder === true,
     reminderAt: Math.round(num(s.reminderAt, 0, 24 * 60 - 1, d.reminderAt)),

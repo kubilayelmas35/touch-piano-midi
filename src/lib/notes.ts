@@ -39,6 +39,25 @@ export function niceKeyboardRange(low: number, high: number, minKeys = 25): [num
   return [lo, hi];
 }
 
+/** Octaves of the full 88-key piano the player can show, by the C they start on (C1 … C7). */
+export const PIANO_OCTAVES = [1, 2, 3, 4, 5, 6, 7] as const;
+
+/** Keys of one full-piano octave; C1 also takes A0–B0 below it and C7 also takes C8 above it. */
+export function octaveSpan(octave: number): [number, number] {
+  return [octave === 1 ? 21 : (octave + 1) * 12, octave === 7 ? 108 : (octave + 1) * 12 + 11];
+}
+
+/** Keys of the chosen full-piano octaves, low → high (all 88 when none are chosen). */
+export function fullPianoKeys(octaves: readonly number[]): number[] {
+  const pick = PIANO_OCTAVES.filter((o) => octaves.includes(o));
+  const keys: number[] = [];
+  for (const o of pick.length ? pick : PIANO_OCTAVES) {
+    const [lo, hi] = octaveSpan(o);
+    for (let m = lo; m <= hi; m++) keys.push(m);
+  }
+  return keys;
+}
+
 export function clamp(v: number, lo: number, hi: number): number {
   return v < lo ? lo : v > hi ? hi : v;
 }

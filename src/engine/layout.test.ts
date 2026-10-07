@@ -1,6 +1,27 @@
 import { describe, expect, it } from "vitest";
 import { GUITAR, VIOLIN } from "./fretting";
-import { FretLayout, fretView, pluckWidth } from "./layout";
+import { FretLayout, PianoLayout, fretView, pluckWidth } from "./layout";
+import { fullPianoKeys } from "../lib/notes";
+
+describe("full piano", () => {
+  it("covers all 88 keys, with A0–B0 in C1 and C8 in C7", () => {
+    const all = fullPianoKeys([1, 2, 3, 4, 5, 6, 7]);
+    expect(all.length).toBe(88);
+    expect([all[0], all[87]]).toEqual([21, 108]);
+    expect(fullPianoKeys([1])).toEqual(Array.from({ length: 15 }, (_, i) => 21 + i));
+    expect(fullPianoKeys([7])).toEqual(Array.from({ length: 13 }, (_, i) => 96 + i));
+    expect(fullPianoKeys([]).length).toBe(88);
+  });
+
+  it("leaves out octaves that aren't chosen, keys still side by side", () => {
+    const keep = fullPianoKeys([2, 4]);
+    const L = new PianoLayout(keep[0], keep[keep.length - 1], 1400, { keep });
+    expect(L.whiteCount).toBe(14);
+    expect(L.lane(48)).toBeUndefined();
+    expect(L.lane(47)!.x + L.lane(47)!.w).toBeCloseTo(L.lane(60)!.x);
+    expect(L.hit(L.lane(60)!.x + 1, 999, 50)).toBe(60);
+  });
+});
 
 const base = { usedFrets: [0, 2, 3, 7], usedStrings: [1, 2, 4], hideNut: false, compactFrets: false, compactStrings: false, part: "both" as const };
 

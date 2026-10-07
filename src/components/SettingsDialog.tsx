@@ -8,6 +8,7 @@ import { useFullscreen } from "../lib/fullscreen";
 import { updateSettings } from "../state/actions";
 import { EDGE_GAP_RANGE, INSTRUMENT_HEIGHT_RANGE, KEY_ZOOM_MAX, defaultSettings, hasKeyboard } from "../state/settings";
 import { STRIKE_ZONE_RANGE } from "../engine/layout";
+import { PIANO_OCTAVES, noteName } from "../lib/notes";
 import { openVideo, setPanel, useApp } from "../state/store";
 import { isNativeApp, platform } from "../lib/platform";
 import { IconChevronDown, IconCrown, IconMessage, IconMic, IconPlug, IconSparkles, IconVideo } from "../ui/icons";
@@ -754,6 +755,35 @@ export function SettingsDialog() {
               format={(v) => `${v.toFixed(2).replace(/\.?0+$/, "")}×`}
             />
             <Switch label={t("compactKeys")} hint={t("compactKeysHint")} checked={s.compactKeys} onChange={(v) => updateSettings({ compactKeys: v })} />
+            <Switch label={t("fullPiano")} hint={t("fullPianoHint")} checked={s.fullPiano} onChange={(v) => updateSettings({ fullPiano: v })} />
+            {s.fullPiano && (
+              <div className="py-2">
+                <div className="mb-1 text-sm font-medium">{t("pianoOctaves")}</div>
+                <p className="mb-2 text-xs leading-relaxed text-mist-400">{t("pianoOctavesHint")}</p>
+                <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
+                  {PIANO_OCTAVES.map((o) => {
+                    const on = s.pianoOctaves.includes(o);
+                    const last = on && s.pianoOctaves.length === 1;
+                    return (
+                      <button
+                        key={o}
+                        type="button"
+                        aria-pressed={on}
+                        disabled={last}
+                        onClick={() => updateSettings({ pianoOctaves: on ? s.pianoOctaves.filter((x) => x !== o) : [...s.pianoOctaves, o].sort((a, b) => a - b) })}
+                        className={cx(
+                          "rounded-xl border px-3 py-2 text-xs font-semibold transition",
+                          on ? "border-brand-400/80 bg-brand-400/10 text-mist-100 ring-2 ring-brand-400/35" : "border-white/10 text-mist-400 hover:border-white/25",
+                          last && "cursor-not-allowed"
+                        )}
+                      >
+                        {noteName((o + 1) * 12, s.noteNaming, true)}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </Section>
         )}
         {tab === "gameplay" && (

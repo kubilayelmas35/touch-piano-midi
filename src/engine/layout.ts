@@ -14,6 +14,8 @@ export interface PianoOptions {
   pan?: number;
   /** Show only these keys, side by side as equal columns (keys the song never uses are left out). */
   only?: readonly number[] | null;
+  /** Draw only these keys of the range as a normal keyboard (whole octaves may be left out). */
+  keep?: readonly number[] | null;
 }
 
 /**
@@ -43,7 +45,9 @@ export class PianoLayout {
     const zoom = Math.max(1, opts.zoom ?? 1);
     this.fullW = width * zoom;
     this.offset = Math.round(Math.max(0, Math.min(1, opts.pan ?? 0.5)) * (this.fullW - width));
-    const only = opts.only?.filter((m) => m >= low && m <= high) ?? [];
+    const keep = opts.keep?.length ? new Set(opts.keep) : null;
+    const shown = (m: number) => !keep || keep.has(m);
+    const only = opts.only?.filter((m) => m >= low && m <= high && shown(m)) ?? [];
     this.compact = only.length > 0;
     if (this.compact) {
       this.keys = [...new Set(only)].sort((a, b) => a - b);
@@ -54,6 +58,7 @@ export class PianoLayout {
       const keys: number[] = [];
       let whites = 0;
       for (let m = low; m <= high; m++) {
+        if (!shown(m)) continue;
         keys.push(m);
         if (!isBlack(m)) whites++;
       }
@@ -62,7 +67,7 @@ export class PianoLayout {
       this.whiteW = this.fullW / this.whiteCount;
       const blackW = this.whiteW * 0.62;
       let wi = 0;
-      for (let m = low; m <= high; m++) {
+      for (const m of keys) {
         if (isBlack(m)) {
           const pc = m % 12;
           // Nudge black keys off-centre like a real keyboard (C#/D# left-right, F#/G#/A# spread).
@@ -75,7 +80,7 @@ export class PianoLayout {
         }
       }
     }
-    this.sig = `${low}-${high}@${width}x${zoom.toFixed(3)}+${this.offset}${this.compact ? `:${this.keys.join(",")}` : ""}`;
+    this.sig = `${low}-${high}@${width}x${zoom.toFixed(3)}+${this.offset}${this.compact || keep ? `:${this.keys.join(",")}` : ""}`;
   }
 
   lane(midi: number): Lane | undefined {

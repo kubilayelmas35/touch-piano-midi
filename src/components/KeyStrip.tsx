@@ -29,7 +29,7 @@ export function KeyStrip({ piano, used }: { piano: PianoLayout; used: readonly n
     const g = c.getContext("2d")!;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, w, h);
-    const mini = new PianoLayout(piano.low, piano.high, w, { only: piano.compact ? piano.keys : null });
+    const mini = new PianoLayout(piano.low, piano.high, w, { only: piano.compact ? piano.keys : null, keep: piano.keys });
     const hit = new Set(used);
     for (const black of [false, true]) {
       for (const m of mini.keys) {

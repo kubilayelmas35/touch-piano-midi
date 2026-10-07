@@ -9,7 +9,7 @@ import { INSTRUMENT_HEIGHT_RANGE } from "../state/settings";
 import { visibleLook } from "../state/designs";
 import { GUITAR_SKIN, PIANO_SKIN, VIOLIN_SKIN } from "../render/instrumentSkins";
 import { hasPro } from "../auth/account";
-import { niceKeyboardRange } from "../lib/notes";
+import { fullPianoKeys, niceKeyboardRange } from "../lib/notes";
 import { Highway } from "../render/highway";
 import { COVERED_GAP, FramePacer, IDLE_GAP } from "../render/pacer";
 import { activeVoiceCount } from "../audio/sampler";
@@ -69,6 +69,8 @@ export function GameView() {
   const hasSong = useApp((s) => !!s.song);
   const keyZoom = useApp((s) => s.settings.keyZoom);
   const compactKeys = useApp((s) => s.settings.compactKeys);
+  const fullPiano = useApp((s) => s.settings.fullPiano);
+  const pianoOctaves = useApp((s) => s.settings.pianoOctaves);
   const keyPan = useApp((s) => s.keyPan);
   const hideNut = useApp((s) => s.settings.hideNut);
   const compactFrets = useApp((s) => s.settings.compactFrets);
@@ -121,7 +123,12 @@ export function GameView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [notesRev]
   );
-  const range = useMemo(() => (size.w ? pianoRange(size.w) : null), [size.w, notesRev]); // eslint-disable-line react-hooks/exhaustive-deps
+  const fullKeys = useMemo(() => (fullPiano ? fullPianoKeys(pianoOctaves) : null), [fullPiano, pianoOctaves]);
+  const range = useMemo<[number, number] | null>(
+    () => (!size.w ? null : fullKeys ? [fullKeys[0], fullKeys[fullKeys.length - 1]] : pianoRange(size.w)),
+    [size.w, notesRev, fullKeys] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const keep = fullKeys && fullKeys.length < fullKeys[fullKeys.length - 1] - fullKeys[0] + 1 ? fullKeys : null;
   const only = compactKeys && used.length ? used : null;
 
   const calm = useApp((s) => s.settings.onboarded && !s.welcomeOpen && !s.video && !s.panel);
@@ -134,16 +141,17 @@ export function GameView() {
   // Zooming in or switching song: centre the song's notes on screen.
   useEffect(() => {
     if (instrument !== "piano" || !range || keyZoom <= 1) return;
-    const probe = new PianoLayout(range[0], range[1], size.w, { zoom: keyZoom, only });
-    useApp.setState({ keyPan: used.length ? probe.panFor(used[0], used[used.length - 1]) : 0.5 });
+    const probe = new PianoLayout(range[0], range[1], size.w, { zoom: keyZoom, only, keep });
+    const onScreen = used.filter((m) => probe.lane(m));
+    useApp.setState({ keyPan: onScreen.length ? probe.panFor(onScreen[0], onScreen[onScreen.length - 1]) : 0.5 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [instrument, range, keyZoom, compactKeys, used]);
+  }, [instrument, range, keep, keyZoom, compactKeys, used]);
 
   const layout = useMemo(() => {
     if (!size.w) return null;
     if (instrument === "piano") {
       const [lo, hi] = range!;
-      return { piano: new PianoLayout(lo, hi, size.w, { zoom: keyZoom, pan: keyPan, only }), fret: null };
+      return { piano: new PianoLayout(lo, hi, size.w, { zoom: keyZoom, pan: keyPan, only, keep }), fret: null };
     }
     const usedFrets = new Set<number>();
     const usedStrings = new Set<number>();
@@ -162,7 +170,7 @@ export function GameView() {
     });
     return { piano: null, fret };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [size.w, instrument, notesRev, fretSpec, range, keyZoom, keyPan, only, hideNut, compactFrets, compactStrings, neckPart, strikeZoneGuitar, strikeZoneViolin]);
+  }, [size.w, instrument, notesRev, fretSpec, range, keep, keyZoom, keyPan, only, hideNut, compactFrets, compactStrings, neckPart, strikeZoneGuitar, strikeZoneViolin]);
 
   useEffect(() => {
     fretted.reset();
