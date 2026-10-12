@@ -25,6 +25,7 @@ export function Hud() {
   const mult = comboMultiplier(stats.combo);
   const idle = status === "ready" || status === "paused";
   const freePlay = useApp((s) => !!s.song && s.song.notes.length === 0);
+  const freeStage = useApp((s) => s.settings.freePlayStage);
   const coach = useApp((s) => !!s.coach);
 
   return (
@@ -72,8 +73,8 @@ export function Hud() {
       </div>
 
       {(audioLoading || audioError) && (
-        <div className="absolute inset-x-0 bottom-6 flex justify-center px-4">
-          <div className="glass w-full max-w-xs rounded-2xl px-4 py-3 text-center animate-pop" role="status">
+        <div className="pointer-events-none absolute inset-x-0 bottom-6 flex justify-center px-4">
+          <div className="glass pointer-events-auto w-full max-w-xs rounded-2xl px-4 py-3 text-center animate-pop" role="status">
             <div className="text-sm font-semibold">{audioError ? t("loadFailed") : t("loadingSounds")}</div>
             {audioError && <div className="mt-1 text-[11px] break-words text-mist-400 select-text">{audioError}</div>}
             {!audioError && (
@@ -97,7 +98,7 @@ export function Hud() {
         </div>
       )}
 
-      {freePlay && !audioLoading && !songLoading && (
+      {freePlay && freeStage && !audioLoading && !songLoading && (
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 px-6 text-center">
           <div className="text-2xl font-extrabold tracking-tight text-white/80">{t("freePlay")}</div>
           <div className="text-sm text-mist-400">{t("freePlayHint")}</div>

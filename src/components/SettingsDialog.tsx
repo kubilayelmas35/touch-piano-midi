@@ -724,6 +724,7 @@ export function SettingsDialog() {
               format={pct}
             />
             <Switch label={t("lockHeight")} hint={t("lockHeightHint")} checked={s.lockHeight} onChange={(v) => updateSettings({ lockHeight: v })} />
+            <Switch label={t("freePlayStage")} hint={t("freePlayStageHint")} checked={s.freePlayStage} onChange={(v) => updateSettings({ freePlayStage: v })} />
             {isNativeApp && (
               <>
                 <Switch label={t("edgeGap")} hint={t("edgeGapHint")} checked={s.edgeGap} onChange={(v) => updateSettings({ edgeGap: v })} />

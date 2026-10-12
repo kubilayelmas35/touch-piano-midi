@@ -136,6 +136,8 @@ export interface Settings {
   fullPiano: boolean;
   /** Octaves (C1 … C7) shown when `fullPiano` is on. */
   pianoOctaves: number[];
+  /** Free play keeps the note area above the instrument (off: the instrument fills the stage). */
+  freePlayStage: boolean;
   /** Minutes of practice a day that count as the daily goal. */
   dailyGoalMin: number;
   /** App: a notification on days without practice yet, at `reminderAt` (minutes after midnight). */
@@ -256,6 +258,7 @@ export function defaultSettings(): Settings {
     compactKeys: false,
     fullPiano: false,
     pianoOctaves: [...PIANO_OCTAVES],
+    freePlayStage: false,
     dailyGoalMin: 10,
     reminder: false,
     reminderAt: 19 * 60,
@@ -413,6 +416,7 @@ function sanitize(s: Settings): Settings {
     compactKeys: s.compactKeys === true,
     fullPiano: s.fullPiano === true,
     pianoOctaves: pianoOctaves(s.pianoOctaves, d.pianoOctaves),
+    freePlayStage: s.freePlayStage === true,
     dailyGoalMin: Math.round(num(s.dailyGoalMin, 5, 60, d.dailyGoalMin)),
     reminder: s.reminder === true,
     reminderAt: Math.round(num(s.reminderAt, 0, 24 * 60 - 1, d.reminderAt)),

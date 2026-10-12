@@ -518,6 +518,8 @@ export const en = {
   edgeGapSize: "Gap at the bottom",
   lockHeight: "Lock panel size",
   lockHeightHint: "Removes the drag bar between the notes and the instrument, so the panel can't grow by accident while playing (e.g. during vibrato). Use the slider above to change the size.",
+  freePlayStage: "Note area in free play",
+  freePlayStageHint: "Off: in free play the instrument fills the screen, with bigger keys and taller strings. On: the area above stays, with light rising from the notes you play.",
   keyZoom: "Piano key zoom",
   keyZoomHint: "Wider keys for phones; the rest scrolls off screen. Drag the strip above the keys to choose the visible part.",
   keyZoomIn: "Zoom keys in",

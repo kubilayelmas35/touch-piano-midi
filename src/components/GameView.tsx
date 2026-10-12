@@ -67,6 +67,7 @@ export function GameView() {
   const instrumentHeight = useApp((s) => s.settings.instrumentHeight);
   const lockHeight = useApp((s) => s.settings.lockHeight);
   const hasSong = useApp((s) => !!s.song);
+  const fullStage = useApp((s) => !!s.song && s.song.notes.length === 0 && !s.settings.freePlayStage);
   const keyZoom = useApp((s) => s.settings.keyZoom);
   const compactKeys = useApp((s) => s.settings.compactKeys);
   const fullPiano = useApp((s) => s.settings.fullPiano);
@@ -181,7 +182,7 @@ export function GameView() {
     fretted.reset();
   }, [instrument]);
 
-  const instH = useMemo(() => {
+  const panelH = useMemo(() => {
     if (!size.h) return 0;
     const want = size.h * instrumentHeight;
     const minH = instrument === "piano" ? 96 : (instrument === "guitar" ? 6 : 4) * 22;
@@ -189,6 +190,7 @@ export function GameView() {
   }, [size.h, instrumentHeight, instrument]);
   const showStrip = !!layout?.piano && (keyZoom > 1 || compactKeys || size.w < 760);
   const stripH = showStrip ? KEY_STRIP_H : 0;
+  const instH = fullStage ? Math.max(0, size.h - stripH) : panelH;
   const staffOn = useApp((s) => s.settings.staffView) && hasSong && used.length > 0;
   const room = size.h - instH - stripH;
   const staff = useMemo(() => {
@@ -515,10 +517,10 @@ export function GameView() {
       />
       <div className="absolute inset-x-0" style={{ top: staffH, height: hwH }}>
         <canvas ref={hwRef} className="block h-full w-full" aria-hidden="true" />
-        {hasSong ? <Hud /> : <EmptyState />}
-        <RecordingBar />
+        {!fullStage && (hasSong ? <Hud /> : <EmptyState />)}
+        {!fullStage && <RecordingBar />}
       </div>
-      {!lockHeight && (
+      {!lockHeight && !fullStage && (
         <div
           role="separator"
           aria-orientation="horizontal"
@@ -552,6 +554,12 @@ export function GameView() {
           onContextMenu={(e) => e.preventDefault()}
         />
       </div>
+      {fullStage && (
+        <div className="pointer-events-none absolute inset-0 z-20">
+          <Hud />
+          <RecordingBar />
+        </div>
+      )}
     </div>
   );
 }

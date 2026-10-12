@@ -513,6 +513,8 @@ export const tr: Dict = {
   edgeGapSize: "Alttaki boşluk",
   lockHeight: "Panel boyutunu kilitle",
   lockHeightHint: "Notalarla enstrüman arasındaki sürükleme çubuğunu kaldırır; çalarken (ör. teli titretirken) panel yanlışlıkla büyümez. Boyutu yukarıdaki kaydırıcıdan ayarlayabilirsin.",
+  freePlayStage: "Serbest çalda nota alanı",
+  freePlayStageHint: "Kapalı: serbest çalda enstrüman tüm ekranı kaplar, tuşlar ve teller büyür. Açık: üstteki alan kalır, çaldığın notalardan ışık yükselir.",
   keyZoom: "Piyano tuş büyütme",
   keyZoomHint: "Telefonda daha geniş tuşlar; kalan kısım ekran dışına taşar. Tuşların üstündeki şeridi sürükleyerek görünen kısmı seç.",
   keyZoomIn: "Tuşları büyüt",
