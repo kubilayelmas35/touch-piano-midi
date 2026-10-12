@@ -416,7 +416,7 @@ export class FretboardRenderer extends CanvasSurface {
 
     // Inlays / position markers.
     const bare = !!view.hideFrets;
-    const inlays = bare ? [] : view.violin ? [2, 4, 5, 7, 9, 12] : [3, 5, 7, 9, 12, 15];
+    const inlays = bare ? [] : view.violin ? [2, 4, 5, 7, 9, 12] : [3, 5, 7, 9, 12, 15, 17, 19, 21, 24];
     const dotR = Math.min(7, L.colW * 0.16);
     ctx.fillStyle = withAlpha(sk.inlay, sk.inlayAlpha);
     for (const f of inlays) {
@@ -425,12 +425,12 @@ export class FretboardRenderer extends CanvasSurface {
       const cx = col.x + col.w / 2;
       if (sk.inlayShape === "band") ctx.fillRect(col.x, 0, col.w, h);
       else if (sk.inlayShape === "block") {
-        const bw = col.w * (f === 12 ? 0.42 : 0.32);
-        const bh = h * (f === 12 ? 0.7 : 0.5);
+        const bw = col.w * (f % 12 === 0 ? 0.42 : 0.32);
+        const bh = h * (f % 12 === 0 ? 0.7 : 0.5);
         roundRect(ctx, cx - bw / 2, (h - bh) / 2, bw, bh, 2);
         ctx.fill();
       } else {
-        for (const y of f === 12 ? [h * 0.3, h * 0.7] : [h / 2]) {
+        for (const y of f % 12 === 0 ? [h * 0.3, h * 0.7] : [h / 2]) {
           ctx.beginPath();
           ctx.arc(cx, y, dotR, 0, Math.PI * 2);
           ctx.fill();
@@ -470,7 +470,7 @@ export class FretboardRenderer extends CanvasSurface {
     ctx.textBaseline = "top";
     for (let i = 0; i < (bare || neckW <= 0 ? 0 : L.columns); i++) {
       const f = L.frets[i];
-      if (f === 0 || (L.colW < 22 && f % 2 === 0 && f !== 12)) continue;
+      if (f === 0 || (L.colW < 22 && f % 2 === 0 && f % 12 !== 0)) continue;
       const cx = i * L.colW + L.colW / 2;
       ctx.font = "600 9px system-ui, sans-serif";
       ctx.fillStyle = sk.numbers;

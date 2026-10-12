@@ -96,4 +96,13 @@ describe("fretView", () => {
     expect(L.column(2)).toBeNull();
     expect(L.inPluckZone(0)).toBe(true);
   });
+
+  it("shows the whole neck up to the chosen fret, past the instrument's usual range", () => {
+    const L = fretView(GUITAR, 800, { ...base, fullNeck: 22 });
+    expect(L.frets).toEqual(Array.from({ length: 23 }, (_, f) => f));
+    expect(L.column(22)).not.toBeNull();
+    expect(fretView(GUITAR, 800, { ...base, fullNeck: 22, hideNut: true }).frets[0]).toBe(1);
+    expect(fretView(VIOLIN, 2000, { ...base }).lastFret).toBe(VIOLIN.maxFret);
+    expect(fretView(VIOLIN, 2000, { ...base, fullNeck: 19 }).lastFret).toBe(19);
+  });
 });

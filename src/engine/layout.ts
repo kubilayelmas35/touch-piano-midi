@@ -288,7 +288,15 @@ export interface FretViewOptions {
   part: "both" | "neck" | "strings";
   /** Strike-zone size relative to the automatic width (1). */
   strikeZone?: number;
+  /** Full neck: every fret from the nut up to this one, however few the song uses. */
+  fullNeck?: number | null;
 }
+
+/** Frets a full neck can end at, per instrument; never below the frets songs are written on. */
+export const NECK_FRETS = {
+  guitar: [15, 19, 22, 24],
+  violin: [12, 15, 19, 24],
+} as const;
 
 /** The fretboard for a song and the view settings. */
 export function fretView(spec: FrettedSpec, totalW: number, o: FretViewOptions): FretLayout {
@@ -296,14 +304,16 @@ export function fretView(spec: FrettedSpec, totalW: number, o: FretViewOptions):
   // Without a strike zone, open notes have nowhere else to fall, so the nut column stays.
   const hideNut = o.hideNut && pluckW > 0;
   const highest = o.usedFrets.reduce((m, f) => Math.max(m, f), 0);
+  const neck = o.fullNeck ? { ...spec, maxFret: o.fullNeck } : spec;
+  const last = o.fullNeck || visibleFrets(spec, totalW - pluckW, highest);
   let frets: number[] | undefined;
   if (o.compactFrets && o.usedFrets.some((f) => f > 0)) frets = [...new Set(o.usedFrets)];
   if (hideNut) {
-    frets ??= Array.from({ length: visibleFrets(spec, totalW - pluckW, highest) + 1 }, (_, f) => f);
+    frets ??= Array.from({ length: last + 1 }, (_, f) => f);
     frets = frets.filter((f) => f > 0);
   }
-  return new FretLayout(spec, totalW, {
-    lastFret: visibleFrets(spec, totalW - pluckW, highest),
+  return new FretLayout(neck, totalW, {
+    lastFret: last,
     frets,
     strings: o.compactStrings && o.usedStrings.length ? o.usedStrings : undefined,
     pluckW,

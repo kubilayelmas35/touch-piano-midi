@@ -3,7 +3,7 @@ import type { GuitarTone, InstrumentKind } from "../engine/types";
 import { readLegacySettings } from "../storage/migrate";
 import { GUITAR_SOUNDS, PIANO_SOUNDS, VIOLIN_SOUNDS, type PianoSound, type ViolinSound } from "../audio/instruments";
 import { isNativeApp } from "../lib/platform";
-import { STRIKE_ZONE_RANGE } from "../engine/layout";
+import { NECK_FRETS, STRIKE_ZONE_RANGE } from "../engine/layout";
 import { STAFF_STYLES, type StaffStyle } from "../render/staffThemes";
 import {
   GUITAR_SKINS,
@@ -104,6 +104,11 @@ export interface Settings {
   compactFrets: boolean;
   /** Guitar/violin: only the strings the song uses. */
   compactStrings: boolean;
+  /** Guitar/violin: the whole neck (up to `neckFrets…`) instead of fitting the song. */
+  fullNeck: boolean;
+  /** Last fret of the full neck, per instrument. */
+  neckFretsGuitar: number;
+  neckFretsViolin: number;
   /** Guitar/violin one-handed: right hand shows only the strike zone, left hand only the neck. */
   handFocus: boolean;
   midiInput: string;
@@ -235,6 +240,9 @@ export function defaultSettings(): Settings {
     hideNut: false,
     compactFrets: false,
     compactStrings: false,
+    fullNeck: false,
+    neckFretsGuitar: 22,
+    neckFretsViolin: 19,
     handFocus: false,
     midiInput: "all",
     micSensitivity: 0.5,
@@ -393,6 +401,9 @@ function sanitize(s: Settings): Settings {
     hideNut: s.hideNut === true,
     compactFrets: s.compactFrets === true,
     compactStrings: s.compactStrings === true,
+    fullNeck: s.fullNeck === true,
+    neckFretsGuitar: (NECK_FRETS.guitar as readonly number[]).includes(s.neckFretsGuitar) ? s.neckFretsGuitar : d.neckFretsGuitar,
+    neckFretsViolin: (NECK_FRETS.violin as readonly number[]).includes(s.neckFretsViolin) ? s.neckFretsViolin : d.neckFretsViolin,
     handFocus: s.handFocus === true,
     instrumentHeight: num(s.instrumentHeight, ...INSTRUMENT_HEIGHT_RANGE, d.instrumentHeight),
     lockHeight: s.lockHeight === true,

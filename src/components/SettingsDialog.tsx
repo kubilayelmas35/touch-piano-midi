@@ -7,7 +7,7 @@ import { startMidi } from "../input/midi";
 import { useFullscreen } from "../lib/fullscreen";
 import { updateSettings } from "../state/actions";
 import { EDGE_GAP_RANGE, INSTRUMENT_HEIGHT_RANGE, KEY_ZOOM_MAX, defaultSettings, hasKeyboard } from "../state/settings";
-import { STRIKE_ZONE_RANGE } from "../engine/layout";
+import { NECK_FRETS, STRIKE_ZONE_RANGE } from "../engine/layout";
 import { PIANO_OCTAVES, noteName } from "../lib/notes";
 import { openVideo, setPanel, useApp } from "../state/store";
 import { isNativeApp, platform } from "../lib/platform";
@@ -799,6 +799,40 @@ export function SettingsDialog() {
             <Switch label={t("hideNut")} hint={t("hideNutHint")} checked={s.hideNut} onChange={(v) => updateSettings({ hideNut: v })} />
             <Switch label={t("compactFrets")} hint={t("compactFretsHint")} checked={s.compactFrets} onChange={(v) => updateSettings({ compactFrets: v })} />
             <Switch label={t("compactStrings")} hint={t("compactStringsHint")} checked={s.compactStrings} onChange={(v) => updateSettings({ compactStrings: v })} />
+            <Switch label={t("fullNeck")} hint={t("fullNeckHint")} checked={s.fullNeck} onChange={(v) => updateSettings({ fullNeck: v })} />
+            {s.fullNeck && (
+              <div className="py-2">
+                <div className="mb-1 text-sm font-medium">{t("neckFrets")}</div>
+                <p className="mb-2 text-xs leading-relaxed text-mist-400">{t("neckFretsHint")}</p>
+                {(["guitar", "violin"] as const).map((inst) => {
+                  const key = inst === "guitar" ? "neckFretsGuitar" : "neckFretsViolin";
+                  return (
+                    <div key={inst} className="mb-2 flex items-center gap-2">
+                      <span className="w-16 shrink-0 text-xs text-mist-300">{t(inst)}</span>
+                      <div className="flex flex-1 flex-wrap gap-2">
+                        {NECK_FRETS[inst].map((f) => {
+                          const on = s[key] === f;
+                          return (
+                            <button
+                              key={f}
+                              type="button"
+                              aria-pressed={on}
+                              onClick={() => updateSettings({ [key]: f })}
+                              className={cx(
+                                "min-w-[3rem] rounded-xl border px-3 py-2 text-xs font-semibold transition",
+                                on ? "border-brand-400/80 bg-brand-400/10 text-mist-100 ring-2 ring-brand-400/35" : "border-white/10 text-mist-400 hover:border-white/25"
+                              )}
+                            >
+                              {f}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
             <Switch label={t("handFocus")} hint={t("handFocusHint")} checked={s.handFocus} onChange={(v) => updateSettings({ handFocus: v })} />
             <Slider
               label={t("strikeZoneGuitar")}
