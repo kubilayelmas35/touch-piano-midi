@@ -1,4 +1,13 @@
 import { reportError } from "../lib/errors";
+import { platform } from "../lib/platform";
+
+/**
+ * Android phones (app or browser) render Web Audio on a much weaker audio thread; a dense piano passage at full
+ * quality overruns it, heard as crackling and dropouts. They get a larger output buffer, fewer voices, a shorter
+ * reverb and less oversampling.
+ */
+export const lightAudio =
+  platform === "android" || (platform === "web" && typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent));
 
 /** Shared AudioContext with a master bus: voices → dry/reverb → compressor → limiter → destination. */
 
@@ -50,7 +59,7 @@ function softClipper(ctx: AudioContext): { input: AudioNode; output: AudioNode }
   pre.gain.value = 0.5;
   const shaper = ctx.createWaveShaper();
   shaper.curve = softClipCurve();
-  shaper.oversample = "4x";
+  shaper.oversample = lightAudio ? "2x" : "4x";
   pre.connect(shaper);
   return { input: pre, output: shaper };
 }
@@ -67,7 +76,7 @@ export function setAudioSession(recording: boolean): void {
 export function getBus(): MasterBus {
   if (bus) return bus;
   setAudioSession(false);
-  const ctx = new AudioContext({ latencyHint: "interactive" });
+  const ctx = new AudioContext({ latencyHint: lightAudio ? "balanced" : "interactive" });
 
   const input = ctx.createGain();
   const dryInput = ctx.createGain();
@@ -102,7 +111,7 @@ export function getBus(): MasterBus {
   // the audio hardware switched between 44.1 and 48 kHz. Try the other rate, then go without reverb.
   for (const rate of new Set([ctx.sampleRate, 48000, 44100])) {
     try {
-      reverb.buffer = buildImpulse(ctx, 2.2, 3.2, rate);
+      reverb.buffer = buildImpulse(ctx, lightAudio ? 1.4 : 2.2, 3.2, rate);
       break;
     } catch (err) {
       console.warn(`[audio] reverb at ${rate} Hz rejected`, err);

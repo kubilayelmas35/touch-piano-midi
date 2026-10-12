@@ -1,6 +1,6 @@
 import { reportError } from "../lib/errors";
 import { isNativeApp, SITE_URL } from "../lib/platform";
-import { getBus } from "./context";
+import { getBus, lightAudio } from "./context";
 import { INSTRUMENTS, sampleUrl, type InstrumentDef, type InstrumentId } from "./instruments";
 
 export interface PlayOptions {
@@ -44,8 +44,15 @@ interface LoadedInstrument {
 const loaded = new Map<InstrumentId, LoadedInstrument>();
 const loading = new Map<InstrumentId, Promise<LoadedInstrument>>();
 const active = new Set<VoiceImpl>();
-const MAX_VOICES = 72;
+const MAX_VOICES = lightAudio ? 40 : 72;
 let nextId = 1;
+
+/** Voice to cut when out of voices: the one whose fade ends soonest, else the oldest still held. */
+export function pickVictim<T extends { readonly endsAt: number }>(voices: Iterable<T>): T | null {
+  let pick: T | null = null;
+  for (const v of voices) if (!pick || v.endsAt < pick.endsAt) pick = v;
+  return pick;
+}
 
 function makeLoopBuffer(ctx: BaseAudioContext, src: AudioBuffer, def: InstrumentDef): AudioBuffer {
   const loop = def.loop;
@@ -339,7 +346,8 @@ function velocityGain(v: number): number {
 class VoiceImpl implements Voice {
   readonly id = nextId++;
   done = false;
-  private releaseEnd = Infinity;
+  /** When its release fade ends; Infinity while the note is held. */
+  endsAt = Infinity;
   private readonly baseDetune: number;
   private readonly startedAt: number;
   private readonly level: GainNode;
@@ -373,8 +381,8 @@ class VoiceImpl implements Voice {
     const t = Math.max(when ?? ctx.currentTime, this.startedAt + 0.005);
     const rel = Math.max(this.def.minRelease, Math.min(this.def.maxRing, release ?? this.def.minRelease));
     // A later stop may only shorten the fade (re-striking a ringing key), never stretch it.
-    if (t + rel >= this.releaseEnd) return;
-    this.releaseEnd = t + rel;
+    if (t + rel >= this.endsAt) return;
+    this.endsAt = t + rel;
     const g = this.env.gain;
     if (typeof g.cancelAndHoldAtTime === "function") {
       g.cancelAndHoldAtTime(t);
@@ -398,6 +406,7 @@ class VoiceImpl implements Voice {
 
   kill(): void {
     if (this.done) return;
+    active.delete(this);
     const ctx = this.env.context as AudioContext;
     const t = ctx.currentTime;
     const g = this.env.gain;
@@ -409,6 +418,7 @@ class VoiceImpl implements Voice {
       g.setValueAtTime(g.value, t);
     }
     g.setTargetAtTime(0, t, 0.012);
+    this.endsAt = t + 0.07;
     try {
       this.source.stop(t + 0.07);
     } catch {
@@ -440,14 +450,7 @@ export function playNote(id: InstrumentId, midi: number, velocity: number, opts:
   const sample = opts.duration == null && base.held ? base.held : base;
   const buffer = sample.buffer;
 
-  if (active.size >= MAX_VOICES) {
-    let oldest: VoiceImpl | null = null;
-    for (const v of active) {
-      oldest = v;
-      break;
-    }
-    oldest?.kill();
-  }
+  if (active.size >= MAX_VOICES) pickVictim(active)?.kill();
 
   const source = ctx.createBufferSource();
   source.buffer = buffer;
