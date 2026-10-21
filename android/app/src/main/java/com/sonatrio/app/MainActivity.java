@@ -9,7 +9,7 @@ import android.view.WindowManager;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 
-import androidx.core.graphics.Insets;
+import androidx.activity.EdgeToEdge;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -22,10 +22,11 @@ import java.util.Arrays;
 public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        // Android 15 / targetSdk 35+: declare edge-to-edge before the content view is set.
+        EdgeToEdge.enable(this);
         super.onCreate(savedInstanceState);
         // Practising with both hands on the screen: never dim or lock while the app is open.
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         fillCutout();
         // Shown behind the system bars while a swipe brings them back.
         getWindow().getDecorView().setBackgroundColor(Color.rgb(0x0a, 0x0d, 0x1f));
@@ -79,13 +80,12 @@ public class MainActivity extends BridgeActivity {
      * "disable"). Only the keyboard still pushes the page up.
      */
     private void fillCutout() {
-        WindowManager.LayoutParams attrs = getWindow().getAttributes();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            attrs.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        // EdgeToEdge.enable already draws behind the cutout on current APIs; only set the mode on older ones.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            WindowManager.LayoutParams attrs = getWindow().getAttributes();
             attrs.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+            getWindow().setAttributes(attrs);
         }
-        getWindow().setAttributes(attrs);
 
         ViewCompat.setOnApplyWindowInsetsListener(getWindow().getDecorView(), (v, insets) -> {
             boolean keyboard = insets.isVisible(WindowInsetsCompat.Type.ime());
@@ -93,10 +93,8 @@ public class MainActivity extends BridgeActivity {
             // hidden, a single swipe from the bottom leaves the app.
             if (!keyboard && insets.isVisible(WindowInsetsCompat.Type.navigationBars())) v.post(this::immersive);
             v.setPadding(0, 0, 0, keyboard ? insets.getInsets(WindowInsetsCompat.Type.ime()).bottom : 0);
-            return new WindowInsetsCompat.Builder(insets)
-                .setInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout(), Insets.NONE)
-                .setDisplayCutout(null)
-                .build();
+            // Consume system-bar / cutout insets so the WebView stays full-bleed (piano at the screen edge).
+            return WindowInsetsCompat.CONSUMED;
         });
     }
 }
