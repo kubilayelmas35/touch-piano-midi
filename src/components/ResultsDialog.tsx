@@ -8,6 +8,7 @@ import { IconCheck, IconPlay, IconShare, IconStar, IconTrophy } from "../ui/icon
 import { shareResult } from "../lib/shareResult";
 import { Button, Dialog } from "../ui/primitives";
 import { CoachResult, CoachResultActions } from "./CoachUI";
+import { EffectsTip } from "./EffectsTip";
 import { SignInNudge } from "./SignInNudge";
 import { InsightsCard } from "./InsightsCard";
 import { ResultsSocial } from "./ResultsSocial";
@@ -219,6 +220,7 @@ export function ResultsDialog() {
             </ul>
           </button>
         )}
+        {!dirty && <EffectsTip />}
         {!dirty && <SignInNudge periodic beforeOpen={closeResults} />}
       </div>
     </Dialog>

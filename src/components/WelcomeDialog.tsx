@@ -6,7 +6,8 @@ import { updateSettings } from "../state/actions";
 import { openVideo, setPanel, useApp } from "../state/store";
 import { unlockAudio } from "../audio/context";
 import { IconGuitar, IconKeyboard, IconLibrary, IconPiano, IconRoute, IconSparkles, IconStar, IconTrophy, IconViolin } from "../ui/icons";
-import { Button, Dialog, Segmented, cx } from "../ui/primitives";
+import { Button, Dialog, cx } from "../ui/primitives";
+import { LanguageSelect } from "./LanguageSelect";
 
 function Choice<T extends string>({
   value,
@@ -121,33 +122,39 @@ export function WelcomeDialog() {
 
   return (
     <Dialog open={open} onClose={finish} width="max-w-xl" closeLabel={t("close")}>
-      <div className="pt-6 text-center">
-        <div className="mx-auto mb-3 flex items-center justify-between">
+      <div className="relative overflow-hidden pt-2 text-center">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -top-24 left-1/2 h-56 w-[28rem] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(139,92,246,0.35),transparent)]"
+        />
+        <div className="relative mb-4 flex items-center justify-between gap-3">
           <div className="flex gap-1.5" aria-label={t("stepOf", { n: step + 1, total: steps.length })}>
             {steps.map((_, i) => (
-              <span key={i} className={cx("h-1.5 rounded-full transition-all", i === step ? "w-6 bg-brand-400" : i < step ? "w-3 bg-brand-400/50" : "w-3 bg-white/15")} />
+              <span
+                key={i}
+                className={cx(
+                  "h-1.5 rounded-full transition-all",
+                  i === step ? "w-6 bg-brand-400" : i < step ? "w-3 bg-brand-400/50" : "w-3 bg-white/15"
+                )}
+              />
             ))}
           </div>
-          <Segmented
-            size="sm"
+          <LanguageSelect
             label={t("language")}
             value={settings.language}
             onChange={(v) => updateSettings({ language: v })}
-            options={[
-              { value: "tr", label: "TR" },
-              { value: "en", label: "EN" },
-            ]}
           />
         </div>
         {step === 0 && (
-          <>
-            <h1 className="bg-gradient-to-r from-sky-glow via-brand-300 to-brand-500 bg-clip-text text-3xl font-extrabold tracking-tight text-transparent">
+          <div className="relative mb-5">
+            <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-brand-300/90">Sonatrio</p>
+            <h1 className="mt-1 bg-gradient-to-r from-sky-glow via-brand-300 to-brand-500 bg-clip-text text-3xl font-extrabold tracking-tight text-transparent sm:text-4xl">
               {t("welcomeTitle")}
             </h1>
-            <p className="mx-auto mt-2 max-w-sm text-sm text-mist-300">{t("welcomeBody")}</p>
-          </>
+            <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-mist-300">{t("welcomeBody")}</p>
+          </div>
         )}
-        <h2 className={cx("mb-3 font-bold", step === 0 ? "mt-6 text-sm tracking-[0.12em] text-mist-400 uppercase" : "mt-2 text-xl")}>
+        <h2 className={cx("mb-3 font-bold", step === 0 ? "mt-1 text-sm tracking-[0.12em] text-mist-400 uppercase" : "mt-2 text-xl")}>
           {steps[step].title}
         </h2>
         {steps[step].body}

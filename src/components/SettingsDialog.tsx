@@ -1,5 +1,7 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useT } from "../i18n";
+import { LanguageSelect } from "./LanguageSelect";
+import { takePendingSettingsTab } from "./settingsNav";
 import { keyboardOctaveNow, pianoKeyMap } from "../input/keyboardBase";
 import { micSupported, toggleMic } from "../input/mic";
 import { MicDevicePicker, MicSensitivity } from "./MicChip";
@@ -227,7 +229,8 @@ const VIOLIN_SKIN_LABEL: Record<ViolinSkinId, DictKey> = {
   gold: "skGold",
 };
 
-type Tab = "general" | "look" | "sound" | "gameplay" | "input";
+export type SettingsTab = "general" | "look" | "sound" | "gameplay" | "input";
+type Tab = SettingsTab;
 
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 
@@ -309,6 +312,11 @@ export function SettingsDialog() {
   const fs = useFullscreen();
   const [tab, setTab] = useState<Tab>("general");
   const [askHideFrets, setAskHideFrets] = useState<"piano" | "fret" | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const pending = takePendingSettingsTab();
+    if (pending) setTab(pending);
+  }, [open]);
   /** Turning a fretless mode on asks whether the fret wires / key lines should go too. */
   const setFretless = (patch: { glidePiano: boolean } | { glideGuitar: boolean } | { glideViolin: boolean }) => {
     updateSettings(patch);
@@ -384,14 +392,10 @@ export function SettingsDialog() {
           <>
             <Section>
               <Row label={t("language")}>
-                <Segmented
+                <LanguageSelect
                   label={t("language")}
                   value={s.language}
                   onChange={(v) => updateSettings({ language: v })}
-                  options={[
-                    { value: "tr", label: "Türkçe" },
-                    { value: "en", label: "English" },
-                  ]}
                 />
               </Row>
               <Row label={t("noteNaming")}>

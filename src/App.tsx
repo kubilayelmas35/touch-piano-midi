@@ -20,7 +20,7 @@ import { TopBar } from "./components/TopBar";
 import { VideoDialog } from "./components/VideoDialog";
 import { WelcomeDialog } from "./components/WelcomeDialog";
 import { useGlobalInput } from "./hooks/useGlobalInput";
-import { useT } from "./i18n";
+import { isRtl, useT } from "./i18n";
 import { detectKeyLabels } from "./input/keyboard";
 import { startMidi } from "./input/midi";
 import { initNative } from "./lib/native";
@@ -77,6 +77,7 @@ export function App() {
 
   useEffect(() => {
     document.documentElement.lang = language;
+    document.documentElement.dir = isRtl(language) ? "rtl" : "ltr";
   }, [language]);
 
   return (

@@ -623,6 +623,10 @@ export const en = {
   violinDesc: "Bowed violin sound on the fingerboard",
   start: "Let's go",
   tipKeyboard: "Tip: press Space to play or pause.",
+  effectsTipTitle: "Want a bit more sparkle?",
+  effectsTipBody:
+    "Hit effects, dust clouds and approach lights start off so the first songs stay calm. Turn them on anytime in Settings → Look.",
+  effectsTipOpen: "Open Look settings",
   next: "Next",
   more: "More",
   stepOf: "Step {n} of {total}",

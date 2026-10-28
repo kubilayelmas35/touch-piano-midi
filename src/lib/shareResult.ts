@@ -1,6 +1,6 @@
 import { engine } from "../engine/engine";
 import { NoteState } from "../engine/types";
-import { tNow, type DictKey } from "../i18n";
+import { localeTag, tNow, type DictKey } from "../i18n";
 import { streak } from "../progress/progress";
 import { drawShareCard, type ShareCardData } from "../render/shareCard";
 import { toast, useApp } from "../state/store";
@@ -23,7 +23,7 @@ export async function resultCard(): Promise<HTMLCanvasElement | null> {
     accuracy: results.accuracy,
     maxCombo: results.stats.maxCombo,
     streak: streak(progress),
-    date: new Date().toLocaleDateString(settings.language === "tr" ? "tr-TR" : "en-US", { day: "numeric", month: "long", year: "numeric" }),
+    date: new Date().toLocaleDateString(localeTag(settings.language), { day: "numeric", month: "long", year: "numeric" }),
     badges: [results.newBest ? tNow("newBest") : "", results.daily ? tNow("dailyDoneNow") : ""].filter(Boolean),
     notes: engine.notes.map((n) => ({
       time: n.time,

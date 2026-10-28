@@ -32,7 +32,152 @@ import {
   type NoteStyle,
 } from "../render/appearance";
 
-export type Language = "tr" | "en";
+export type Language =
+  | "tr"
+  | "en"
+  | "ja"
+  | "ko"
+  | "zh"
+  | "id"
+  | "es"
+  | "pt"
+  | "de"
+  | "fr"
+  | "it"
+  | "nl"
+  | "pl"
+  | "ru"
+  | "ar"
+  | "vi"
+  | "th"
+  | "sv"
+  | "hi"
+  | "uk"
+  | "cs"
+  | "ro"
+  | "el"
+  | "hu"
+  | "da"
+  | "fi"
+  | "no"
+  | "sk"
+  | "bg"
+  | "hr"
+  | "he"
+  | "ms"
+  | "fa"
+  | "bn"
+  | "ca"
+  | "sr"
+  | "sl"
+  | "fil"
+  | "ta"
+  | "te"
+  | "mr"
+  | "ur"
+  | "et"
+  | "lv"
+  | "lt"
+  | "az"
+  | "kk"
+  | "sw"
+  | "af"
+  | "gu"
+  | "kn"
+  | "ml"
+  | "zht"
+  | "is"
+  | "eu"
+  | "gl"
+  | "hy"
+  | "ka"
+  | "be"
+  | "mk"
+  | "sq"
+  | "my"
+  | "km"
+  | "ne"
+  | "si"
+  | "pa"
+  | "am"
+  | "zu"
+  | "mn"
+  | "lo"
+  | "ky";
+
+const LANGUAGE_SET = new Set<string>([
+  "tr",
+  "en",
+  "ja",
+  "ko",
+  "zh",
+  "zht",
+  "id",
+  "es",
+  "pt",
+  "de",
+  "fr",
+  "it",
+  "nl",
+  "pl",
+  "ru",
+  "ar",
+  "vi",
+  "th",
+  "sv",
+  "hi",
+  "uk",
+  "cs",
+  "ro",
+  "el",
+  "hu",
+  "da",
+  "fi",
+  "no",
+  "sk",
+  "bg",
+  "hr",
+  "he",
+  "ms",
+  "fa",
+  "bn",
+  "ca",
+  "sr",
+  "sl",
+  "fil",
+  "ta",
+  "te",
+  "mr",
+  "ur",
+  "et",
+  "lv",
+  "lt",
+  "az",
+  "kk",
+  "sw",
+  "af",
+  "gu",
+  "kn",
+  "ml",
+  "is",
+  "eu",
+  "gl",
+  "hy",
+  "ka",
+  "be",
+  "mk",
+  "sq",
+  "my",
+  "km",
+  "ne",
+  "si",
+  "pa",
+  "am",
+  "zu",
+  "mn",
+  "lo",
+  "ky",
+]);
 
 export const DUET_SOUNDS = ["auto", "live", "off"] as const;
 export type DuetSound = (typeof DUET_SOUNDS)[number];
@@ -183,7 +328,83 @@ const KEY = "staveflow-settings-v2";
 
 function detectLanguage(): Language {
   const langs = navigator.languages?.length ? navigator.languages : [navigator.language];
-  return langs.some((l) => l?.toLowerCase().startsWith("tr")) ? "tr" : "en";
+  for (const raw of langs) {
+    const l = raw?.toLowerCase() ?? "";
+    if (l.startsWith("tr")) return "tr";
+    if (l.startsWith("ja")) return "ja";
+    if (l.startsWith("ko")) return "ko";
+    if (l.startsWith("zh")) {
+      if (l.includes("tw") || l.includes("hk") || l.includes("hant") || l.includes("mo")) return "zht";
+      return "zh";
+    }
+    if (l.startsWith("id")) return "id";
+    if (l.startsWith("es")) return "es";
+    if (l.startsWith("pt")) return "pt";
+    if (l.startsWith("de")) return "de";
+    if (l.startsWith("fr")) return "fr";
+    if (l.startsWith("it")) return "it";
+    if (l.startsWith("nl")) return "nl";
+    if (l.startsWith("pl")) return "pl";
+    if (l.startsWith("ru")) return "ru";
+    if (l.startsWith("ar")) return "ar";
+    if (l.startsWith("vi")) return "vi";
+    if (l.startsWith("th")) return "th";
+    if (l.startsWith("sv")) return "sv";
+    if (l.startsWith("hi")) return "hi";
+    if (l.startsWith("uk")) return "uk";
+    if (l.startsWith("cs")) return "cs";
+    if (l.startsWith("ro")) return "ro";
+    if (l.startsWith("el")) return "el";
+    if (l.startsWith("hu")) return "hu";
+    if (l.startsWith("da")) return "da";
+    if (l.startsWith("fi")) return "fi";
+    if (l.startsWith("nb") || l.startsWith("nn") || l.startsWith("no")) return "no";
+    if (l.startsWith("sk")) return "sk";
+    if (l.startsWith("bg")) return "bg";
+    if (l.startsWith("hr")) return "hr";
+    if (l.startsWith("he") || l.startsWith("iw")) return "he";
+    if (l.startsWith("ms")) return "ms";
+    if (l.startsWith("fa")) return "fa";
+    if (l.startsWith("bn")) return "bn";
+    if (l.startsWith("ca")) return "ca";
+    if (l.startsWith("sr")) return "sr";
+    if (l.startsWith("sl")) return "sl";
+    if (l.startsWith("fil") || l.startsWith("tl")) return "fil";
+    if (l.startsWith("ta")) return "ta";
+    if (l.startsWith("te")) return "te";
+    if (l.startsWith("mr")) return "mr";
+    if (l.startsWith("ur")) return "ur";
+    if (l.startsWith("et")) return "et";
+    if (l.startsWith("lv")) return "lv";
+    if (l.startsWith("lt")) return "lt";
+    if (l.startsWith("az")) return "az";
+    if (l.startsWith("kk")) return "kk";
+    if (l.startsWith("sw")) return "sw";
+    if (l.startsWith("af")) return "af";
+    if (l.startsWith("gu")) return "gu";
+    if (l.startsWith("kn")) return "kn";
+    if (l.startsWith("ml")) return "ml";
+    if (l.startsWith("is")) return "is";
+    if (l.startsWith("eu")) return "eu";
+    if (l.startsWith("gl")) return "gl";
+    if (l.startsWith("hy")) return "hy";
+    if (l.startsWith("ka")) return "ka";
+    if (l.startsWith("be")) return "be";
+    if (l.startsWith("mk")) return "mk";
+    if (l.startsWith("sq")) return "sq";
+    if (l.startsWith("my")) return "my";
+    if (l.startsWith("km")) return "km";
+    if (l.startsWith("ne")) return "ne";
+    if (l.startsWith("si")) return "si";
+    if (l.startsWith("pa")) return "pa";
+    if (l.startsWith("am")) return "am";
+    if (l.startsWith("zu")) return "zu";
+    if (l.startsWith("mn")) return "mn";
+    if (l.startsWith("lo")) return "lo";
+    if (l.startsWith("ky")) return "ky";
+    if (l.startsWith("en")) return "en";
+  }
+  return "en";
 }
 
 /** A device with a precise pointer usually has a keyboard too; phones, tablets and the phone app don't. */
@@ -210,13 +431,13 @@ export function defaultSettings(): Settings {
     fallSeconds: 3,
     showNoteNames: true,
     showKeyLabels: hasKeyboard(),
-    effects: true,
+    effects: false,
     effectLevel: 0.5,
     effectStyle: "sparks",
-    dustOn: true,
+    dustOn: false,
     dust: "smoke",
     dustLevel: 0.5,
-    approachOn: true,
+    approachOn: false,
     approach: "beam",
     pianoSkin: "standard",
     guitarSkin: "standard",
@@ -317,7 +538,13 @@ const KEYMAP_REV = 3;
 function migrate(raw: Partial<Settings>): Partial<Settings> {
   if (!raw || typeof raw !== "object") return raw;
   const s = offToSwitch(raw);
-  if ((s.keymapRev ?? 0) >= KEYMAP_REV) return s;
+  // Saves from before calm defaults: missing hit/dust/approach toggles meant "on".
+  const legacyFx: Partial<Settings> = {
+    ...(!("effects" in s) ? { effects: true } : {}),
+    ...(!("dustOn" in s) ? { dustOn: true } : {}),
+    ...(!("approachOn" in s) ? { approachOn: true } : {}),
+  };
+  if ((s.keymapRev ?? 0) >= KEYMAP_REV) return { ...s, ...legacyFx };
   const piano = s.keymaps?.piano;
   const rev = s.keymapRev ?? 0;
   const old =
@@ -327,6 +554,7 @@ function migrate(raw: Partial<Settings>): Partial<Settings> {
     (isPianoPreset(piano, "classic") || (rev >= 1 && isPianoPreset(piano, "twoRow")));
   return {
     ...s,
+    ...legacyFx,
     keymapRev: KEYMAP_REV,
     ...(old && s.keymaps ? { keymaps: { ...s.keymaps, piano: { ...PIANO_PRESETS.home } } } : {}),
     ...(rev < 3 && !hasKeyboard() ? { showKeyLabels: false, noteKeyLabels: false } : {}),
@@ -361,7 +589,7 @@ function sanitize(s: Settings): Settings {
   const d = defaultSettings();
   return {
     ...s,
-    language: s.language === "tr" || s.language === "en" ? s.language : d.language,
+    language: LANGUAGE_SET.has(s.language) ? s.language : d.language,
     noteNaming: s.noteNaming === "solfege" ? "solfege" : "letters",
     instrument: ["piano", "guitar", "violin"].includes(s.instrument) ? s.instrument : "piano",
     guitarTone: oneOf(GUITAR_SOUNDS, s.guitarTone, d.guitarTone),
@@ -373,12 +601,13 @@ function sanitize(s: Settings): Settings {
     clickVolume: num(s.clickVolume, 0, 1, d.clickVolume),
     timingWindowMs: num(s.timingWindowMs, 60, 300, d.timingWindowMs),
     fallSeconds: num(s.fallSeconds, 1, 8, d.fallSeconds),
+    effects: typeof s.effects === "boolean" ? s.effects : d.effects,
     effectLevel: num(s.effectLevel, 0.1, 1, d.effectLevel),
     effectStyle: oneOf(EFFECT_STYLES, s.effectStyle, d.effectStyle),
-    dustOn: s.dustOn !== false,
+    dustOn: typeof s.dustOn === "boolean" ? s.dustOn : d.dustOn,
     dust: oneOf(DUST_STYLES, s.dust, d.dust),
     dustLevel: num(s.dustLevel, 0.1, 1, d.dustLevel),
-    approachOn: s.approachOn !== false,
+    approachOn: typeof s.approachOn === "boolean" ? s.approachOn : d.approachOn,
     approach: oneOf(APPROACH_STYLES, s.approach, d.approach),
     pianoSkin: oneOf(PIANO_SKINS, s.pianoSkin, d.pianoSkin),
     guitarSkin: oneOf(GUITAR_SKINS, s.guitarSkin, d.guitarSkin),

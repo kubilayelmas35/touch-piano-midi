@@ -2,7 +2,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { startCoach } from "../coach/coach";
 import { pathSteps, readPath, stagesFor } from "../coach/path";
 import type { InstrumentKind } from "../engine/types";
-import { useT, type DictKey } from "../i18n";
+import { localeTag, useT, type DictKey } from "../i18n";
 import { desktop } from "../lib/platform";
 import { BUILTIN_SONGS, builtinTitle } from "../midi/builtin";
 import { ACHIEVEMENTS } from "../progress/achievements";
@@ -137,7 +137,7 @@ function WeekBars({ p, goal }: { p: Progress; goal: number }) {
                 d.key === today ? "font-bold text-mist-100" : "text-mist-400"
               )}
             >
-              {d.date.toLocaleDateString(lang === "tr" ? "tr-TR" : "en-US", { weekday: "short" })}
+              {d.date.toLocaleDateString(localeTag(lang), { weekday: "short" })}
             </span>
           </div>
         ))}
@@ -221,7 +221,7 @@ function RecentRuns({ p, onOpen }: { p: Progress; onOpen: (id: string) => void }
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-semibold">{title(r.song)}</div>
                   <div className="flex items-center gap-1.5 text-[11px] text-mist-400">
-                    {new Date(r.at).toLocaleDateString(lang === "tr" ? "tr-TR" : "en-US", { day: "numeric", month: "short" })}
+                    {new Date(r.at).toLocaleDateString(localeTag(lang), { day: "numeric", month: "short" })}
                     <span>·</span>
                     {t("speed")} {pct(r.speed)}
                     {r.wait && <IconWait size={11} className="text-amber-300" />}

@@ -616,6 +616,10 @@ export const tr: Dict = {
   violinDesc: "Keman klavyesinde yaylı keman sesi",
   start: "Başlayalım",
   tipKeyboard: "İpucu: çalmak/duraklatmak için Boşluk tuşuna bas.",
+  effectsTipTitle: "Biraz daha ışıltı ister misin?",
+  effectsTipBody:
+    "Vuruş efekti, toz bulutu ve yaklaşma efekti başlangıçta kapalı — ilk şarkılar sakin gelsin diye. İstediğin zaman Ayarlar → Görünüm’den açabilirsin.",
+  effectsTipOpen: "Görünüm ayarlarını aç",
   next: "İleri",
   more: "Daha fazla",
   stepOf: "Adım {n}/{total}",

@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { useT } from "../i18n";
+import { localeTag, useT } from "../i18n";
 import { formatTime } from "../lib/notes";
+import type { Language } from "../state/settings";
 import { useApp } from "../state/store";
 import { discardTake, saveTake, stopRecording } from "../studio/recording";
 import { IconShare, IconStop } from "../ui/icons";
@@ -30,9 +31,9 @@ export function RecordingBar() {
   );
 }
 
-function defaultName(lang: string): string {
+function defaultName(lang: Language): string {
   const d = new Date();
-  return d.toLocaleString(lang === "tr" ? "tr-TR" : "en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleString(localeTag(lang), { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
 export function TakeDialog() {

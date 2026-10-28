@@ -322,7 +322,7 @@ export function isArranged(id: string): boolean {
 
 export const BUILTIN_BY_DIFFICULTY: BuiltinInfo[] = [...BUILTIN_SONGS].sort(byDifficulty);
 
-export function builtinTitle(id: string, lang: "tr" | "en"): string {
+export function builtinTitle(id: string, lang: string): string {
   const s = BUILTIN_SONGS.find((x) => x.id === id);
   if (!s) return id;
   return lang === "tr" && s.titleTr ? s.titleTr : s.title;

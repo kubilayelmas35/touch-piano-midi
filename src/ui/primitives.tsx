@@ -190,7 +190,7 @@ export function Segmented<T extends string>({
     <div
       role="radiogroup"
       aria-label={label}
-      className={cx("inline-flex rounded-xl bg-black/30 p-1 border border-white/[0.06]", className)}
+      className={cx("inline-flex flex-wrap rounded-xl bg-black/30 p-1 border border-white/[0.06]", className)}
     >
       {options.map((o) => (
         <button

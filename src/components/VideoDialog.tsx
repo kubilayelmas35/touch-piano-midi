@@ -4,12 +4,13 @@ import { reportError } from "../lib/errors";
 import { isNativeApp, platform, SITE_URL } from "../lib/platform";
 import { useApp, type VideoKind } from "../state/store";
 import type { Language } from "../state/settings";
+import { videoLang } from "../i18n/langs";
 import { Button, Dialog } from "../ui/primitives";
 import { followGoal } from "../coach/coach";
 
 /** The Android app streams the videos from the website; the iOS app ships the tutorial and plays it offline. */
 export function videoUrl(kind: VideoKind, lang: Language, ext: "mp4" | "jpg" = "mp4"): string {
-  const file = `videos/${kind}-${lang}.${ext}`;
+  const file = `videos/${kind}-${videoLang(lang)}.${ext}`;
   return platform === "android" ? SITE_URL + file : file;
 }
 
