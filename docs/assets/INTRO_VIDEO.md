@@ -1,4 +1,4 @@
-# Açılış videosu
+# StaveFlow — açılış videosu
 
 `assets/intro.mp4` veya `assets/intro.webm` dosyasını buraya koyun (kısa, sessiz, ~5–15 sn önerilir).
 
