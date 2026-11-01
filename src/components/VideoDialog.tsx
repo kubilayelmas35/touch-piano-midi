@@ -1,17 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import { useT } from "../i18n";
 import { reportError } from "../lib/errors";
-import { isNativeApp, platform, SITE_URL } from "../lib/platform";
+import { isNativeApp, SITE_URL } from "../lib/platform";
 import { useApp, type VideoKind } from "../state/store";
 import type { Language } from "../state/settings";
 import { videoLang } from "../i18n/langs";
 import { Button, Dialog } from "../ui/primitives";
 import { followGoal } from "../coach/coach";
 
-/** The Android app streams the videos from the website; the iOS app ships the tutorial and plays it offline. */
+/**
+ * Native WebViews (especially iOS Capacitor) fail on large local mp4 over capacitor://
+ * (MEDIA_ERR_SRC_NOT_SUPPORTED / network 3 — no Range). Stream from the site instead;
+ * the system browser is the last resort when the in-app player still can't play it.
+ */
 export function videoUrl(kind: VideoKind, lang: Language, ext: "mp4" | "jpg" = "mp4"): string {
   const file = `videos/${kind}-${videoLang(lang)}.${ext}`;
-  return platform === "android" ? SITE_URL + file : file;
+  return isNativeApp ? SITE_URL + file : file;
 }
 
 function describeVideo(el: HTMLVideoElement): string {
@@ -20,7 +24,11 @@ function describeVideo(el: HTMLVideoElement): string {
   return `code ${e?.code ?? "-"} ${e?.message ?? ""}; network ${el.networkState}, ready ${el.readyState}; mp4 ${mp4}; ${el.currentSrc || el.src}`;
 }
 
-/** The system player (Safari view) when the in-app one can't play it. */
+/** Absolute https URL for the system player (Safari / Chrome Custom Tab). */
+function externalUrl(kind: VideoKind, lang: Language): string {
+  return SITE_URL + `videos/${kind}-${videoLang(lang)}.mp4`;
+}
+
 async function openExternally(url: string): Promise<void> {
   const { Browser } = await import("@capacitor/browser");
   await Browser.open({ url });
@@ -30,33 +38,34 @@ export function VideoDialog() {
   const t = useT();
   const video = useApp((s) => s.video);
   const lang = useApp((s) => s.settings.language);
-  const [failed, setFailed] = useState<string | null>(null);
-  const [fallback, setFallback] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
   const ref = useRef<HTMLVideoElement>(null);
   const close = () => {
     const first = useApp.getState().video?.first;
     useApp.setState({ video: null });
-    setFallback(null);
+    setFailed(false);
     if (first) followGoal();
   };
-  const local = video ? videoUrl(video.kind, lang) : "";
-  // A packaged file that won't play gets one more try from the website.
-  const src = fallback === local ? SITE_URL + local : local;
+  const src = video ? videoUrl(video.kind, lang) : "";
+  const openUrl = video ? externalUrl(video.kind, lang) : "";
 
   useEffect(() => {
-    if (!src) return;
+    setFailed(false);
+  }, [src]);
+
+  useEffect(() => {
+    if (!src || failed) return;
     const timer = setTimeout(() => {
       const el = ref.current;
       if (el && el.readyState < 2 && !el.error) reportError("error", `Video stalled: ${describeVideo(el)}`);
     }, 12000);
     return () => clearTimeout(timer);
-  }, [src]);
+  }, [src, failed]);
 
   const onError = () => {
     const el = ref.current;
     if (el) reportError("error", `Video failed: ${describeVideo(el)}`);
-    if (!src.startsWith("http")) setFallback(local);
-    else setFailed(src);
+    setFailed(true);
   };
 
   return (
@@ -75,13 +84,16 @@ export function VideoDialog() {
       {video && (
         <>
           {video.first && <p className="mb-3 text-sm text-mist-300">{t("tutorialFirstHint")}</p>}
-          {failed === src && isNativeApp ? (
+          {failed && isNativeApp ? (
             <div className="flex justify-center rounded-2xl bg-white/[0.05] px-4 py-8">
-              <Button variant="primary" onClick={() => void openExternally(src).catch((err) => reportError("error", err))}>
+              <Button
+                variant="primary"
+                onClick={() => void openExternally(openUrl).catch((err) => reportError("error", err))}
+              >
                 {t("videoOpenExternal")}
               </Button>
             </div>
-          ) : failed === src ? (
+          ) : failed ? (
             <p className="rounded-2xl bg-white/[0.05] px-4 py-8 text-center text-sm text-mist-300">{t("videoOffline")}</p>
           ) : (
             <video

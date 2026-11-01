@@ -30,7 +30,9 @@ function describe(error: unknown): { message: string; stack: string } {
 export function reportError(kind: ErrorKind, error: unknown): void {
   if (!supabase || import.meta.env.DEV) return;
   const { message, stack } = describe(error);
-  if (!message || IGNORED.some((re) => re.test(message))) return;
+  // Empty reject({}) / null show up as "{}" or "null" and aren't actionable.
+  if (!message || message === "{}" || message === "null" || message === "undefined") return;
+  if (IGNORED.some((re) => re.test(message))) return;
   if (/chrome-extension:|moz-extension:|safari-extension:/.test(stack)) return;
   const key = `${kind}|${message}`;
   if (seen.has(key) || seen.size >= MAX_PER_SESSION) return;
