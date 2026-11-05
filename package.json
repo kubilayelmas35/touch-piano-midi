@@ -2,7 +2,7 @@
   "name": "sonatrio",
   "productName": "Sonatrio",
   "private": true,
-  "version": "2.3.17",
+  "version": "2.3.18",
   "description": "Sonatrio — piano, guitar & violin with falling MIDI notes",
   "author": "Sonatrio",
   "homepage": "https://sonatrio.com",
@@ -21,9 +21,12 @@
     "android:sync": "npm run build && cap sync android",
     "android:apk": "npm run android:sync && cd android && gradlew.bat assembleRelease",
     "android:aab": "npm run android:sync && cd android && gradlew.bat bundleRelease",
-    "ios:sync": "npm run build && cap sync ios && node tools/strip-ios-videos.mjs"
+    "ios:localizations": "node tools/sync-ios-localizations.mjs",
+    "ios:sync": "npm run build && npm run ios:localizations && cap sync ios && node tools/strip-ios-videos.mjs"
   },
   "dependencies": {
+    "@capgo/capacitor-video-player": "^8.3.0",
+    "hls.js": "^1.7.4",
     "steamworks.js": "^0.4.0"
   },
   "devDependencies": {

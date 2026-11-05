@@ -7,3 +7,4 @@ release/
 android/keystore.properties
 *.jks
 *.keystore
+scripts/.store-upload-profile/

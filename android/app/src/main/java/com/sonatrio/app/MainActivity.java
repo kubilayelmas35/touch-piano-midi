@@ -10,6 +10,8 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 
 import androidx.activity.EdgeToEdge;
+import androidx.appcompat.app.ActionBar;
+import androidx.core.splashscreen.SplashScreen;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -22,9 +24,15 @@ import java.util.Arrays;
 public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        // Required for Theme.SplashScreen → postSplashScreenTheme; without this, some devices
+        // keep a native title bar showing the activity label ("Sonatrio").
+        SplashScreen.installSplashScreen(this);
         // Android 15 / targetSdk 35+: declare edge-to-edge before the content view is set.
         EdgeToEdge.enable(this);
         super.onCreate(savedInstanceState);
+        setTitle(null);
+        ActionBar bar = getSupportActionBar();
+        if (bar != null) bar.hide();
         // Practising with both hands on the screen: never dim or lock while the app is open.
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         fillCutout();
