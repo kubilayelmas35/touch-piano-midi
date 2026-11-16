@@ -140,6 +140,11 @@ export class KeyboardRenderer extends CanvasSurface {
     const pulse = 0.5 + 0.5 * Math.sin(now / 160);
     ctx.textAlign = "center";
     ctx.textBaseline = "alphabetic";
+    const whiteAt = new Map<number, number>();
+    if (view.showAllNames) {
+      let n = 0;
+      for (const m of L.keys) if (!isBlack(m)) whiteAt.set(m, ++n);
+    }
 
     // White keys (in compact mode every key is a full-height column; black ones are drawn below).
     for (const m of L.keys) {
@@ -185,7 +190,13 @@ export class KeyboardRenderer extends CanvasSurface {
       const fs = Math.max(8, Math.min(12, kw * 0.36));
       let ly = h - 7;
       const keyLabel = view.keyLabels?.get(m);
-      if (keyLabel && kw >= 16) {
+      const index = whiteAt.get(m);
+      if (index && kw >= 14) {
+        ctx.font = `800 ${fs}px system-ui, sans-serif`;
+        ctx.fillStyle = sound || pressed ? "rgba(255,255,255,0.95)" : k.whiteInk;
+        ctx.fillText(String(index), x + kw / 2, ly);
+        ly -= fs + 2;
+      } else if (keyLabel && kw >= 16) {
         ctx.font = `700 ${fs}px system-ui, sans-serif`;
         ctx.fillStyle = sound || pressed ? "rgba(255,255,255,0.95)" : withAlpha(k.whiteInk, 0.8);
         ctx.fillText(keyLabel.toUpperCase(), x + kw / 2, ly);
@@ -245,11 +256,12 @@ export class KeyboardRenderer extends CanvasSurface {
           ctx.fillStyle = sound || pressed ? "rgba(255,255,255,0.9)" : withAlpha(k.blackInk, 0.6);
           ctx.fillText(this.keyName(m, view, lane.w), lane.x + lane.w / 2, ly);
         }
-      } else if (keyLabel && lane.w >= 12) {
+      } else if ((view.showAllNames || keyLabel) && lane.w >= 12) {
         const fs = Math.max(8, Math.min(11, lane.w * 0.45));
         ctx.font = `700 ${fs}px system-ui, sans-serif`;
-        ctx.fillStyle = withAlpha(k.blackInk, 0.8);
-        ctx.fillText(keyLabel.toUpperCase(), lane.x + lane.w / 2, bh - 6);
+        ctx.fillStyle = sound || pressed ? "rgba(255,255,255,0.95)" : withAlpha(k.blackInk, 0.85);
+        const text = view.showAllNames ? this.keyName(m, view, lane.w) : keyLabel!.toUpperCase();
+        ctx.fillText(text, lane.x + lane.w / 2, bh - 6);
       }
     }
 

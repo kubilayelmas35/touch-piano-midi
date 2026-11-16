@@ -23,6 +23,7 @@ import { isNativeApp, platform } from "../lib/platform";
 import { Hud } from "./Hud";
 import { RecordingBar } from "./RecordingUI";
 import { EmptyState } from "./EmptyState";
+import { KEY_GUIDE_H, KeyGuide } from "./KeyGuide";
 import { KEY_STRIP_H, KeyStrip } from "./KeyStrip";
 
 const COMPACT_TIP_KEY = "sonatrio-compact-tip";
@@ -78,6 +79,7 @@ export function GameView() {
   const midiOctave = useApp((s) => s.settings.midiOctave);
   const midiTranspose = useApp((s) => s.settings.midiTranspose);
   const midiFit = useApp((s) => s.settings.midiFit);
+  const midiGuide = useApp((s) => s.settings.midiGuide);
   const song = useApp((s) => s.song);
   const playTracks = useApp((s) => s.session.playTracks);
   const hand = useApp((s) => s.session.hand);
@@ -214,8 +216,10 @@ export function GameView() {
     const opts = instrument === "guitar" ? { clefs: "treble" as const, transpose: 12 } : instrument === "violin" ? { clefs: "treble" as const } : {};
     return staffMetrics(used, room * 0.32, opts);
   }, [staffOn, used, room, instrument]);
-  const staffH = staff && room - staff.height >= 110 ? staff.height : 0;
-  const hwH = Math.max(0, size.h - instH - stripH - staffH);
+  const guideOn = instrument === "piano" && !!midiSpan && midiGuide && hasSong && used.length > 0 && !fullStage;
+  const guideH = guideOn ? KEY_GUIDE_H : 0;
+  const staffH = staff && room - staff.height - guideH >= 110 ? staff.height : 0;
+  const hwH = Math.max(0, size.h - instH - stripH - staffH - guideH);
 
   // Renderers live for the component lifetime; the frame loop reads the latest view through a ref.
   const renderers = useRef<{ hw: Highway; kb: KeyboardRenderer; fb: FretboardRenderer; staff: StaffRenderer } | null>(null);
@@ -311,7 +315,7 @@ export function GameView() {
           layout: v.layout.piano,
           t: time,
           naming: s.noteNaming,
-          showAllNames: false,
+          showAllNames: s.instrument === "piano" && s.midiKeys > 0 && s.midiGuide && !st.duet?.songId,
           keyLabels: s.showKeyLabels ? pianoLabels.map : null,
           bare: hideFrets,
           fingers: hideFrets ? [...pointers.current.values()].filter((p) => p.zone === "keys").map((p) => p.lastX) : undefined,
@@ -535,13 +539,18 @@ export function GameView() {
         {!fullStage && (hasSong ? <Hud /> : <EmptyState />)}
         {!fullStage && <RecordingBar />}
       </div>
+      {guideOn && midiSpan && (
+        <div className="absolute inset-x-0" style={{ top: staffH + hwH, height: guideH }}>
+          <KeyGuide low={midiSpan[0]} high={midiSpan[1]} />
+        </div>
+      )}
       {!lockHeight && !fullStage && (
         <div
           role="separator"
           aria-orientation="horizontal"
           aria-label={t("instrumentHeight")}
           className="group absolute inset-x-0 z-10 flex h-3 -translate-y-1/2 cursor-row-resize items-center justify-center touch-none"
-          style={{ top: staffH + hwH }}
+          style={{ top: staffH + hwH + guideH }}
           onPointerDown={onHandleDown}
           onPointerMove={onHandleMove}
           onPointerUp={onHandleUp}
@@ -551,7 +560,7 @@ export function GameView() {
         </div>
       )}
       {showStrip && layout?.piano && (
-        <div className="absolute inset-x-0" style={{ top: staffH + hwH, height: stripH }}>
+        <div className="absolute inset-x-0" style={{ top: staffH + hwH + guideH, height: stripH }}>
           <KeyStrip piano={layout.piano} used={used} />
         </div>
       )}

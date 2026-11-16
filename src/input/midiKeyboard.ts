@@ -1,4 +1,5 @@
-import { foldIntoSpan } from "../lib/notes";
+import { NoteState } from "../engine/types";
+import { foldIntoSpan, isBlack } from "../lib/notes";
 import { selectPlayerNotes, type HandFilter, type Song } from "../midi/song";
 
 /** Sizes a MIDI keyboard is sold in. 0 in settings means the on-screen piano follows the song. */
@@ -117,6 +118,35 @@ export function mapMidiNote(raw: number, map: MidiMap, span: [number, number] | 
   if (!map.keys || !span) return clampMidi(raw + shift);
   const n = span[0] + (raw - hardwareLow(map));
   return clampMidi(fold ? foldIntoSpan(n, span[0], span[1]) : n);
+}
+
+/** Where a pitch sits on a keyboard that starts at `low`: the white-key count from the left. */
+export interface KeyPlace {
+  /** 1-based. On a black key this is the white key immediately to its left. */
+  white: number;
+  black: boolean;
+}
+
+export function keyPlace(midi: number, low: number, high: number): KeyPlace | null {
+  if (midi < low || midi > high) return null;
+  let white = 0;
+  for (let m = low; m <= midi; m++) if (!isBlack(m)) white++;
+  if (!isBlack(midi)) return white > 0 ? { white, black: false } : null;
+  return white > 0 ? { white, black: true } : null;
+}
+
+/** The earliest chord that still has a note waiting to be played. */
+export function nextPendingChord<T extends { state: number; group: number }>(notes: readonly T[]): T[] {
+  let group = -1;
+  const out: T[] = [];
+  for (const n of notes) {
+    if (group < 0) {
+      if (n.state !== NoteState.Pending) continue;
+      group = n.group;
+    } else if (n.group !== group) break;
+    if (n.state === NoteState.Pending) out.push(n);
+  }
+  return out;
 }
 
 /** 0 light presses speak louder, 0.5 matches how hard the key was struck, 1 keeps soft playing quiet. */

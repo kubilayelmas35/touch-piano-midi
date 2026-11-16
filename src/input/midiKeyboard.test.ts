@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { PianoLayout } from "../engine/layout";
 import { foldIntoSpan } from "../lib/notes";
-import { defaultMidiLow, mapMidiNote, midiStartChoices, playedSpan, shapeVelocity, type MidiMap } from "./midiKeyboard";
+import { NoteState } from "../engine/types";
+import { defaultMidiLow, keyPlace, mapMidiNote, midiStartChoices, nextPendingChord, playedSpan, shapeVelocity, type MidiMap } from "./midiKeyboard";
 
 const fixed = (over: Partial<MidiMap> = {}): MidiMap => ({
   keys: 25,
@@ -70,6 +71,33 @@ describe("foldIntoSpan", () => {
     expect(foldIntoSpan(48, 60, 84)).toBe(60);
     expect(foldIntoSpan(96, 60, 84)).toBe(84);
     expect(foldIntoSpan(49, 60, 84)).toBe(61);
+  });
+});
+
+describe("keyPlace", () => {
+  it("counts white keys from the left of a 25-key keyboard", () => {
+    expect(keyPlace(48, 48, 72)).toEqual({ white: 1, black: false });
+    expect(keyPlace(49, 48, 72)).toEqual({ white: 1, black: true });
+    expect(keyPlace(60, 48, 72)).toEqual({ white: 8, black: false });
+    expect(keyPlace(72, 48, 72)).toEqual({ white: 15, black: false });
+    expect(keyPlace(47, 48, 72)).toBeNull();
+  });
+
+  it("counts from F when a 32-key keyboard starts there", () => {
+    expect(keyPlace(53, 53, 84)).toEqual({ white: 1, black: false });
+    expect(keyPlace(60, 53, 84)).toEqual({ white: 5, black: false });
+  });
+});
+
+describe("nextPendingChord", () => {
+  it("keeps the earliest chord and drops notes already played", () => {
+    const notes = [
+      { state: NoteState.Hit, group: 0 },
+      { state: NoteState.Pending, group: 1 },
+      { state: NoteState.Pending, group: 1 },
+      { state: NoteState.Pending, group: 2 },
+    ];
+    expect(nextPendingChord(notes)).toEqual([notes[1], notes[2]]);
   });
 });
 

@@ -276,6 +276,8 @@ export interface Settings {
   midiChannel: number;
   /** Honour the keyboard's sustain pedal. */
   midiPedal: boolean;
+  /** Name the next note and which white key it is, for a keyboard with no lights. */
+  midiGuide: boolean;
   /** Microphone listening: 0 only loud notes … 1 picks up quiet playing. */
   micSensitivity: number;
   /** Microphone to listen with (a MediaDevices id); "" is the system default. */
@@ -496,6 +498,7 @@ export function defaultSettings(): Settings {
     midiVelocity: 0.5,
     midiChannel: 0,
     midiPedal: true,
+    midiGuide: true,
     micSensitivity: 0.5,
     micDevice: "",
     duetSound: "auto",
@@ -674,6 +677,7 @@ function sanitize(s: Settings): Settings {
     midiVelocity: num(s.midiVelocity, 0, 1, 0.5),
     midiChannel: Math.round(num(s.midiChannel, 0, 16, 0)),
     midiPedal: s.midiPedal !== false,
+    midiGuide: s.midiGuide !== false,
     instrumentHeight: num(s.instrumentHeight, ...INSTRUMENT_HEIGHT_RANGE, d.instrumentHeight),
     lockHeight: s.lockHeight === true,
     edgeGap: typeof s.edgeGap === "boolean" ? s.edgeGap : d.edgeGap,

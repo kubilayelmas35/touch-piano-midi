@@ -37,6 +37,7 @@ describe("MIDI keyboard", () => {
     expect([s.midiOctave, s.midiTranspose, s.midiChannel]).toEqual([1, -2, 10]);
     expect(s.midiFold).toBe(true);
     expect(s.midiFit).toBe(true);
+    expect(s.midiGuide).toBe(true);
     const bad = sanitizeSettings({ midiKeys: 30, midiOctave: 9, midiLow: 2 } as never);
     expect(bad.midiKeys).toBe(0);
     expect(bad.midiOctave).toBe(3);
