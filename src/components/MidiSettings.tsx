@@ -113,7 +113,6 @@ export function MidiKeyboardSettings() {
           />
           <Switch label={t("midiFit")} hint={t("midiFitHint")} checked={s.midiFit} onChange={(v) => updateSettings({ midiFit: v })} />
           <Switch label={t("midiFold")} hint={t("midiFoldHint")} checked={s.midiFold} onChange={(v) => updateSettings({ midiFold: v })} />
-          <Switch label={t("midiGuide")} hint={t("midiGuideHint")} checked={s.midiGuide} onChange={(v) => updateSettings({ midiGuide: v })} />
         </>
       )}
 

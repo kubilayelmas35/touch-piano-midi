@@ -10,6 +10,7 @@ import {
   type NoteColor,
   type NoteStyle,
 } from "../render/appearance";
+import { type CueStyle, type LampStyle } from "../render/cue";
 import { HAND_INK, STAFF_THEMES, type StaffStyle } from "../render/staffThemes";
 import { pastelKey, type FretSkin, type PianoSkin } from "../render/instrumentSkins";
 import { GUITAR_STRING_COLORS, VIOLIN_STRING_COLORS, withAlpha } from "../render/theme";
@@ -581,6 +582,41 @@ export function ApproachSwatch({ style }: { style: ApproachStyle }) {
         <div className="absolute bottom-0.5 left-1/2 h-2 w-9 -translate-x-1/2 rounded-[50%]" style={{ background: `radial-gradient(${c}, ${c}55 60%, transparent)` }} />
       )}
       <div className="absolute left-[40%] top-[22%] h-[22%] w-[20%] rounded-md" style={{ background: `linear-gradient(#bdf3ff, ${c})`, boxShadow: `0 0 8px ${c}` }} />
+    </div>
+  );
+}
+
+/** A falling note with the charge colour loading into it. */
+export function CueSwatch({ style, color }: { style: CueStyle; color: string }) {
+  return (
+    <div className="absolute inset-0 bg-[#12142a]" aria-hidden="true">
+      <div className="absolute top-[18%] left-1/2 h-[64%] w-[22%] -translate-x-1/2 overflow-hidden rounded-md bg-sky-400/80">
+        {style === "fill" && <div className="absolute inset-x-0 bottom-0 h-2/3" style={{ background: `linear-gradient(transparent, ${color})` }} />}
+        {style === "rise" && <div className="absolute inset-x-0 top-1/3 h-2" style={{ background: color, boxShadow: `0 0 8px ${color}` }} />}
+        {style === "pulse" && <div className="absolute inset-0" style={{ background: color, opacity: 0.55 }} />}
+        {style === "neon" && <div className="absolute inset-1 rounded-sm border-2" style={{ borderColor: color }} />}
+        {style === "ring" && <div className="absolute bottom-2 left-1/2 h-4 w-4 -translate-x-1/2 rounded-full border-2" style={{ borderColor: color }} />}
+        {style === "ember" && (
+          <>
+            <span className="absolute bottom-2 left-1/3 h-1.5 w-1.5 rounded-full" style={{ background: color }} />
+            <span className="absolute bottom-4 left-1/2 h-1.5 w-1.5 rounded-full bg-white" />
+          </>
+        )}
+        {style === "wave" && <div className="absolute inset-x-0 bottom-0 h-1/2" style={{ background: `linear-gradient(transparent, ${color})`, clipPath: "polygon(0 40%, 30% 20%, 60% 45%, 100% 10%, 100% 100%, 0 100%)" }} />}
+        {style === "spark" && <div className="absolute bottom-2 left-1/2 h-3 w-3 -translate-x-1/2 rotate-45" style={{ background: color }} />}
+      </div>
+    </div>
+  );
+}
+
+export function LampSwatch({ style, color }: { style: LampStyle; color: string }) {
+  return (
+    <div className="absolute inset-0 bg-[#0c1024]" aria-hidden="true">
+      {style === "beam" && <div className="absolute inset-x-[30%] bottom-0 h-3/4" style={{ background: `linear-gradient(transparent, ${color})` }} />}
+      {style === "bloom" && <div className="absolute bottom-0 left-1/2 h-2/3 w-1/2 -translate-x-1/2" style={{ background: `radial-gradient(ellipse at 50% 100%, ${color}, transparent 70%)` }} />}
+      {style === "bar" && <div className="absolute inset-x-[28%] bottom-0 h-2" style={{ background: color, boxShadow: `0 0 10px ${color}` }} />}
+      {style === "spark" && <div className="absolute bottom-0 left-1/2 h-1/2 w-1 -translate-x-1/2" style={{ background: `linear-gradient(transparent, ${color})` }} />}
+      {style === "rainbow" && <div className="absolute inset-x-[18%] bottom-0 h-2/3" style={{ background: "linear-gradient(transparent, #fb7185, #22d3ee)" }} />}
     </div>
   );
 }

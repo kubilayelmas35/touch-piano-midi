@@ -32,6 +32,7 @@ import {
   type NoteColor,
   type NoteStyle,
 } from "../render/appearance";
+import { CUE_COLORS, CUE_STYLES, LAMP_COLORS, LAMP_STYLES, type CueColor, type CueStyle, type LampColor, type LampStyle } from "../render/cue";
 
 export type Language =
   | "tr"
@@ -211,6 +212,23 @@ export interface Settings {
   dustLevel: number;
   approachOn: boolean;
   approach: ApproachStyle;
+  /** A colour loads into each falling note and flashes when it should be played. */
+  cueOn: boolean;
+  cueStyle: CueStyle;
+  cueColor: CueColor;
+  cueHex: string;
+  /** 0.15–1 strength of the loaded colour. */
+  cueLevel: number;
+  /** Bright light at the bottom edge of the screen, aimed at a keyboard underneath. */
+  lampOn: boolean;
+  lampStyle: LampStyle;
+  lampColor: LampColor;
+  /** 0.2–1 brightness of that edge light. */
+  lampLevel: number;
+  /** 0.3–1: how much of the screen width the row of lights uses. */
+  lampWidth: number;
+  /** -1 … 1 slides that row left or right so it can sit on the keyboard. */
+  lampShift: number;
   pianoSkin: PianoSkinId;
   guitarSkin: GuitarSkinId;
   violinSkin: ViolinSkinId;
@@ -276,8 +294,6 @@ export interface Settings {
   midiChannel: number;
   /** Honour the keyboard's sustain pedal. */
   midiPedal: boolean;
-  /** Name the next note and which white key it is, for a keyboard with no lights. */
-  midiGuide: boolean;
   /** Microphone listening: 0 only loud notes … 1 picks up quiet playing. */
   micSensitivity: number;
   /** Microphone to listen with (a MediaDevices id); "" is the system default. */
@@ -460,6 +476,17 @@ export function defaultSettings(): Settings {
     dustLevel: 0.5,
     approachOn: false,
     approach: "beam",
+    cueOn: true,
+    cueStyle: "fill",
+    cueColor: "gold",
+    cueHex: "#f5c451",
+    cueLevel: 0.85,
+    lampOn: false,
+    lampStyle: "beam",
+    lampColor: "match",
+    lampLevel: 1,
+    lampWidth: 1,
+    lampShift: 0,
     pianoSkin: "standard",
     guitarSkin: "standard",
     violinSkin: "standard",
@@ -498,7 +525,6 @@ export function defaultSettings(): Settings {
     midiVelocity: 0.5,
     midiChannel: 0,
     midiPedal: true,
-    midiGuide: true,
     micSensitivity: 0.5,
     micDevice: "",
     duetSound: "auto",
@@ -640,6 +666,17 @@ function sanitize(s: Settings): Settings {
     dustLevel: num(s.dustLevel, 0.1, 1, d.dustLevel),
     approachOn: typeof s.approachOn === "boolean" ? s.approachOn : d.approachOn,
     approach: oneOf(APPROACH_STYLES, s.approach, d.approach),
+    cueOn: s.cueOn !== false,
+    cueStyle: oneOf(CUE_STYLES, s.cueStyle, d.cueStyle),
+    cueColor: oneOf(CUE_COLORS, s.cueColor, d.cueColor),
+    cueHex: hex(s.cueHex, d.cueHex),
+    cueLevel: num(s.cueLevel, 0.15, 1, d.cueLevel),
+    lampOn: s.lampOn === true,
+    lampStyle: oneOf(LAMP_STYLES, s.lampStyle, d.lampStyle),
+    lampColor: oneOf(LAMP_COLORS, s.lampColor, d.lampColor),
+    lampLevel: num(s.lampLevel, 0.2, 1, d.lampLevel),
+    lampWidth: num(s.lampWidth, 0.3, 1, d.lampWidth),
+    lampShift: num(s.lampShift, -1, 1, d.lampShift),
     pianoSkin: oneOf(PIANO_SKINS, s.pianoSkin, d.pianoSkin),
     guitarSkin: oneOf(GUITAR_SKINS, s.guitarSkin, d.guitarSkin),
     violinSkin: oneOf(VIOLIN_SKINS, s.violinSkin, d.violinSkin),
@@ -677,7 +714,6 @@ function sanitize(s: Settings): Settings {
     midiVelocity: num(s.midiVelocity, 0, 1, 0.5),
     midiChannel: Math.round(num(s.midiChannel, 0, 16, 0)),
     midiPedal: s.midiPedal !== false,
-    midiGuide: s.midiGuide !== false,
     instrumentHeight: num(s.instrumentHeight, ...INSTRUMENT_HEIGHT_RANGE, d.instrumentHeight),
     lockHeight: s.lockHeight === true,
     edgeGap: typeof s.edgeGap === "boolean" ? s.edgeGap : d.edgeGap,

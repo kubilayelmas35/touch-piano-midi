@@ -28,8 +28,10 @@ import {
   ChoiceCards,
   ColorPicker,
   ColorSwatch,
+  CueSwatch,
   DustSwatch,
   EffectSwatch,
+  LampSwatch,
   FretSkinSwatch,
   NoteSwatch,
   PianoSkinSwatch,
@@ -62,6 +64,7 @@ import {
   type NoteColor,
   type NoteStyle,
 } from "../render/appearance";
+import { CUE_COLORS, CUE_STYLES, LAMP_COLORS, LAMP_STYLES, cueSwatch, type CueColor, type CueStyle, type LampColor, type LampStyle } from "../render/cue";
 import type { DictKey } from "../i18n/en";
 import { Button, Dialog, Segmented, Slider, Switch, cx } from "../ui/primitives";
 
@@ -141,6 +144,39 @@ const DUST_LABEL: Record<DustStyle, DictKey> = {
   embers: "duEmbers",
   stardust: "duStardust",
   snow: "duSnow",
+};
+const CUE_STYLE_LABEL: Record<CueStyle, DictKey> = {
+  fill: "cueFill",
+  rise: "cueRise",
+  pulse: "cuePulse",
+  neon: "cueNeon",
+  ring: "cueRing",
+  ember: "cueEmber",
+  wave: "cueWave",
+  spark: "cueSpark",
+};
+const CUE_COLOR_LABEL: Record<CueColor, DictKey> = {
+  gold: "ccGold",
+  amber: "ccAmber",
+  white: "ccWhite",
+  cyan: "ccCyan",
+  rose: "ccRose",
+  violet: "ccViolet",
+  lime: "ccLime",
+  ice: "ccIce",
+  note: "ccNote",
+  custom: "ccCustom",
+};
+const LAMP_STYLE_LABEL: Record<LampStyle, DictKey> = {
+  beam: "lampBeam",
+  bloom: "lampBloom",
+  bar: "lampBar",
+  spark: "lampSpark",
+  rainbow: "lampRainbow",
+};
+const LAMP_COLOR_LABEL: Record<LampColor, DictKey> = {
+  match: "lampMatch",
+  ...CUE_COLOR_LABEL,
 };
 const APPROACH_LABEL: Record<ApproachStyle, DictKey> = {
   beam: "apBeam",
@@ -594,6 +630,91 @@ export function SettingsDialog() {
                   onLocked={toPro}
                   options={APPROACH_STYLES.map((a) => ({ value: a, label: t(APPROACH_LABEL[a]), preview: <ApproachSwatch style={a} />, locked: designLocked("approach", a, pro) }))}
                 />
+              )}
+            </Section>
+            <Section>
+              <Switch label={t("cue")} hint={t("cueHint")} checked={s.cueOn} onChange={(v) => updateSettings({ cueOn: v })} />
+              {s.cueOn && (
+                <>
+                  <Slider
+                    label={t("cueLevel")}
+                    value={s.cueLevel}
+                    min={0.15}
+                    max={1}
+                    step={0.05}
+                    onChange={(v) => updateSettings({ cueLevel: v })}
+                    format={pct}
+                  />
+                  <ChoiceCards
+                    label={t("cueStyle")}
+                    value={look.cueStyle}
+                    onChange={(v) => updateSettings({ cueStyle: v })}
+                    onLocked={toPro}
+                    options={CUE_STYLES.map((c) => ({
+                      value: c,
+                      label: t(CUE_STYLE_LABEL[c]),
+                      preview: <CueSwatch style={c} color={cueSwatch(look.cueColor, s.cueHex)} />,
+                      locked: designLocked("cueStyle", c, pro),
+                    }))}
+                  />
+                  <ChoiceCards
+                    label={t("cueColor")}
+                    value={look.cueColor}
+                    onChange={(v) => updateSettings({ cueColor: v })}
+                    onLocked={toPro}
+                    options={CUE_COLORS.map((c) => ({
+                      value: c,
+                      label: t(CUE_COLOR_LABEL[c]),
+                      preview: <CueSwatch style="fill" color={cueSwatch(c, s.cueHex)} />,
+                      locked: designLocked("cueColor", c, pro),
+                    }))}
+                  />
+                  {look.cueColor === "custom" && (
+                    <ColorPicker label={t("cuePick")} value={s.cueHex} onChange={(v) => updateSettings({ cueHex: v })} />
+                  )}
+                </>
+              )}
+            </Section>
+            <Section>
+              <Switch label={t("lamp")} hint={t("lampHint")} checked={s.lampOn} onChange={(v) => updateSettings({ lampOn: v })} />
+              {s.lampOn && (
+                <>
+                  <Slider label={t("lampLevel")} value={s.lampLevel} min={0.2} max={1} step={0.05} onChange={(v) => updateSettings({ lampLevel: v })} format={pct} />
+                  <Slider label={t("lampWidth")} value={s.lampWidth} min={0.3} max={1} step={0.05} onChange={(v) => updateSettings({ lampWidth: v })} format={pct} />
+                  <Slider
+                    label={t("lampShift")}
+                    value={s.lampShift}
+                    min={-1}
+                    max={1}
+                    step={0.05}
+                    onChange={(v) => updateSettings({ lampShift: Math.round(v * 20) / 20 })}
+                    format={(v) => (v > 0 ? `+${Math.round(v * 100)}` : String(Math.round(v * 100)))}
+                  />
+                  <ChoiceCards
+                    label={t("lampStyle")}
+                    value={look.lampStyle}
+                    onChange={(v) => updateSettings({ lampStyle: v })}
+                    onLocked={toPro}
+                    options={LAMP_STYLES.map((c) => ({
+                      value: c,
+                      label: t(LAMP_STYLE_LABEL[c]),
+                      preview: <LampSwatch style={c} color={cueSwatch(look.cueColor, s.cueHex)} />,
+                      locked: designLocked("lampStyle", c, pro),
+                    }))}
+                  />
+                  <ChoiceCards
+                    label={t("lampColor")}
+                    value={look.lampColor}
+                    onChange={(v) => updateSettings({ lampColor: v })}
+                    onLocked={toPro}
+                    options={LAMP_COLORS.map((c) => ({
+                      value: c,
+                      label: t(LAMP_COLOR_LABEL[c]),
+                      preview: <LampSwatch style="beam" color={c === "match" ? cueSwatch(look.cueColor, s.cueHex) : cueSwatch(c, s.cueHex)} />,
+                      locked: designLocked("lampColor", c, pro),
+                    }))}
+                  />
+                </>
               )}
             </Section>
             <Section title={t("instrumentLook")}>

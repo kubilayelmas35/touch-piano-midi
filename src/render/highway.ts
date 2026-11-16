@@ -4,6 +4,7 @@ import { NoteState, type PlayNote } from "../engine/types";
 import { HAND_SPLIT } from "../midi/song";
 import { isBlack, noteName, type NoteNaming } from "../lib/notes";
 import { paletteColor, type ApproachStyle, type Background, type ColorChoice, type DustStyle, type EffectStyle, type NoteColor, type NoteStyle } from "./appearance";
+import { cueProgress, cueSwatch, paintNoteCue, type CueColor, type CueStyle } from "./cue";
 import { BackdropAnimator, paintBackdrop } from "./backgrounds";
 import { drawNote, labelHeight, lightInk } from "./noteStyles";
 import {
@@ -39,6 +40,8 @@ export interface HighwayView {
   /** 0.1–1 density of the dust cloud. */
   dustLevel: number;
   approach: ApproachStyle | "off";
+  /** Colour that loads into a falling note and flashes when it should be played. Off when null. */
+  cue: { style: CueStyle; color: CueColor; hex: string; level: number } | null;
   noteStyle: NoteStyle;
   noteColor: NoteColor;
   colors: ColorChoice;
@@ -509,6 +512,13 @@ export class Highway {
         glow,
       };
       drawNote(ctx, view.noteStyle, draw);
+      if (view.cue && n.state === NoteState.Pending) {
+        const prog = cueProgress(n.time - t, view.fallSeconds, this.engine.config.speed, this.engine.config.timingWindowMs / 1000);
+        if (prog) {
+          const ink = view.cue.color === "note" ? color : cueSwatch(view.cue.color, view.cue.hex);
+          paintNoteCue(ctx, { x: lane.x, y: yTop, w: lane.w, h: height }, prog, view.cue.style, ink, view.cue.level, now);
+        }
+      }
       if (holdingNow) holdingLanes.push({ x: lane.x, w: lane.w, top: Math.max(0, yTop), color: fill });
 
       // Matching marker in the string lane above the strike zone, in the same style.

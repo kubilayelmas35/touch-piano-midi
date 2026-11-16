@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { engine } from "../engine/engine";
+import { NoteState } from "../engine/types";
 import { type FretLayout, fretView, PianoLayout } from "../engine/layout";
 import { fretted } from "../input/fretted";
 import { glider } from "../input/glide";
@@ -11,7 +12,9 @@ import { GUITAR_SKIN, PIANO_SKIN, VIOLIN_SKIN } from "../render/instrumentSkins"
 import { hasPro } from "../auth/account";
 import { playedSpan, songPitchBounds, type MidiMap } from "../input/midiKeyboard";
 import { fullPianoKeys, niceKeyboardRange } from "../lib/notes";
+import { cueNoteHex, cueProgress, cueSwatch } from "../render/cue";
 import { Highway } from "../render/highway";
+import { lampSpot, paintKeyLamp } from "../render/keyLamp";
 import { COVERED_GAP, FramePacer, IDLE_GAP } from "../render/pacer";
 import { activeVoiceCount } from "../audio/sampler";
 import { StaffRenderer, staffMetrics } from "../render/staff";
@@ -23,7 +26,6 @@ import { isNativeApp, platform } from "../lib/platform";
 import { Hud } from "./Hud";
 import { RecordingBar } from "./RecordingUI";
 import { EmptyState } from "./EmptyState";
-import { KEY_GUIDE_H, KeyGuide } from "./KeyGuide";
 import { KEY_STRIP_H, KeyStrip } from "./KeyStrip";
 
 const COMPACT_TIP_KEY = "sonatrio-compact-tip";
@@ -79,7 +81,6 @@ export function GameView() {
   const midiOctave = useApp((s) => s.settings.midiOctave);
   const midiTranspose = useApp((s) => s.settings.midiTranspose);
   const midiFit = useApp((s) => s.settings.midiFit);
-  const midiGuide = useApp((s) => s.settings.midiGuide);
   const song = useApp((s) => s.song);
   const playTracks = useApp((s) => s.session.playTracks);
   const hand = useApp((s) => s.session.hand);
@@ -103,6 +104,7 @@ export function GameView() {
   const hwRef = useRef<HTMLCanvasElement>(null);
   const instRef = useRef<HTMLCanvasElement>(null);
   const staffRef = useRef<HTMLCanvasElement>(null);
+  const lampRef = useRef<HTMLCanvasElement>(null);
   const [box, setBox] = useState({ w: 0, h: 0 });
   const edgeGap = useApp((s) => (isNativeApp && s.settings.edgeGap ? s.settings.edgeGapPx : 0));
   const size = useMemo(() => ({ w: box.w, h: Math.max(0, box.h - edgeGap) }), [box, edgeGap]);
@@ -216,10 +218,8 @@ export function GameView() {
     const opts = instrument === "guitar" ? { clefs: "treble" as const, transpose: 12 } : instrument === "violin" ? { clefs: "treble" as const } : {};
     return staffMetrics(used, room * 0.32, opts);
   }, [staffOn, used, room, instrument]);
-  const guideOn = instrument === "piano" && !!midiSpan && midiGuide && hasSong && used.length > 0 && !fullStage;
-  const guideH = guideOn ? KEY_GUIDE_H : 0;
-  const staffH = staff && room - staff.height - guideH >= 110 ? staff.height : 0;
-  const hwH = Math.max(0, size.h - instH - stripH - staffH - guideH);
+  const staffH = staff && room - staff.height >= 110 ? staff.height : 0;
+  const hwH = Math.max(0, size.h - instH - stripH - staffH);
 
   // Renderers live for the component lifetime; the frame loop reads the latest view through a ref.
   const renderers = useRef<{ hw: Highway; kb: KeyboardRenderer; fb: FretboardRenderer; staff: StaffRenderer } | null>(null);
@@ -299,6 +299,7 @@ export function GameView() {
         dust: s.dustOn ? s.dust : "off",
         dustLevel: s.dustLevel,
         approach: s.approachOn ? s.approach : "off",
+        cue: s.cueOn ? { style: s.cueStyle, color: s.cueColor, hex: s.cueHex, level: s.cueLevel } : null,
         noteStyle: s.noteStyle,
         noteColor: s.noteColor,
         colors: { solid: s.solidColor, from: s.gradFrom, to: s.gradTo },
@@ -315,7 +316,7 @@ export function GameView() {
           layout: v.layout.piano,
           t: time,
           naming: s.noteNaming,
-          showAllNames: s.instrument === "piano" && s.midiKeys > 0 && s.midiGuide && !st.duet?.songId,
+          showAllNames: false,
           keyLabels: s.showKeyLabels ? pianoLabels.map : null,
           bare: hideFrets,
           fingers: hideFrets ? [...pointers.current.values()].filter((p) => p.zone === "keys").map((p) => p.lastX) : undefined,
@@ -340,6 +341,42 @@ export function GameView() {
           hideFrets,
           skin: s.instrument === "violin" ? VIOLIN_SKIN[s.violinSkin] : GUITAR_SKIN[s.guitarSkin],
         });
+      }
+      const lamp = lampRef.current;
+      if (lamp) {
+        const dpr = window.devicePixelRatio || 1;
+        const cssW = window.innerWidth;
+        const cssH = 96;
+        if (lamp.width !== Math.round(cssW * dpr) || lamp.height !== Math.round(cssH * dpr)) {
+          lamp.width = Math.round(cssW * dpr);
+          lamp.height = Math.round(cssH * dpr);
+        }
+        const g = lamp.getContext("2d");
+        const piano = v.layout.piano;
+        const inst = instRef.current;
+        if (g && s.lampOn && piano && inst) {
+          g.setTransform(dpr, 0, 0, dpr, 0, 0);
+          const rect = inst.getBoundingClientRect();
+          const win = s.timingWindowMs / 1000;
+          const spots: { x: number; w: number; p: number; flash: boolean; midi: number; color: string }[] = [];
+          const [i0, i1] = engine.visibleRange(time - win, time + 1.4);
+          for (let i = i0; i < i1; i++) {
+            const n = engine.notes[i];
+            if (!n || n.state !== NoteState.Pending) continue;
+            const prog = cueProgress(n.time - time, s.fallSeconds, engine.config.speed, win);
+            if (!prog || prog.p < 0.05) continue;
+            const lane = piano.lane(n.midi);
+            if (!lane) continue;
+            const spot = lampSpot(lane, rect.left, rect.width, s.lampWidth, s.lampShift);
+            const mode = s.lampColor === "match" ? s.cueColor : s.lampColor;
+            const color = mode === "note" ? cueNoteHex(n.midi) : cueSwatch(mode, s.cueHex);
+            spots.push({ ...spot, p: prog.p, flash: prog.flash, midi: n.midi, color });
+          }
+          paintKeyLamp(g, cssW, cssH, spots, s.lampStyle, s.lampLevel, performance.now());
+        } else if (g) {
+          g.setTransform(dpr, 0, 0, dpr, 0, 0);
+          g.clearRect(0, 0, cssW, cssH);
+        }
       }
     };
     raf = requestAnimationFrame(frame);
@@ -528,6 +565,7 @@ export function GameView() {
 
   return (
     <div ref={wrapRef} className="relative min-h-0 flex-1 overflow-hidden">
+      <canvas ref={lampRef} className="pointer-events-none fixed bottom-0 left-0 z-20 h-24 w-screen" aria-hidden="true" />
       <canvas
         ref={staffRef}
         className="absolute inset-x-0 top-0 block w-full"
@@ -539,18 +577,13 @@ export function GameView() {
         {!fullStage && (hasSong ? <Hud /> : <EmptyState />)}
         {!fullStage && <RecordingBar />}
       </div>
-      {guideOn && midiSpan && (
-        <div className="absolute inset-x-0" style={{ top: staffH + hwH, height: guideH }}>
-          <KeyGuide low={midiSpan[0]} high={midiSpan[1]} />
-        </div>
-      )}
       {!lockHeight && !fullStage && (
         <div
           role="separator"
           aria-orientation="horizontal"
           aria-label={t("instrumentHeight")}
           className="group absolute inset-x-0 z-10 flex h-3 -translate-y-1/2 cursor-row-resize items-center justify-center touch-none"
-          style={{ top: staffH + hwH + guideH }}
+          style={{ top: staffH + hwH }}
           onPointerDown={onHandleDown}
           onPointerMove={onHandleMove}
           onPointerUp={onHandleUp}
@@ -560,7 +593,7 @@ export function GameView() {
         </div>
       )}
       {showStrip && layout?.piano && (
-        <div className="absolute inset-x-0" style={{ top: staffH + hwH + guideH, height: stripH }}>
+        <div className="absolute inset-x-0" style={{ top: staffH + hwH, height: stripH }}>
           <KeyStrip piano={layout.piano} used={used} />
         </div>
       )}
