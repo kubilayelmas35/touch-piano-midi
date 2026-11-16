@@ -36,13 +36,18 @@ import { coachAfterRun } from "../coach/coach";
 import { drillAfterPass } from "../coach/drill";
 import { analyzeRun, type Hand } from "../coach/insights";
 import { HAND_SPLIT, handTracks } from "../midi/song";
+import { playedSpan, songPitchBounds, type MidiMap } from "../input/midiKeyboard";
 
 export { handTracks };
 
 const LAST_SONG = "staveflow-last-song";
 
+function midiMapOf(s: Settings): MidiMap {
+  return { keys: s.midiKeys, low: s.midiLow, octave: s.midiOctave, transpose: s.midiTranspose, fit: s.midiFit };
+}
+
 export function engineConfig(): Partial<EngineConfig> {
-  const { settings, session, duet } = useApp.getState();
+  const { settings, session, duet, song } = useApp.getState();
   // In a live duet both devices must run the very same timeline.
   const together = !!duet?.songId;
   return {
@@ -57,7 +62,11 @@ export function engineConfig(): Partial<EngineConfig> {
     accompVolume: together && settings.duetSound !== "auto" ? 0 : settings.accompVolume,
     pianoPedal: settings.pianoPedal,
     pianoSustain: settings.pianoSustain,
-    compactKeys: settings.compactKeys,
+    compactKeys: !together && settings.midiKeys > 0 ? false : settings.compactKeys,
+    pianoSpan:
+      !together && settings.instrument === "piano" && settings.midiKeys > 0 && settings.midiFold
+        ? playedSpan(midiMapOf(settings), songPitchBounds(song, session.playTracks, session.hand))
+        : null,
     playTracks: session.playTracks,
     mutedTracks: session.mutedTracks,
     // On guitar/violin the hands split the playing technique (strike vs. fret), not the notes.

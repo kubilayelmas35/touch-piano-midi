@@ -1,3 +1,4 @@
+import { isMidiKeyCount } from "../input/midiKeyboard";
 import { PIANO_OCTAVES, type NoteNaming } from "../lib/notes";
 import type { GuitarTone, InstrumentKind } from "../engine/types";
 import { readLegacySettings } from "../storage/migrate";
@@ -257,6 +258,24 @@ export interface Settings {
   /** Guitar/violin one-handed: right hand shows only the strike zone, left hand only the neck. */
   handFocus: boolean;
   midiInput: string;
+  /** 0 = the on-screen piano follows the song. Otherwise a MIDI keyboard of this many keys. */
+  midiKeys: number;
+  /** 0 = the usual note for that size. Otherwise the MIDI note the leftmost key sends. */
+  midiLow: number;
+  /** Whole-keyboard shift in octaves, -3 … 3. */
+  midiOctave: number;
+  /** Semitone shift, -12 … 12, applied with the octave. */
+  midiTranspose: number;
+  /** Slide the fixed keyboard onto the open song. */
+  midiFit: boolean;
+  /** Notes outside the keyboard move by octaves onto a key it has. */
+  midiFold: boolean;
+  /** 0 soft … 1 firm. 0.5 plays the velocity the key sent. */
+  midiVelocity: number;
+  /** 0 = every channel, 1–16 = that channel only. */
+  midiChannel: number;
+  /** Honour the keyboard's sustain pedal. */
+  midiPedal: boolean;
   /** Microphone listening: 0 only loud notes … 1 picks up quiet playing. */
   micSensitivity: number;
   /** Microphone to listen with (a MediaDevices id); "" is the system default. */
@@ -468,6 +487,15 @@ export function defaultSettings(): Settings {
     neckFretsViolin: 19,
     handFocus: false,
     midiInput: "all",
+    midiKeys: 0,
+    midiLow: 0,
+    midiOctave: 0,
+    midiTranspose: 0,
+    midiFit: true,
+    midiFold: true,
+    midiVelocity: 0.5,
+    midiChannel: 0,
+    midiPedal: true,
     micSensitivity: 0.5,
     micDevice: "",
     duetSound: "auto",
@@ -637,6 +665,15 @@ function sanitize(s: Settings): Settings {
     neckFretsGuitar: (NECK_FRETS.guitar as readonly number[]).includes(s.neckFretsGuitar) ? s.neckFretsGuitar : d.neckFretsGuitar,
     neckFretsViolin: (NECK_FRETS.violin as readonly number[]).includes(s.neckFretsViolin) ? s.neckFretsViolin : d.neckFretsViolin,
     handFocus: s.handFocus === true,
+    midiKeys: isMidiKeyCount(s.midiKeys) ? s.midiKeys : 0,
+    midiLow: s.midiLow === 0 ? 0 : Math.round(num(s.midiLow, 21, 108, 0)),
+    midiOctave: Math.round(num(s.midiOctave, -3, 3, 0)),
+    midiTranspose: Math.round(num(s.midiTranspose, -12, 12, 0)),
+    midiFit: s.midiFit !== false,
+    midiFold: s.midiFold !== false,
+    midiVelocity: num(s.midiVelocity, 0, 1, 0.5),
+    midiChannel: Math.round(num(s.midiChannel, 0, 16, 0)),
+    midiPedal: s.midiPedal !== false,
     instrumentHeight: num(s.instrumentHeight, ...INSTRUMENT_HEIGHT_RANGE, d.instrumentHeight),
     lockHeight: s.lockHeight === true,
     edgeGap: typeof s.edgeGap === "boolean" ? s.edgeGap : d.edgeGap,

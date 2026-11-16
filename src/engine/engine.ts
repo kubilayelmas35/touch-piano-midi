@@ -4,6 +4,7 @@ import { INSTRUMENTS, soundIdFor, type InstrumentId } from "../audio/instruments
 import { isLoaded, loadInstrument, playNote, type Voice } from "../audio/sampler";
 import { HAND_SPLIT, handOfNote, handTracks, selectAccompanimentNotes, selectPlayerNotes, type Song, type SongNote } from "../midi/song";
 import { assignPianoFingers } from "./fingering";
+import { foldIntoSpan } from "../lib/notes";
 import { GUITAR, VIOLIN, assignFingerings, foldIntoRange, type FrettedSpec } from "./fretting";
 import {
   EARLY_FACTOR,
@@ -64,9 +65,15 @@ export const DEFAULT_CONFIG: EngineConfig = {
   pianoPedal: false,
   pianoSustain: 0.7,
   compactKeys: false,
+  pianoSpan: null,
   loop: { a: -1, b: -1, enabled: false },
   segmentEnd: 0,
 };
+
+function sameSpan(a: [number, number] | null, b: [number, number] | null): boolean {
+  if (a === b) return true;
+  return !!a && !!b && a[0] === b[0] && a[1] === b[1];
+}
 
 /** Fade of a key let go with the piano pedal mode on at the longest sustain (seconds to silence); none at 0. */
 const PEDAL_TAIL = 7.5;
@@ -297,7 +304,7 @@ export class Engine {
     const kept: SongNote[][] = groups.map((g) => {
       const seen = new Map<number, SongNote>();
       for (const n of g) {
-        const midi = spec ? foldIntoRange(n.midi, spec) : n.midi;
+        const midi = spec ? foldIntoRange(n.midi, spec) : cfg.pianoSpan ? foldIntoSpan(n.midi, cfg.pianoSpan[0], cfg.pianoSpan[1]) : n.midi;
         const prev = seen.get(midi);
         if (!prev || prev.duration < n.duration) seen.set(midi, { ...n, midi });
       }
@@ -608,7 +615,8 @@ export class Engine {
       next.countIn !== prev.countIn ||
       next.segmentEnd !== prev.segmentEnd ||
       next.playTracks.join() !== prev.playTracks.join() ||
-      next.mutedTracks.join() !== prev.mutedTracks.join();
+      next.mutedTracks.join() !== prev.mutedTracks.join() ||
+      !sameSpan(next.pianoSpan, prev.pianoSpan);
     const fingersChanged = next.compactKeys !== prev.compactKeys;
     const timingChanged = next.speed !== prev.speed || next.autoPlay !== prev.autoPlay;
     const audioChanged = instrumentIdFor(next) !== instrumentIdFor(prev);

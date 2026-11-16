@@ -29,6 +29,21 @@ describe("instrument looks", () => {
   });
 });
 
+describe("MIDI keyboard", () => {
+  it("keeps a 25-key setup and drops a size the app doesn't know", () => {
+    const s = sanitizeSettings({ midiKeys: 25, midiLow: 48, midiOctave: 1, midiTranspose: -2, midiVelocity: 0.2, midiChannel: 10 });
+    expect(s.midiKeys).toBe(25);
+    expect(s.midiLow).toBe(48);
+    expect([s.midiOctave, s.midiTranspose, s.midiChannel]).toEqual([1, -2, 10]);
+    expect(s.midiFold).toBe(true);
+    expect(s.midiFit).toBe(true);
+    const bad = sanitizeSettings({ midiKeys: 30, midiOctave: 9, midiLow: 2 } as never);
+    expect(bad.midiKeys).toBe(0);
+    expect(bad.midiOctave).toBe(3);
+    expect(bad.midiLow).toBe(21);
+  });
+});
+
 describe("instrument sounds", () => {
   it("keeps chosen sounds and falls back to the original ones", () => {
     const s = sanitizeSettings({ pianoSound: "church", guitarTone: "banjo", violinSound: "electric" });

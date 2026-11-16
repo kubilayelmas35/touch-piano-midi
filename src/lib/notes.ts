@@ -62,6 +62,26 @@ export function clamp(v: number, lo: number, hi: number): number {
   return v < lo ? lo : v > hi ? hi : v;
 }
 
+/**
+ * Moves a pitch by octaves into [lo, hi], keeping its name (C stays C).
+ * Pitches already inside are unchanged. A span shorter than an octave that has no match is clamped.
+ */
+export function foldIntoSpan(midi: number, lo: number, hi: number): number {
+  if (midi >= lo && midi <= hi) return midi;
+  const pc = ((midi % 12) + 12) % 12;
+  let best = lo;
+  let bestD = Infinity;
+  for (let x = lo; x <= hi; x++) {
+    if (((x % 12) + 12) % 12 !== pc) continue;
+    const d = Math.abs(x - midi);
+    if (d < bestD) {
+      best = x;
+      bestD = d;
+    }
+  }
+  return bestD === Infinity ? clamp(midi, lo, hi) : best;
+}
+
 export function formatTime(sec: number): string {
   const s = Math.max(0, Math.floor(sec));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;

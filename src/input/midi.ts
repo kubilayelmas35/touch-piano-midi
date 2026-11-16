@@ -1,7 +1,10 @@
 import { hasPro } from "../auth/account";
 import { engine } from "../engine/engine";
 import { tNow } from "../i18n";
+import { noteName } from "../lib/notes";
+import { updateSettings } from "../state/actions";
 import { setPanel, toast, useApp } from "../state/store";
+import { mapMidiNote, playedSpan, songPitchBounds, shapeVelocity, type MidiMap } from "./midiKeyboard";
 
 let access: MIDIAccess | null = null;
 let started = false;
@@ -10,6 +13,25 @@ const known = new Set<string>();
 
 function selectedInput(): string {
   return useApp.getState().settings.midiInput;
+}
+
+function midiMap(): MidiMap {
+  const s = useApp.getState().settings;
+  return { keys: s.midiKeys, low: s.midiLow, octave: s.midiOctave, transpose: s.midiTranspose, fit: s.midiFit };
+}
+
+/** Span the piano is showing for the keyboard, so a key lines up with the note it plays. */
+function liveSpan(map: MidiMap): [number, number] | null {
+  const { settings, song, session, duet } = useApp.getState();
+  if (duet?.songId || settings.instrument !== "piano" || !map.keys) return null;
+  return playedSpan(map, songPitchBounds(song, session.playTracks, session.hand));
+}
+
+function playedMidi(raw: number): number {
+  const s = useApp.getState().settings;
+  const map = midiMap();
+  const span = liveSpan(map);
+  return mapMidiNote(raw, map, span, s.midiFold && !!span);
 }
 
 function onMessage(this: MIDIInput, ev: MIDIMessageEvent): void {
@@ -21,6 +43,8 @@ function onMessage(this: MIDIInput, ev: MIDIMessageEvent): void {
   const channel = data[0] & 0x0f;
   const d1 = data[1];
   const d2 = data.length > 2 ? data[2] : 0;
+  const settings = useApp.getState().settings;
+  if (settings.midiChannel > 0 && channel !== settings.midiChannel - 1) return;
   const key = `midi:${this.id}:${channel}:${d1}`;
   if (!hasPro()) {
     // A MIDI keyboard is a Pro feature: the first key pressed explains it once per session.
@@ -32,10 +56,17 @@ function onMessage(this: MIDIInput, ev: MIDIMessageEvent): void {
     return;
   }
   if (status === 0x90 && d2 > 0) {
-    engine.press(key, d1, Math.max(0.08, d2 / 127));
+    if (useApp.getState().midiLearn === "low") {
+      updateSettings({ midiLow: d1, midiOctave: 0, midiTranspose: 0, midiFit: false });
+      useApp.setState({ midiLearn: null });
+      toast(tNow("midiLowSet", { note: noteName(d1, useApp.getState().settings.noteNaming, true) }), "success");
+    }
+    const note = playedMidi(d1);
+    useApp.setState({ midiHeard: note });
+    engine.press(key, note, shapeVelocity(d2 / 127, useApp.getState().settings.midiVelocity));
   } else if (status === 0x80 || (status === 0x90 && d2 === 0)) {
     engine.release(key);
-  } else if (status === 0xb0 && d1 === 64) {
+  } else if (status === 0xb0 && d1 === 64 && useApp.getState().settings.midiPedal) {
     engine.setSustain(d2 >= 64);
   } else if (status === 0xb0 && (d1 === 120 || d1 === 123)) {
     engine.releaseAll();

@@ -6,6 +6,7 @@ import { keyboardOctaveNow, pianoKeyMap } from "../input/keyboardBase";
 import { micSupported, toggleMic } from "../input/mic";
 import { MicDevicePicker, MicSensitivity } from "./MicChip";
 import { startMidi } from "../input/midi";
+import { MidiKeyboardSettings } from "./MidiSettings";
 import { useFullscreen } from "../lib/fullscreen";
 import { updateSettings } from "../state/actions";
 import { EDGE_GAP_RANGE, INSTRUMENT_HEIGHT_RANGE, KEY_ZOOM_MAX, defaultSettings, hasKeyboard } from "../state/settings";
@@ -949,6 +950,7 @@ export function SettingsDialog() {
                       ))}
                     </select>
                   )}
+                  <MidiKeyboardSettings />
                 </div>
               )}
             </Section>

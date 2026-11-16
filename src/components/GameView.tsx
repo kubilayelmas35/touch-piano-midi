@@ -9,6 +9,7 @@ import { INSTRUMENT_HEIGHT_RANGE } from "../state/settings";
 import { visibleLook } from "../state/designs";
 import { GUITAR_SKIN, PIANO_SKIN, VIOLIN_SKIN } from "../render/instrumentSkins";
 import { hasPro } from "../auth/account";
+import { playedSpan, songPitchBounds, type MidiMap } from "../input/midiKeyboard";
 import { fullPianoKeys, niceKeyboardRange } from "../lib/notes";
 import { Highway } from "../render/highway";
 import { COVERED_GAP, FramePacer, IDLE_GAP } from "../render/pacer";
@@ -72,6 +73,15 @@ export function GameView() {
   const compactKeys = useApp((s) => s.settings.compactKeys);
   const fullPiano = useApp((s) => s.settings.fullPiano);
   const pianoOctaves = useApp((s) => s.settings.pianoOctaves);
+  const midiKeys = useApp((s) => s.settings.midiKeys);
+  const midiLow = useApp((s) => s.settings.midiLow);
+  const midiOctave = useApp((s) => s.settings.midiOctave);
+  const midiTranspose = useApp((s) => s.settings.midiTranspose);
+  const midiFit = useApp((s) => s.settings.midiFit);
+  const song = useApp((s) => s.song);
+  const playTracks = useApp((s) => s.session.playTracks);
+  const hand = useApp((s) => s.session.hand);
+  const inDuet = useApp((s) => !!s.duet?.songId);
   const keyPan = useApp((s) => s.keyPan);
   const hideNut = useApp((s) => s.settings.hideNut);
   const compactFrets = useApp((s) => s.settings.compactFrets);
@@ -129,12 +139,17 @@ export function GameView() {
     [notesRev]
   );
   const fullKeys = useMemo(() => (fullPiano ? fullPianoKeys(pianoOctaves) : null), [fullPiano, pianoOctaves]);
+  const midiSpan = useMemo(() => {
+    if (inDuet || instrument !== "piano" || !midiKeys) return null;
+    const map: MidiMap = { keys: midiKeys, low: midiLow, octave: midiOctave, transpose: midiTranspose, fit: midiFit };
+    return playedSpan(map, songPitchBounds(song, playTracks, hand));
+  }, [inDuet, instrument, midiKeys, midiLow, midiOctave, midiTranspose, midiFit, song, playTracks, hand]);
   const range = useMemo<[number, number] | null>(
-    () => (!size.w ? null : fullKeys ? [fullKeys[0], fullKeys[fullKeys.length - 1]] : pianoRange(size.w)),
-    [size.w, notesRev, fullKeys] // eslint-disable-line react-hooks/exhaustive-deps
+    () => (!size.w ? null : midiSpan ? midiSpan : fullKeys ? [fullKeys[0], fullKeys[fullKeys.length - 1]] : pianoRange(size.w)),
+    [size.w, notesRev, fullKeys, midiSpan] // eslint-disable-line react-hooks/exhaustive-deps
   );
-  const keep = fullKeys && fullKeys.length < fullKeys[fullKeys.length - 1] - fullKeys[0] + 1 ? fullKeys : null;
-  const only = compactKeys && used.length ? used : null;
+  const keep = !midiSpan && fullKeys && fullKeys.length < fullKeys[fullKeys.length - 1] - fullKeys[0] + 1 ? fullKeys : null;
+  const only = !midiSpan && compactKeys && used.length ? used : null;
 
   const calm = useApp((s) => s.settings.onboarded && !s.welcomeOpen && !s.video && !s.panel);
   useEffect(() => {

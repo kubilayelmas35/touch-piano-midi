@@ -161,6 +161,10 @@ export interface AppState {
   /** "idle" until access is requested, then "ready" or "denied". */
   midiAccess: "idle" | "ready" | "denied";
   midiDevices: MidiDevice[];
+  /** "low" while the next note-on sets which note the leftmost MIDI key sends. */
+  midiLearn: "low" | null;
+  /** Last pitch the MIDI keyboard played, after octave, transpose and size mapping. */
+  midiHeard: number | null;
   /** Listening to a real instrument through the microphone. */
   mic: "off" | "starting" | "on" | "denied";
   social: import("../social/social").SocialOverview | null;
@@ -227,6 +231,8 @@ export const useApp = create<AppState>(() => ({
   midiSupported: typeof navigator !== "undefined" && "requestMIDIAccess" in navigator,
   midiAccess: "idle",
   midiDevices: [],
+  midiLearn: null,
+  midiHeard: null,
   mic: "off",
   social: null,
   socialLoading: false,

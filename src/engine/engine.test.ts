@@ -487,6 +487,16 @@ describe("engine", () => {
     expect(engine.notes.map((n) => n.finger)).not.toEqual([1, 2, 3]);
   });
 
+  it("folds piano notes onto a small keyboard by octaves", () => {
+    const notes: SongNote[] = [48, 60, 96].map((midi, i) => ({ midi, time: i * 0.4, duration: 0.25, velocity: 0.8, track: 0 }));
+    const song = finalizeSong("mini", notes, [{ index: 0, name: "Melody", instrument: "piano", isDrum: false, noteCount: 3, low: 48, high: 96 }], [], 60, 4);
+    const engine = new Engine();
+    engine.load(song, { playTracks: [0], hand: "both", pianoSpan: [60, 84] });
+    expect(engine.notes.map((n) => n.midi)).toEqual([60, 60, 84]);
+    engine.configure({ pianoSpan: null });
+    expect(engine.notes.map((n) => n.midi)).toEqual([48, 60, 96]);
+  });
+
   it("passes player input to every listener until it unsubscribes", async () => {
     const engine = await startEngine();
     const seen: string[] = [];

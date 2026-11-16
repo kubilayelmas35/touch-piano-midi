@@ -137,6 +137,8 @@ export interface EngineConfig {
   pianoSustain: number;
   /** Piano shows only the song's keys side by side; finger numbers then follow those columns. */
   compactKeys: boolean;
+  /** Piano notes fold into this inclusive span so a small MIDI keyboard can play them. Null keeps every pitch. */
+  pianoSpan: [number, number] | null;
   loop: LoopRange;
   /** Song time (s) the run stops at; notes from there on are left out. 0 = the whole song. */
   segmentEnd: number;
