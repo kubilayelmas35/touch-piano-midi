@@ -32,7 +32,7 @@ import {
   type NoteColor,
   type NoteStyle,
 } from "../render/appearance";
-import { CUE_COLORS, CUE_STYLES, LAMP_COLORS, LAMP_STYLES, type CueColor, type CueStyle, type LampColor, type LampStyle } from "../render/cue";
+import { CUE_COLORS, CUE_STYLES, KEY_COLORS, KEY_STYLES, LAMP_COLORS, LAMP_STYLES, type CueColor, type CueStyle, type KeyColor, type KeyStyle, type LampColor, type LampStyle } from "../render/cue";
 
 export type Language =
   | "tr"
@@ -229,6 +229,13 @@ export interface Settings {
   lampWidth: number;
   /** -1 … 1 slides that row left or right so it can sit on the keyboard. */
   lampShift: number;
+  /** The on-screen piano key loads with colour and flashes when it should be played. */
+  keyCueOn: boolean;
+  keyCueStyle: KeyStyle;
+  keyCueColor: KeyColor;
+  keyCueHex: string;
+  /** 0.15–1 strength of the colour on the key. */
+  keyCueLevel: number;
   pianoSkin: PianoSkinId;
   guitarSkin: GuitarSkinId;
   violinSkin: ViolinSkinId;
@@ -487,6 +494,11 @@ export function defaultSettings(): Settings {
     lampLevel: 1,
     lampWidth: 1,
     lampShift: 0,
+    keyCueOn: true,
+    keyCueStyle: "fill",
+    keyCueColor: "match",
+    keyCueHex: "#f5c451",
+    keyCueLevel: 0.9,
     pianoSkin: "standard",
     guitarSkin: "standard",
     violinSkin: "standard",
@@ -677,6 +689,11 @@ function sanitize(s: Settings): Settings {
     lampLevel: num(s.lampLevel, 0.2, 1, d.lampLevel),
     lampWidth: num(s.lampWidth, 0.3, 1, d.lampWidth),
     lampShift: num(s.lampShift, -1, 1, d.lampShift),
+    keyCueOn: s.keyCueOn !== false,
+    keyCueStyle: oneOf(KEY_STYLES, s.keyCueStyle, d.keyCueStyle),
+    keyCueColor: oneOf(KEY_COLORS, s.keyCueColor, d.keyCueColor),
+    keyCueHex: hex(s.keyCueHex, d.keyCueHex),
+    keyCueLevel: num(s.keyCueLevel, 0.15, 1, d.keyCueLevel),
     pianoSkin: oneOf(PIANO_SKINS, s.pianoSkin, d.pianoSkin),
     guitarSkin: oneOf(GUITAR_SKINS, s.guitarSkin, d.guitarSkin),
     violinSkin: oneOf(VIOLIN_SKINS, s.violinSkin, d.violinSkin),

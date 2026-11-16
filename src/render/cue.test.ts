@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cueProgress, cueSwatch } from "./cue";
+import { cueProgress, cueSwatch, keyCueInk } from "./cue";
 import { lampSpot } from "./keyLamp";
 
 describe("cueProgress", () => {
@@ -16,6 +16,10 @@ describe("cueProgress", () => {
   it("names the preset colours", () => {
     expect(cueSwatch("gold")).toBe("#f5c451");
     expect(cueSwatch("custom", "#112233")).toBe("#112233");
+    expect(keyCueInk("match", "#000000", "gold", "#f5c451", 60)).toBe("#f5c451");
+    expect(keyCueInk("custom", "#112233", "gold", "#f5c451", 60)).toBe("#112233");
+    expect(keyCueInk("note", "#000000", "gold", "#f5c451", 60)).toBe(keyCueInk("note", "#000000", "gold", "#f5c451", 72));
+    expect(keyCueInk("note", "#000000", "gold", "#f5c451", 60)).not.toBe(keyCueInk("note", "#000000", "gold", "#f5c451", 61));
   });
 });
 

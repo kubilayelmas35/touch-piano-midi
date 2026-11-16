@@ -1,5 +1,5 @@
 import { APPROACH_STYLES, BACKGROUNDS, DUST_STYLES, EFFECT_STYLES, NOTE_COLORS, NOTE_STYLES } from "../render/appearance";
-import { CUE_COLORS, CUE_STYLES, LAMP_COLORS, LAMP_STYLES } from "../render/cue";
+import { CUE_COLORS, CUE_STYLES, KEY_COLORS, KEY_STYLES, LAMP_COLORS, LAMP_STYLES } from "../render/cue";
 import { GUITAR_SKINS, PIANO_SKINS, VIOLIN_SKINS } from "../render/instrumentSkins";
 import { STAFF_STYLES } from "../render/staffThemes";
 import { defaultSettings, type Settings } from "./settings";
@@ -18,6 +18,8 @@ const LISTS = {
   cueColor: CUE_COLORS,
   lampStyle: LAMP_STYLES,
   lampColor: LAMP_COLORS,
+  keyCueStyle: KEY_STYLES,
+  keyCueColor: KEY_COLORS,
   staffStyle: STAFF_STYLES,
   pianoSkin: PIANO_SKINS,
   guitarSkin: GUITAR_SKINS,

@@ -4,6 +4,7 @@ import { NoteState, type PlayNote } from "../engine/types";
 import { HAND_SPLIT } from "../midi/song";
 import { isBlack, noteName, octaveOf, type NoteNaming } from "../lib/notes";
 import { GUITAR_SKIN, PIANO_SKIN, VIOLIN_SKIN, pastelKey, type FretSkin, type PianoSkin } from "./instrumentSkins";
+import { cueProgress, keyCueInk, paintKeyCue, type CueColor, type KeyColor, type KeyStyle } from "./cue";
 import { GUITAR_STRING_COLORS, TRACK_COLORS, VIOLIN_STRING_COLORS, glowSprite, mixHex, roundRect, withAlpha } from "./theme";
 
 export const BLACK_KEY_RATIO = 0.62;
@@ -106,6 +107,16 @@ export interface KeyboardView {
   /** x of each finger on the surface (bare mode). */
   fingers?: number[];
   skin?: PianoSkin;
+  /** Colour loading into the key that should be played. */
+  keyCue?: {
+    style: KeyStyle;
+    color: KeyColor;
+    hex: string;
+    level: number;
+    cueColor: CueColor;
+    cueHex: string;
+    fallSeconds: number;
+  } | null;
 }
 
 export class KeyboardRenderer extends CanvasSurface {
@@ -138,6 +149,7 @@ export class KeyboardRenderer extends CanvasSurface {
     const blackH = h * BLACK_KEY_RATIO;
     const now = performance.now();
     const pulse = 0.5 + 0.5 * Math.sin(now / 160);
+    const charges = this.keyCharges(view);
     ctx.textAlign = "center";
     ctx.textBaseline = "alphabetic";
     const whiteAt = new Map<number, number>();
@@ -181,7 +193,10 @@ export class KeyboardRenderer extends CanvasSurface {
         roundRect(ctx, x + kw * 0.18, top + 2, kw * 0.22, h * 0.5, kw * 0.1);
         ctx.fill();
       }
-      if (target && !sound && !pressed) {
+      const charge = charges.get(m);
+      if (charge && view.keyCue && !sound && !pressed) {
+        paintKeyCue(ctx, { x, y: Math.max(0, top), w: kw, h: h - Math.max(0, top) - 1 }, charge, view.keyCue.style, charge.color, view.keyCue.level, now);
+      } else if (target && !sound && !pressed) {
         ctx.fillStyle = withAlpha(target, 0.25 + 0.3 * pulse);
         roundRect(ctx, x + 2, blackH * 0.6, kw - 4, h - blackH * 0.6 - 4, 4);
         ctx.fill();
@@ -235,7 +250,10 @@ export class KeyboardRenderer extends CanvasSurface {
       roundRect(ctx, lane.x, -4, lane.w, bh + 4, Math.min(4, lane.w * 0.2));
       ctx.fill();
       if (!sound && !pressed) outline(k.blackEdge, 1);
-      if (target && !sound && !pressed) {
+      const charge = charges.get(m);
+      if (charge && view.keyCue && !sound && !pressed) {
+        paintKeyCue(ctx, { x: lane.x, y: 0, w: lane.w, h: bh }, charge, view.keyCue.style, charge.color, view.keyCue.level, now);
+      } else if (target && !sound && !pressed) {
         ctx.fillStyle = withAlpha(target, 0.4 + 0.4 * pulse);
         roundRect(ctx, lane.x + 2, bh * 0.45, lane.w - 4, bh * 0.5, 3);
         ctx.fill();
@@ -269,6 +287,27 @@ export class KeyboardRenderer extends CanvasSurface {
     this.felt(k);
   }
 
+  /** The closest pending note on each key, with the colour that should load into it. */
+  private keyCharges(view: KeyboardView): Map<number, { p: number; flash: boolean; color: string }> {
+    const out = new Map<number, { p: number; flash: boolean; color: string }>();
+    const cue = view.keyCue;
+    if (!cue) return out;
+    const t = view.t;
+    const win = this.engine.config.timingWindowMs / 1000;
+    const [i0, i1] = this.engine.visibleRange(t - win, t + 1.4);
+    const notes = this.engine.notes;
+    for (let i = i0; i < i1; i++) {
+      const n = notes[i];
+      if (!n || n.state !== NoteState.Pending) continue;
+      const prog = cueProgress(n.time - t, cue.fallSeconds, this.engine.config.speed, win);
+      if (!prog || prog.p < 0.05) continue;
+      const prev = out.get(n.midi);
+      if (prev && (prev.flash || prev.p >= prog.p) && !prog.flash) continue;
+      out.set(n.midi, { p: prog.p, flash: prog.flash, color: keyCueInk(cue.color, cue.hex, cue.cueColor, cue.cueHex, n.midi) });
+    }
+    return out;
+  }
+
   private felt(k: PianoSkin): void {
     if (!k.felt) return;
     this.ctx.fillStyle = k.felt;
@@ -300,9 +339,11 @@ export class KeyboardRenderer extends CanvasSurface {
     roundRect(ctx, x0, -6, x1 - x0, h + 5, 6);
     ctx.fill();
 
-    const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 160);
+    const now = performance.now();
+    const pulse = 0.5 + 0.5 * Math.sin(now / 160);
     const bw = Math.max(6, L.whiteW * 0.7);
     const fingers = view.fingers ?? [];
+    const charges = this.keyCharges(view);
     for (const m of L.keys) {
       const lane = L.lane(m)!;
       const c = lane.x + lane.w / 2;
@@ -310,6 +351,11 @@ export class KeyboardRenderer extends CanvasSurface {
       const sound = marks.sounding.get(m);
       const target = marks.target.get(m);
       const pressed = marks.pressed.has(m) && fingers.length === 0;
+      const charge = charges.get(m);
+      if (charge && view.keyCue && !sound && !pressed) {
+        paintKeyCue(ctx, { x: c - bw / 2, y: 0, w: bw, h: h - 4 }, charge, view.keyCue.style, charge.color, view.keyCue.level, now);
+        continue;
+      }
       const col = sound ?? (pressed ? "#a78bfa" : target);
       if (!col) continue;
       const a = sound || pressed ? 0.75 : 0.25 + 0.3 * pulse;

@@ -10,7 +10,7 @@ import {
   type NoteColor,
   type NoteStyle,
 } from "../render/appearance";
-import { type CueStyle, type LampStyle } from "../render/cue";
+import { type CueStyle, type KeyStyle, type LampStyle } from "../render/cue";
 import { HAND_INK, STAFF_THEMES, type StaffStyle } from "../render/staffThemes";
 import { pastelKey, type FretSkin, type PianoSkin } from "../render/instrumentSkins";
 import { GUITAR_STRING_COLORS, VIOLIN_STRING_COLORS, withAlpha } from "../render/theme";
@@ -605,6 +605,30 @@ export function CueSwatch({ style, color }: { style: CueStyle; color: string }) 
         {style === "wave" && <div className="absolute inset-x-0 bottom-0 h-1/2" style={{ background: `linear-gradient(transparent, ${color})`, clipPath: "polygon(0 40%, 30% 20%, 60% 45%, 100% 10%, 100% 100%, 0 100%)" }} />}
         {style === "spark" && <div className="absolute bottom-2 left-1/2 h-3 w-3 -translate-x-1/2 rotate-45" style={{ background: color }} />}
       </div>
+    </div>
+  );
+}
+
+/** One white piano key with the charge loading into it. */
+export function KeySwatch({ style, color }: { style: KeyStyle; color: string }) {
+  return (
+    <div className="absolute inset-0 flex items-end justify-center bg-[#1a1d33]" aria-hidden="true">
+      <div className="relative mb-1 h-[78%] w-[28%] overflow-hidden rounded-b-md bg-gradient-to-b from-white to-zinc-200">
+        {style === "fill" && <div className="absolute inset-x-0 bottom-0 h-2/3" style={{ background: `linear-gradient(transparent, ${color})` }} />}
+        {style === "glow" && <div className="absolute inset-x-[-20%] bottom-0 h-3/4" style={{ background: `radial-gradient(ellipse at 50% 100%, ${color}, transparent 70%)` }} />}
+        {style === "pulse" && <div className="absolute inset-0" style={{ background: color, opacity: 0.55 }} />}
+        {style === "edge" && <div className="absolute inset-1 rounded-sm border-2" style={{ borderColor: color }} />}
+        {style === "rise" && <div className="absolute inset-x-0 top-1/2 h-2" style={{ background: color, boxShadow: `0 0 8px ${color}` }} />}
+        {style === "tip" && <div className="absolute inset-x-0 bottom-0 h-2" style={{ background: color, boxShadow: `0 0 8px ${color}` }} />}
+        {style === "ember" && (
+          <>
+            <span className="absolute bottom-2 left-1/3 h-1.5 w-1.5 rounded-full" style={{ background: color }} />
+            <span className="absolute bottom-4 left-1/2 h-1 w-1 rounded-full bg-white" />
+          </>
+        )}
+        {style === "spark" && <div className="absolute bottom-2 left-1/2 h-3 w-3 -translate-x-1/2 rotate-45" style={{ background: color }} />}
+      </div>
+      <div className="absolute top-2 left-[38%] h-[46%] w-[18%] rounded-b-sm bg-zinc-900" />
     </div>
   );
 }

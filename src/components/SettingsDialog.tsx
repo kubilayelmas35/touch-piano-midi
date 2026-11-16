@@ -31,6 +31,7 @@ import {
   CueSwatch,
   DustSwatch,
   EffectSwatch,
+  KeySwatch,
   LampSwatch,
   FretSkinSwatch,
   NoteSwatch,
@@ -64,7 +65,7 @@ import {
   type NoteColor,
   type NoteStyle,
 } from "../render/appearance";
-import { CUE_COLORS, CUE_STYLES, LAMP_COLORS, LAMP_STYLES, cueSwatch, type CueColor, type CueStyle, type LampColor, type LampStyle } from "../render/cue";
+import { CUE_COLORS, CUE_STYLES, KEY_COLORS, KEY_STYLES, LAMP_COLORS, LAMP_STYLES, cueSwatch, type CueColor, type CueStyle, type KeyColor, type KeyStyle, type LampColor, type LampStyle } from "../render/cue";
 import type { DictKey } from "../i18n/en";
 import { Button, Dialog, Segmented, Slider, Switch, cx } from "../ui/primitives";
 
@@ -176,6 +177,20 @@ const LAMP_STYLE_LABEL: Record<LampStyle, DictKey> = {
 };
 const LAMP_COLOR_LABEL: Record<LampColor, DictKey> = {
   match: "lampMatch",
+  ...CUE_COLOR_LABEL,
+};
+const KEY_STYLE_LABEL: Record<KeyStyle, DictKey> = {
+  fill: "keyFill",
+  glow: "keyGlow",
+  pulse: "keyPulse",
+  edge: "keyEdge",
+  rise: "keyRise",
+  tip: "keyTip",
+  ember: "keyEmber",
+  spark: "keySpark",
+};
+const KEY_COLOR_LABEL: Record<KeyColor, DictKey> = {
+  match: "keyMatch",
   ...CUE_COLOR_LABEL,
 };
 const APPROACH_LABEL: Record<ApproachStyle, DictKey> = {
@@ -367,6 +382,7 @@ export function SettingsDialog() {
   const choice = { solid: s.solidColor, from: s.gradFrom, to: s.gradTo };
   const pro = useHasPro();
   const look = visibleLook(s, pro);
+  const keyInk = look.keyCueColor === "match" ? cueSwatch(look.cueColor, s.cueHex) : cueSwatch(look.keyCueColor, s.keyCueHex);
   const toPro = () => setPanel("pro");
 
   const tabs: { id: Tab; label: string }[] = [
@@ -714,6 +730,49 @@ export function SettingsDialog() {
                       locked: designLocked("lampColor", c, pro),
                     }))}
                   />
+                </>
+              )}
+            </Section>
+            <Section>
+              <Switch label={t("keyCue")} hint={t("keyCueHint")} checked={s.keyCueOn} onChange={(v) => updateSettings({ keyCueOn: v })} />
+              {s.keyCueOn && (
+                <>
+                  <Slider
+                    label={t("keyCueLevel")}
+                    value={s.keyCueLevel}
+                    min={0.15}
+                    max={1}
+                    step={0.05}
+                    onChange={(v) => updateSettings({ keyCueLevel: v })}
+                    format={pct}
+                  />
+                  <ChoiceCards
+                    label={t("keyCueStyle")}
+                    value={look.keyCueStyle}
+                    onChange={(v) => updateSettings({ keyCueStyle: v })}
+                    onLocked={toPro}
+                    options={KEY_STYLES.map((c) => ({
+                      value: c,
+                      label: t(KEY_STYLE_LABEL[c]),
+                      preview: <KeySwatch style={c} color={keyInk} />,
+                      locked: designLocked("keyCueStyle", c, pro),
+                    }))}
+                  />
+                  <ChoiceCards
+                    label={t("keyCueColor")}
+                    value={look.keyCueColor}
+                    onChange={(v) => updateSettings({ keyCueColor: v })}
+                    onLocked={toPro}
+                    options={KEY_COLORS.map((c) => ({
+                      value: c,
+                      label: t(KEY_COLOR_LABEL[c]),
+                      preview: <KeySwatch style="fill" color={c === "match" ? cueSwatch(look.cueColor, s.cueHex) : cueSwatch(c, s.keyCueHex)} />,
+                      locked: designLocked("keyCueColor", c, pro),
+                    }))}
+                  />
+                  {look.keyCueColor === "custom" && (
+                    <ColorPicker label={t("keyPick")} value={s.keyCueHex} onChange={(v) => updateSettings({ keyCueHex: v })} />
+                  )}
                 </>
               )}
             </Section>

@@ -153,3 +153,60 @@ export function paintNoteCue(
   }
   ctx.restore();
 }
+
+/** How the same charge sits on a piano key. */
+export const KEY_STYLES = ["fill", "glow", "pulse", "edge", "rise", "tip", "ember", "spark"] as const;
+export type KeyStyle = (typeof KEY_STYLES)[number];
+
+/** `match` follows the falling-note charge. */
+export const KEY_COLORS = ["match", ...CUE_COLORS] as const;
+export type KeyColor = (typeof KEY_COLORS)[number];
+
+/** Colour for one key, after "same as the charge" and "same as the note" are resolved. */
+export function keyCueInk(color: KeyColor, hex: string, cueColor: CueColor, cueHex: string, midi: number): string {
+  const mode = color === "match" ? cueColor : color;
+  const custom = color === "custom" ? hex : cueHex;
+  if (mode === "note") return cueNoteHex(midi);
+  return cueSwatch(mode, custom);
+}
+
+/** Paint the charge inside one piano key. `y` is the top of the key, so the colour still rises from the front. */
+export function paintKeyCue(
+  ctx: CanvasRenderingContext2D,
+  box: { x: number; y: number; w: number; h: number },
+  prog: { p: number; flash: boolean },
+  style: KeyStyle,
+  color: string,
+  level: number,
+  now: number
+): void {
+  const { x, y, w, h } = box;
+  if (w < 3 || h < 6) return;
+  if (style === "glow" || style === "tip") {
+    const p = prog.p;
+    const flash = prog.flash;
+    const a = Math.max(0.15, Math.min(1, level)) * (flash ? 1 : 0.5 + 0.5 * p);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x, y, w, h);
+    ctx.clip();
+    if (style === "glow") {
+      const r = Math.max(w * 1.4, 18) * (flash ? 1.8 : 0.45 + p);
+      const g = ctx.createRadialGradient(x + w / 2, y + h, 1, x + w / 2, y + h, r);
+      g.addColorStop(0, withAlpha(flash ? "#ffffff" : color, flash ? 0.95 : a));
+      g.addColorStop(0.4, withAlpha(color, 0.62 * a));
+      g.addColorStop(1, withAlpha(color, 0));
+      ctx.fillStyle = g;
+      ctx.fillRect(x - w, y, w * 3, h);
+    } else {
+      const bh = Math.max(5, Math.min(h * (flash ? 0.34 : 0.1 + 0.22 * p), 28));
+      ctx.fillStyle = withAlpha(color, 0.4 * a);
+      ctx.fillRect(x, y + h - bh * 2, w, bh);
+      ctx.fillStyle = withAlpha(flash ? "#ffffff" : color, flash ? 0.95 : a);
+      ctx.fillRect(x, y + h - bh, w, bh);
+    }
+    ctx.restore();
+    return;
+  }
+  paintNoteCue(ctx, box, prog, style === "edge" ? "neon" : style, color, level, now);
+}

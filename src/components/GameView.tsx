@@ -321,6 +321,17 @@ export function GameView() {
           bare: hideFrets,
           fingers: hideFrets ? [...pointers.current.values()].filter((p) => p.zone === "keys").map((p) => p.lastX) : undefined,
           skin: PIANO_SKIN[s.pianoSkin],
+          keyCue: s.keyCueOn
+            ? {
+                style: s.keyCueStyle,
+                color: s.keyCueColor,
+                hex: s.keyCueHex,
+                level: s.keyCueLevel,
+                cueColor: s.cueColor,
+                cueHex: s.cueHex,
+                fallSeconds: s.fallSeconds,
+              }
+            : null,
         });
       } else if (v.layout.fret) {
         const km = s.instrument === "violin" ? s.keymaps.violin : s.keymaps.guitar;
