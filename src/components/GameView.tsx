@@ -13,6 +13,7 @@ import { hasPro } from "../auth/account";
 import { playedSpan, songPitchBounds, type MidiMap } from "../input/midiKeyboard";
 import { fullPianoKeys, niceKeyboardRange } from "../lib/notes";
 import { cueNoteHex, cueProgress, cueSwatch } from "../render/cue";
+import { keyMarkLookup, keysBetween } from "../render/keyIndex";
 import { Highway } from "../render/highway";
 import { lampSpot, paintKeyLamp } from "../render/keyLamp";
 import { COVERED_GAP, FramePacer, IDLE_GAP } from "../render/pacer";
@@ -283,6 +284,18 @@ export function GameView() {
         }
       }
       const hideFrets = fretless && s.hideFrets;
+      const fingerNames = s.fingerNumbers && s.fingerNames ? [t("fingerThumb"), t("fingerIndex"), t("fingerMiddle"), t("fingerRing"), t("fingerLittle")] : null;
+      let keyMarks: Map<number, string> | null = null;
+      if (v.layout.piano && s.keyNumbers) {
+        const span =
+          !st.duet?.songId && s.instrument === "piano" && s.midiKeys > 0
+            ? playedSpan(
+                { keys: s.midiKeys, low: s.midiLow, octave: s.midiOctave, transpose: s.midiTranspose, fit: s.midiFit },
+                songPitchBounds(st.song, st.session.playTracks, st.session.hand)
+              )
+            : null;
+        keyMarks = keyMarkLookup(span ? keysBetween(span[0], span[1]) : v.layout.piano.keys, s.blackKeyOrder, span, s.midiFold);
+      }
       r.hw.resize(v.w, v.hwH);
       r.hw.draw({
         t: time,
@@ -293,7 +306,9 @@ export function GameView() {
         naming: s.noteNaming,
         showNames: s.showNoteNames,
         keyLabels: v.layout.piano && s.noteKeyLabels ? pianoLabels?.map : null,
+        keyMarks,
         fingers: !!v.layout.piano && s.fingerNumbers,
+        fingerNames,
         effects: s.effects,
         effectLevel: s.effectLevel,
         effectStyle: s.effectStyle,
@@ -322,7 +337,9 @@ export function GameView() {
           bare: hideFrets,
           fingers: hideFrets ? [...pointers.current.values()].filter((p) => p.zone === "keys").map((p) => p.lastX) : undefined,
           skin: PIANO_SKIN[s.pianoSkin],
-          keyNumbers: s.keyNumbers ? s.blackKeyOrder : null,
+          keyMarks,
+          fingerStyle: s.fingerNumbers ? (s.fingerNames ? "name" : "number") : null,
+          fingerNames,
           keyCue: s.keyCueOn
             ? {
                 style: s.keyCueStyle,

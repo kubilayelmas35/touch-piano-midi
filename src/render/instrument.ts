@@ -5,7 +5,6 @@ import { HAND_SPLIT } from "../midi/song";
 import { isBlack, noteName, octaveOf, type NoteNaming } from "../lib/notes";
 import { GUITAR_SKIN, PIANO_SKIN, VIOLIN_SKIN, pastelKey, type FretSkin, type PianoSkin } from "./instrumentSkins";
 import { cueProgress, keyCueInk, paintKeyCue, type CueColor, type KeyColor, type KeyStyle } from "./cue";
-import { keyIndexMarks } from "./keyIndex";
 import { GUITAR_STRING_COLORS, TRACK_COLORS, VIOLIN_STRING_COLORS, glowSprite, mixHex, roundRect, withAlpha } from "./theme";
 
 export const BLACK_KEY_RATIO = 0.62;
@@ -108,8 +107,12 @@ export interface KeyboardView {
   /** x of each finger on the surface (bare mode). */
   fingers?: number[];
   skin?: PianoSkin;
-  /** When set, white keys are numbered from the left and black keys use this letter order. */
-  keyNumbers?: string | null;
+  /** Left-to-right mark for each MIDI note. White keys are numbers, black keys letters. */
+  keyMarks?: Map<number, string> | null;
+  /** Suggested finger on the key that should be played next. */
+  fingerStyle?: "number" | "name" | null;
+  /** Name of finger 1…5 when `fingerStyle` is "name". */
+  fingerNames?: readonly string[] | null;
   /** Colour loading into the key that should be played. */
   keyCue?: {
     style: KeyStyle;
@@ -153,7 +156,8 @@ export class KeyboardRenderer extends CanvasSurface {
     const now = performance.now();
     const pulse = 0.5 + 0.5 * Math.sin(now / 160);
     const charges = this.keyCharges(view);
-    const indexes = view.keyNumbers ? keyIndexMarks(L.keys, view.keyNumbers) : null;
+    const indexes = view.keyMarks ?? null;
+    const fingers = this.nextFingers(view);
     ctx.textAlign = "center";
     ctx.textBaseline = "alphabetic";
     const whiteAt = new Map<number, number>();
@@ -226,6 +230,8 @@ export class KeyboardRenderer extends CanvasSurface {
         ctx.fillStyle = sound || pressed ? "rgba(255,255,255,0.9)" : m % 12 === 0 ? k.whiteInk : withAlpha(k.whiteInk, 0.7);
         ctx.fillText(this.keyName(m, view, kw), x + kw / 2, ly);
       }
+      const finger = fingers.get(m);
+      if (finger) this.paintKeyFinger(finger, x + kw / 2, L.compact ? h * 0.38 : blackH + 16, kw, sound || pressed ? "rgba(255,255,255,0.95)" : k.whiteInk);
     }
 
     // Black keys.
@@ -296,10 +302,45 @@ export class KeyboardRenderer extends CanvasSurface {
         const text = view.showAllNames ? this.keyName(m, view, lane.w) : keyLabel!.toUpperCase();
         ctx.fillText(text, lane.x + lane.w / 2, bh - 6);
       }
+      const finger = fingers.get(m);
+      if (finger && bh > 28) this.paintKeyFinger(finger, lane.x + lane.w / 2, L.compact ? h * 0.22 : 16, lane.w, sound || pressed ? "rgba(255,255,255,0.95)" : k.blackInk);
     }
 
     this.topShade();
     this.felt(k);
+  }
+
+  /** Suggested finger for the next note on each key. */
+  private nextFingers(view: KeyboardView): Map<number, string> {
+    const out = new Map<number, string>();
+    if (!view.fingerStyle) return out;
+    const [i0, i1] = this.engine.visibleRange(view.t - 0.2, view.t + 8);
+    const notes = this.engine.notes;
+    const best = new Map<number, number>();
+    for (let i = i0; i < i1; i++) {
+      const n = notes[i];
+      if (!n || n.state !== NoteState.Pending || !n.finger) continue;
+      const prev = best.get(n.midi);
+      if (prev != null && n.time >= prev) continue;
+      best.set(n.midi, n.time);
+      const name = view.fingerStyle === "name" ? view.fingerNames?.[n.finger - 1] : "";
+      out.set(n.midi, name || String(n.finger));
+    }
+    return out;
+  }
+
+  /** Finger number or name, shrunk so it stays inside the key. */
+  private paintKeyFinger(text: string, x: number, y: number, maxW: number, ink: string): void {
+    const ctx = this.ctx;
+    let fs = Math.min(11, Math.max(7, maxW * 0.42));
+    ctx.font = `700 ${fs}px system-ui, sans-serif`;
+    while (fs > 7 && ctx.measureText(text).width > maxW - 2) {
+      fs -= 1;
+      ctx.font = `700 ${fs}px system-ui, sans-serif`;
+    }
+    if (ctx.measureText(text).width > maxW - 1) return;
+    ctx.fillStyle = ink;
+    ctx.fillText(text, x, y);
   }
 
   /** The closest pending note on each key, with the colour that should load into it. */

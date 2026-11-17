@@ -15,6 +15,7 @@ import {
   VIOLIN_STRING_COLORS,
   glowSprite,
   mixHex,
+  roundRect,
   softSprite,
   withAlpha,
 } from "./theme";
@@ -30,8 +31,12 @@ export interface HighwayView {
   showNames: boolean;
   /** Piano: computer key per MIDI note, shown on the falling notes. */
   keyLabels?: Map<number, string> | null;
+  /** Piano: left-to-right key mark (1, 2, 3 or A, B, C) per MIDI note. */
+  keyMarks?: Map<number, string> | null;
   /** Piano: suggested finger numbers in a badge above each note. */
   fingers?: boolean;
+  /** Finger name for 1…5 when names are on. Missing entries stay numbers. */
+  fingerNames?: readonly string[] | null;
   effects: boolean;
   /** 0.1–1 intensity of particles and glows. */
   effectLevel: number;
@@ -302,23 +307,32 @@ export class Highway {
     return isBlack(n.midi) ? pair[1] : pair[0];
   }
 
-  /** Finger number in a badge inside the top of a long note, or just above a short one (`lift` px higher to clear a key label). */
-  private drawFinger(finger: number, cx: number, yTop: number, height: number, headH: number, laneW: number, color: string, lift: number): void {
+  private fingerText(finger: number, view: HighwayView, laneW: number): string {
+    const name = view.fingerNames?.[finger - 1];
+    if (name && laneW >= 22) return name;
+    return String(finger);
+  }
+
+  /** Finger number or name in a badge inside the top of a long note, or just above a short one (`lift` px higher to clear a key label). */
+  private drawFinger(label: string, cx: number, yTop: number, height: number, headH: number, laneW: number, color: string, lift: number): void {
     const ctx = this.ctx;
     const r = Math.min(10, Math.max(6, laneW * 0.4));
+    const wide = label.length > 1;
+    ctx.font = `800 ${Math.round(r * (wide ? 0.95 : 1.25))}px system-ui, sans-serif`;
+    const bw = wide ? Math.min(laneW + 8, Math.max(r * 2, ctx.measureText(label).width + 8)) : r * 2;
     let by = height >= headH + r * 2 + 8 ? yTop + r + 3 : yTop - r - 3;
     if (by < yTop) by -= lift;
     if (by <= r) return;
     ctx.beginPath();
-    ctx.arc(cx, by, r, 0, Math.PI * 2);
+    if (wide) roundRect(ctx, cx - bw / 2, by - r, bw, r * 2, r);
+    else ctx.arc(cx, by, r, 0, Math.PI * 2);
     ctx.fillStyle = "rgba(255,255,255,0.94)";
     ctx.fill();
     ctx.lineWidth = 2;
     ctx.strokeStyle = color;
     ctx.stroke();
-    ctx.font = `800 ${Math.round(r * 1.25)}px system-ui, sans-serif`;
     ctx.fillStyle = "#1e1b4b";
-    ctx.fillText(String(finger), cx, by + 0.5);
+    ctx.fillText(label, cx, by + 0.5);
   }
 
   /** Note colour in the chosen palette; gradient palettes depend on the height `y` (default: at the hit line). */
@@ -538,34 +552,42 @@ export class Highway {
         ctx.fillStyle = ink;
         ctx.fillText(String(n.fret), lane.x + lane.w / 2, headMid + 0.5);
       } else if (lane.w >= 13 && headH >= 14) {
+        const mark = view.keyMarks?.get(n.midi);
         const key = view.keyLabels?.get(n.midi);
         const name = view.showNames ? noteName(n.midi, view.naming).replace("#", "♯") : null;
+        const lead = mark ?? key ?? null;
         const fs = Math.min(12, Math.max(8, lane.w * 0.5));
         const cx = lane.x + lane.w / 2;
-        if (view.fingers && n.finger) this.drawFinger(n.finger, cx, yTop, height, headH, lane.w, color, key && name && headH < 26 ? fs * 1.5 : 0);
+        const finger = view.fingers && n.finger ? this.fingerText(n.finger, view, lane.w) : "";
+        if (finger) this.drawFinger(finger, cx, yTop, height, headH, lane.w, color, lead && name && headH < 26 ? fs * 1.5 : 0);
         ctx.fillStyle = ink;
-        if (key && name && headH >= 26) {
+        if (lead && name && headH >= 26) {
           ctx.font = `800 ${fs + 1}px system-ui, sans-serif`;
-          ctx.fillText(key, cx, headMid - fs * 0.55);
+          ctx.fillText(lead, cx, headMid - fs * 0.55);
           ctx.font = `600 ${fs - 1}px system-ui, sans-serif`;
           ctx.fillText(name, cx, headMid + fs * 0.6);
-        } else if (key && !name) {
+        } else if (lead && !name) {
           ctx.font = `800 ${fs + 1}px system-ui, sans-serif`;
-          ctx.fillText(key, cx, headMid + 0.5);
+          ctx.fillText(lead, cx, headMid + 0.5);
         } else {
           if (name) {
             ctx.font = `700 ${fs}px system-ui, sans-serif`;
             ctx.fillText(name, cx, headMid + 0.5);
           }
-          // No room for both in the head: the key rides just above the note.
-          if (key && yTop > 10) {
+          // No room for both in the head: the key mark rides just above the note.
+          if (lead && yTop > 10) {
             ctx.font = `800 ${fs}px system-ui, sans-serif`;
             ctx.fillStyle = "rgba(255,255,255,0.9)";
-            ctx.fillText(key, cx, yTop - fs * 0.7);
+            ctx.fillText(lead, cx, yTop - fs * 0.7);
           }
         }
+        if (mark && key && !finger && yTop > fs + 12) {
+          ctx.font = `700 ${Math.max(8, fs - 1)}px system-ui, sans-serif`;
+          ctx.fillStyle = "rgba(255,255,255,0.8)";
+          ctx.fillText(key, cx, yTop - fs * (lead && name && headH < 26 ? 2.3 : 1.6));
+        }
       } else if (view.fingers && n.finger && lane.w >= 10) {
-        this.drawFinger(n.finger, lane.x + lane.w / 2, yTop, height, headH, lane.w, color, 0);
+        this.drawFinger(this.fingerText(n.finger, view, lane.w), lane.x + lane.w / 2, yTop, height, headH, lane.w, color, 0);
       }
     }
     ctx.globalAlpha = 1;

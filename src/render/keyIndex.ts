@@ -1,4 +1,4 @@
-import { isBlack } from "../lib/notes";
+import { foldIntoSpan, isBlack } from "../lib/notes";
 
 export const BLACK_KEY_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
@@ -36,6 +36,29 @@ export function keyIndexMarks(midis: readonly number[], blackOrder: string): Map
   for (const midi of [...midis].sort((a, b) => a - b)) {
     if (isBlack(midi)) out.set(midi, blackKeyMark(black++, order));
     else out.set(midi, String(++white));
+  }
+  return out;
+}
+
+/** Every pitch from `lo` through `hi`, the keys of a fixed keyboard. */
+export function keysBetween(lo: number, hi: number): number[] {
+  const out: number[] = [];
+  for (let m = Math.round(lo); m <= Math.round(hi); m++) out.push(m);
+  return out;
+}
+
+/**
+ * Marks for these keys. With a MIDI span and folding, a pitch outside the keyboard
+ * takes the mark of the key it lands on.
+ */
+export function keyMarkLookup(midis: readonly number[], order: string, span: [number, number] | null, fold: boolean): Map<number, string> {
+  const marks = keyIndexMarks(midis, order);
+  if (!span || !fold) return marks;
+  const out = new Map(marks);
+  for (let m = 0; m < 128; m++) {
+    if (out.has(m)) continue;
+    const label = marks.get(foldIntoSpan(m, span[0], span[1]));
+    if (label) out.set(m, label);
   }
   return out;
 }

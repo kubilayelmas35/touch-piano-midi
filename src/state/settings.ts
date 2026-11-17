@@ -353,8 +353,10 @@ export interface Settings {
   stringSustain: number;
   /** Falling notes also show the computer key that plays them. */
   noteKeyLabels: boolean;
-  /** Piano: suggested finger numbers (1 thumb … 5 little finger) on the falling notes. */
+  /** Piano: suggested finger numbers (1 thumb … 5 little finger) on the falling notes and the keys. */
   fingerNumbers: boolean;
+  /** Write the finger's name instead of its number. */
+  fingerNames: boolean;
   /** Piano: a scrolling staff with the notes above the falling notes. */
   staffView: boolean;
   /** Look of the scrolling staff. */
@@ -571,6 +573,7 @@ export function defaultSettings(): Settings {
     stringSustain: 0.55,
     noteKeyLabels: hasKeyboard(),
     fingerNumbers: false,
+    fingerNames: false,
     staffView: false,
     staffStyle: "night",
     glidePiano: false,
@@ -779,6 +782,7 @@ function sanitize(s: Settings, raw: Partial<Settings> = {}): Settings {
     duetSound: oneOf(DUET_SOUNDS, s.duetSound, d.duetSound),
     noteKeyLabels: typeof s.noteKeyLabels === "boolean" ? s.noteKeyLabels : d.noteKeyLabels,
     fingerNumbers: s.fingerNumbers === true,
+    fingerNames: s.fingerNames === true,
     staffView: s.staffView === true,
     staffStyle: oneOf(STAFF_STYLES, s.staffStyle, d.staffStyle),
     glidePiano: s.glidePiano === true,

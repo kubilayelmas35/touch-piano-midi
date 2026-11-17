@@ -475,6 +475,20 @@ export function SettingsDialog() {
                 checked={s.fingerNumbers}
                 onChange={(v) => updateSettings({ fingerNumbers: v })}
               />
+              {s.fingerNumbers && (
+                <div className="py-1">
+                  <Segmented
+                    label={t("fingerStyle")}
+                    size="sm"
+                    value={s.fingerNames ? "name" : "number"}
+                    onChange={(v) => updateSettings({ fingerNames: v === "name" })}
+                    options={[
+                      { value: "number", label: t("fingerAsNumber") },
+                      { value: "name", label: t("fingerAsName") },
+                    ]}
+                  />
+                </div>
+              )}
               <Switch label={t("staffView")} hint={t("staffViewHint")} checked={s.staffView} onChange={(v) => updateSettings({ staffView: v })} />
               <ReminderSettings />
               {fs.supported && <Switch label={t("fullscreen")} hint="F11" checked={fs.full} onChange={fs.toggle} />}
