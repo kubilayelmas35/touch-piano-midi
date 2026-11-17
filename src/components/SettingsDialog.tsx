@@ -776,6 +776,23 @@ export function SettingsDialog() {
                 </>
               )}
             </Section>
+            <Section>
+              <Switch label={t("keyNumbers")} hint={t("keyNumbersHint")} checked={s.keyNumbers} onChange={(v) => updateSettings({ keyNumbers: v })} />
+              {s.keyNumbers && (
+                <label className="block py-2">
+                  <span className="text-sm font-medium text-mist-100">{t("blackKeyOrder")}</span>
+                  <span className="mt-0.5 block text-xs text-mist-400">{t("blackKeyOrderHint")}</span>
+                  <input
+                    value={s.blackKeyOrder}
+                    spellCheck={false}
+                    autoCapitalize="characters"
+                    aria-label={t("blackKeyOrder")}
+                    onChange={(e) => updateSettings({ blackKeyOrder: e.target.value.toUpperCase() })}
+                    className="mt-2 h-10 w-full rounded-xl border border-white/10 bg-ink-800 px-3 font-mono text-sm tracking-wide"
+                  />
+                </label>
+              )}
+            </Section>
             <Section title={t("instrumentLook")}>
               <ChoiceCards
                 label={t("piano")}

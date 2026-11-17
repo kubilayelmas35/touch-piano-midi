@@ -33,6 +33,7 @@ import {
   type NoteStyle,
 } from "../render/appearance";
 import { CUE_COLORS, CUE_STYLES, KEY_COLORS, KEY_STYLES, LAMP_COLORS, LAMP_STYLES, type CueColor, type CueStyle, type KeyColor, type KeyStyle, type LampColor, type LampStyle } from "../render/cue";
+import { normalizeBlackKeyOrder } from "../render/keyIndex";
 
 export type Language =
   | "tr"
@@ -236,6 +237,10 @@ export interface Settings {
   keyCueHex: string;
   /** 0.15–1 strength of the colour on the key. */
   keyCueLevel: number;
+  /** White keys numbered from the left, black keys lettered in `blackKeyOrder`. */
+  keyNumbers: boolean;
+  /** A–Z rearranged: the first letter sits on the leftmost black key. */
+  blackKeyOrder: string;
   pianoSkin: PianoSkinId;
   guitarSkin: GuitarSkinId;
   violinSkin: ViolinSkinId;
@@ -499,6 +504,8 @@ export function defaultSettings(): Settings {
     keyCueColor: "match",
     keyCueHex: "#f5c451",
     keyCueLevel: 0.9,
+    keyNumbers: false,
+    blackKeyOrder: "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
     pianoSkin: "standard",
     guitarSkin: "standard",
     violinSkin: "standard",
@@ -694,6 +701,8 @@ function sanitize(s: Settings): Settings {
     keyCueColor: oneOf(KEY_COLORS, s.keyCueColor, d.keyCueColor),
     keyCueHex: hex(s.keyCueHex, d.keyCueHex),
     keyCueLevel: num(s.keyCueLevel, 0.15, 1, d.keyCueLevel),
+    keyNumbers: s.keyNumbers === true,
+    blackKeyOrder: normalizeBlackKeyOrder(s.blackKeyOrder),
     pianoSkin: oneOf(PIANO_SKINS, s.pianoSkin, d.pianoSkin),
     guitarSkin: oneOf(GUITAR_SKINS, s.guitarSkin, d.guitarSkin),
     violinSkin: oneOf(VIOLIN_SKINS, s.violinSkin, d.violinSkin),

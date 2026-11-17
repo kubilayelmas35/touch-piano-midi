@@ -5,6 +5,7 @@ import { HAND_SPLIT } from "../midi/song";
 import { isBlack, noteName, octaveOf, type NoteNaming } from "../lib/notes";
 import { GUITAR_SKIN, PIANO_SKIN, VIOLIN_SKIN, pastelKey, type FretSkin, type PianoSkin } from "./instrumentSkins";
 import { cueProgress, keyCueInk, paintKeyCue, type CueColor, type KeyColor, type KeyStyle } from "./cue";
+import { keyIndexMarks } from "./keyIndex";
 import { GUITAR_STRING_COLORS, TRACK_COLORS, VIOLIN_STRING_COLORS, glowSprite, mixHex, roundRect, withAlpha } from "./theme";
 
 export const BLACK_KEY_RATIO = 0.62;
@@ -107,6 +108,8 @@ export interface KeyboardView {
   /** x of each finger on the surface (bare mode). */
   fingers?: number[];
   skin?: PianoSkin;
+  /** When set, white keys are numbered from the left and black keys use this letter order. */
+  keyNumbers?: string | null;
   /** Colour loading into the key that should be played. */
   keyCue?: {
     style: KeyStyle;
@@ -150,6 +153,7 @@ export class KeyboardRenderer extends CanvasSurface {
     const now = performance.now();
     const pulse = 0.5 + 0.5 * Math.sin(now / 160);
     const charges = this.keyCharges(view);
+    const indexes = view.keyNumbers ? keyIndexMarks(L.keys, view.keyNumbers) : null;
     ctx.textAlign = "center";
     ctx.textBaseline = "alphabetic";
     const whiteAt = new Map<number, number>();
@@ -205,8 +209,8 @@ export class KeyboardRenderer extends CanvasSurface {
       const fs = Math.max(8, Math.min(12, kw * 0.36));
       let ly = h - 7;
       const keyLabel = view.keyLabels?.get(m);
-      const index = whiteAt.get(m);
-      if (index && kw >= 14) {
+      const index = indexes?.get(m) ?? (whiteAt.get(m) != null ? String(whiteAt.get(m)) : undefined);
+      if (index && kw >= 10) {
         ctx.font = `800 ${fs}px system-ui, sans-serif`;
         ctx.fillStyle = sound || pressed ? "rgba(255,255,255,0.95)" : k.whiteInk;
         ctx.fillText(String(index), x + kw / 2, ly);
@@ -259,11 +263,22 @@ export class KeyboardRenderer extends CanvasSurface {
         ctx.fill();
       }
       const keyLabel = view.keyLabels?.get(m);
-      if (L.compact) {
+      const index = indexes?.get(m);
+      if (index && !L.compact) {
+        const fs = Math.max(9, Math.min(13, lane.w * 0.55));
+        ctx.font = `800 ${fs}px system-ui, sans-serif`;
+        ctx.fillStyle = sound || pressed ? "rgba(255,255,255,0.95)" : withAlpha(k.blackInk, 0.95);
+        ctx.fillText(index, lane.x + lane.w / 2, bh - 6);
+      } else if (L.compact) {
         // Same order as the white keys: computer key at the bottom, note name above it.
         const fs = Math.max(8, Math.min(12, lane.w * 0.36));
         let ly = h - 7;
-        if (keyLabel && lane.w >= 16) {
+        if (index && lane.w >= 10) {
+          ctx.font = `800 ${fs}px system-ui, sans-serif`;
+          ctx.fillStyle = sound || pressed ? "rgba(255,255,255,0.95)" : withAlpha(k.blackInk, 0.95);
+          ctx.fillText(index, lane.x + lane.w / 2, ly);
+          ly -= fs + 2;
+        } else if (keyLabel && lane.w >= 16) {
           ctx.font = `700 ${fs}px system-ui, sans-serif`;
           ctx.fillStyle = sound || pressed ? "rgba(255,255,255,0.95)" : withAlpha(k.blackInk, 0.85);
           ctx.fillText(keyLabel.toUpperCase(), lane.x + lane.w / 2, ly);

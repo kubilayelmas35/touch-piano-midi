@@ -321,6 +321,7 @@ export function GameView() {
           bare: hideFrets,
           fingers: hideFrets ? [...pointers.current.values()].filter((p) => p.zone === "keys").map((p) => p.lastX) : undefined,
           skin: PIANO_SKIN[s.pianoSkin],
+          keyNumbers: s.keyNumbers ? s.blackKeyOrder : null,
           keyCue: s.keyCueOn
             ? {
                 style: s.keyCueStyle,

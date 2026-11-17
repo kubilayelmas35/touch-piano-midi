@@ -41,6 +41,8 @@ describe("MIDI keyboard", () => {
     expect(s.lampOn).toBe(false);
     expect(s.keyCueOn).toBe(true);
     expect(s.keyCueColor).toBe("match");
+    expect(s.keyNumbers).toBe(false);
+    expect(s.blackKeyOrder.startsWith("ABC")).toBe(true);
     const bad = sanitizeSettings({ midiKeys: 30, midiOctave: 9, midiLow: 2 } as never);
     expect(bad.midiKeys).toBe(0);
     expect(bad.midiOctave).toBe(3);
