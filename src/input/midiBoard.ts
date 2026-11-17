@@ -16,8 +16,8 @@ export type BoardKnob =
   | "volume"
   | "cutoff"
   | "resonance"
-  | "env"
-  | "glide"
+  | "glideTime"
+  | "glideDepth"
   | "lfoDelay"
   | "lfoRate"
   | "lfoDepth"
@@ -32,10 +32,12 @@ export interface BoardHit {
 }
 
 /**
- * Factory preset 1, left to right: brightness, harmonic content, portamento, vibrato, pan.
- * The fader is volume. The modulation wheel (CC 1) is vibrato depth.
- * 80–87 repeat the same row for the learn-friendly preset.
- * Transport buttons are global on the LX25+: 102 cycle … 107 record.
+ * Impact LX25+ user guide, pages 22–23.
+ * Preset 1, left to right: brightness, harmonic content, portamento rate, portamento depth,
+ * vibrato delay, vibrato rate, vibrato depth, pan. The fader is channel volume.
+ * The modulation wheel (CC 1) is vibrato depth and is not stored in a preset.
+ * Presets 4 and 5 repeat that row on their own controller numbers.
+ * Transport buttons are global: 102 cycle … 107 record.
  */
 const KNOB: Record<number, BoardKnob> = {
   7: "volume",
@@ -43,20 +45,28 @@ const KNOB: Record<number, BoardKnob> = {
   3: "volume",
   74: "cutoff",
   80: "cutoff",
+  89: "cutoff",
   71: "resonance",
   81: "resonance",
-  5: "env",
-  82: "env",
-  84: "glide",
-  83: "glide",
+  90: "resonance",
+  5: "glideTime",
+  82: "glideTime",
+  96: "glideTime",
+  84: "glideDepth",
+  83: "glideDepth",
+  97: "glideDepth",
   78: "lfoDelay",
   85: "lfoDelay",
+  116: "lfoDelay",
   76: "lfoRate",
   86: "lfoRate",
+  117: "lfoRate",
   1: "lfoDepth",
   77: "lfoDepth",
   87: "lfoDepth",
+  118: "lfoDepth",
   10: "pan",
+  119: "pan",
 };
 
 /** Pitch-bend wheel. Centre is 0 cents; a full throw is two semitones either way. */

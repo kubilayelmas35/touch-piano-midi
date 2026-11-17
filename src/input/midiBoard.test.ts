@@ -15,7 +15,9 @@ describe("LX25+ controls", () => {
     expect(boardHit(0xb0, 7, 127, "Impact LX25+", 0)?.action).toEqual({ t: "knob", id: "volume", v: 1 });
     expect(boardHit(0xb0, 74, 0, "x", 0)?.action).toEqual({ t: "knob", id: "cutoff", v: 0 });
     expect(boardHit(0xb0, 71, 127, "x", 0)?.action).toEqual({ t: "knob", id: "resonance", v: 1 });
-    expect(boardHit(0xb0, 5, 64, "x", 0)?.action).toMatchObject({ t: "knob", id: "env" });
+    expect(boardHit(0xb0, 5, 64, "x", 0)?.action).toMatchObject({ t: "knob", id: "glideTime" });
+    expect(boardHit(0xb0, 84, 10, "x", 0)?.action).toMatchObject({ t: "knob", id: "glideDepth" });
+    expect(boardHit(0xb0, 89, 20, "x", 0)?.action).toMatchObject({ t: "knob", id: "cutoff" });
     expect(boardHit(0xb0, 76, 32, "x", 0)?.action).toMatchObject({ t: "knob", id: "lfoRate" });
     expect(boardHit(0xb0, 77, 90, "x", 0)?.action).toMatchObject({ t: "knob", id: "lfoDepth" });
     expect(boardHit(0xb0, 1, 40, "x", 0)?.action).toMatchObject({ t: "knob", id: "lfoDepth" });

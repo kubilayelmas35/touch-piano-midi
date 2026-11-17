@@ -542,6 +542,8 @@ let releaseScale = 1;
 
 /** Seconds a new note takes to arrive at its pitch. 0 plays the note at once. */
 let glideSec = 0;
+/** Share of the leap that the glide covers. 1 is the whole interval. */
+let glideDepth = 1;
 let lastPlayedMidi: number | null = null;
 
 let bendCents = 0;
@@ -589,28 +591,25 @@ export function setVibratoDelay(seconds: number): void {
   vibDelaySec = Math.max(0, Math.min(0.8, seconds));
 }
 
-export function setGlide(seconds: number): void {
-  glideSec = Math.max(0, Math.min(0.5, seconds));
+/** Portamento rate. 0 is instant; 1 is about half a second. */
+export function setGlideTime(amount: number): void {
+  const a = Math.max(0, Math.min(1, amount));
+  glideSec = a * a * 0.5;
 }
 
-/** Held-note fade plus the release after the key comes up. Stays in effect when another setting is saved. */
-let knobSustain: number | null = null;
-
-export function setEnvelope(amount: number): void {
-  const a = Math.max(0, Math.min(1, amount));
-  knobSustain = 0.08 + a * 0.92;
-  releaseScale = 0.35 + a * 2.5;
-  holdFadeDb = sustainFadeDb(knobSustain);
+/** Portamento depth. 0 stays put; 1 glides the whole leap. */
+export function setGlideDepth(amount: number): void {
+  glideDepth = Math.max(0, Math.min(1, amount));
 }
 
 function slideToPitch(source: AudioBufferSourceNode, detune: number, midi: number, when: number): void {
   const from = lastPlayedMidi;
   lastPlayedMidi = midi;
-  if (from == null || glideSec < 0.02) {
+  if (from == null || glideSec < 0.02 || glideDepth < 0.02) {
     source.detune.setValueAtTime(detune, when);
     return;
   }
-  source.detune.setValueAtTime(detune - (midi - from) * 100, when);
+  source.detune.setValueAtTime(detune - (midi - from) * 100 * glideDepth, when);
   source.detune.linearRampToValueAtTime(detune, when + glideSec);
 }
 
@@ -623,7 +622,7 @@ export function sustainFadeDb(sustain: number): number {
 }
 
 export function setPianoSustain(sustain: number): void {
-  if (knobSustain == null) holdFadeDb = sustainFadeDb(sustain);
+  holdFadeDb = sustainFadeDb(sustain);
 }
 
 export function activeVoiceCount(): number {

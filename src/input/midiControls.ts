@@ -1,5 +1,5 @@
 import { setCutoff, setResonance, setStereoPan } from "../audio/context";
-import { setEnvelope, setGlide, setVibratoDelay, setVibratoDepth, setVibratoRate } from "../audio/sampler";
+import { setGlideDepth, setGlideTime, setVibratoDelay, setVibratoDepth, setVibratoRate } from "../audio/sampler";
 import { engine } from "../engine/engine";
 import { tNow } from "../i18n";
 import type { DictKey } from "../i18n/en";
@@ -25,8 +25,8 @@ const LABEL: Record<BoardKnob, DictKey> = {
   volume: "ctlVol",
   cutoff: "ctlCutoff",
   resonance: "ctlReso",
-  env: "ctlEnv",
-  glide: "ctlGlide",
+  glideTime: "ctlEnv",
+  glideDepth: "ctlGlide",
   lfoDelay: "ctlLfoDelay",
   lfoRate: "ctlLfoRate",
   lfoDepth: "ctlLfo",
@@ -41,10 +41,10 @@ function knob(id: BoardAction & { t: "knob" }): void {
     setCutoff(v);
   } else if (id.id === "resonance") {
     setResonance(v);
-  } else if (id.id === "env") {
-    setEnvelope(v);
-  } else if (id.id === "glide") {
-    setGlide(v * v * 0.45);
+  } else if (id.id === "glideTime") {
+    setGlideTime(v);
+  } else if (id.id === "glideDepth") {
+    setGlideDepth(v);
   } else if (id.id === "lfoDelay") {
     setVibratoDelay(v * 0.7);
   } else if (id.id === "lfoRate") {
