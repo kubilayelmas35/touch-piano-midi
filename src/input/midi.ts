@@ -1,3 +1,4 @@
+import { setPitchBend } from "../audio/sampler";
 import { hasPro } from "../auth/account";
 import { engine } from "../engine/engine";
 import { tNow } from "../i18n";
@@ -5,7 +6,7 @@ import { noteName } from "../lib/notes";
 import { updateSettings } from "../state/actions";
 import { setPanel, toast, useApp } from "../state/store";
 import { applyBoard } from "./midiControls";
-import { boardHit } from "./midiBoard";
+import { bendCents, boardHit } from "./midiBoard";
 import { mapMidiNote, playedSpan, songPitchBounds, shapeVelocity, type MidiMap } from "./midiKeyboard";
 
 let access: MIDIAccess | null = null;
@@ -55,6 +56,10 @@ function onMessage(this: MIDIInput, ev: MIDIMessageEvent): void {
       toast(tNow("midiPro"), "info", 5000);
       setPanel("pro");
     }
+    return;
+  }
+  if (status === 0xe0) {
+    setPitchBend(bendCents(d1, d2));
     return;
   }
   const control = boardHit(status, d1, d2, this.name || "", performance.now());

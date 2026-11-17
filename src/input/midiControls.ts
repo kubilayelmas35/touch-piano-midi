@@ -1,45 +1,60 @@
+import { setCutoff, setResonance, setStereoPan } from "../audio/context";
+import { setEnvelope, setGlide, setVibratoDelay, setVibratoDepth, setVibratoRate } from "../audio/sampler";
 import { engine } from "../engine/engine";
 import { tNow } from "../i18n";
-import { cycleLoop, setHand, updateSession, updateSettings } from "../state/actions";
+import type { DictKey } from "../i18n/en";
+import { cycleLoop, setHand, updateSettings } from "../state/actions";
 import { toast, useApp } from "../state/store";
-import { setVoiceGain } from "../studio/voicePlay";
-import { setVoiceMonitor } from "../studio/voiceTake";
 import { startRecording, stopRecording } from "../studio/recording";
-import type { BoardAction } from "./midiBoard";
+import type { BoardAction, BoardKnob } from "./midiBoard";
 
 function near(a: number, b: number): boolean {
   return Math.abs(a - b) < 0.012;
 }
 
+const told = new Map<string, number>();
+
+function hint(id: string, key: DictKey, v: number): void {
+  const now = performance.now();
+  if (now - (told.get(id) ?? 0) < 900) return;
+  told.set(id, now);
+  toast(tNow(key, { n: Math.round(v * 100) }));
+}
+
+const LABEL: Record<BoardKnob, DictKey> = {
+  volume: "ctlVol",
+  cutoff: "ctlCutoff",
+  resonance: "ctlReso",
+  env: "ctlEnv",
+  glide: "ctlGlide",
+  lfoDelay: "ctlLfoDelay",
+  lfoRate: "ctlLfoRate",
+  lfoDepth: "ctlLfo",
+  pan: "ctlPan",
+};
+
 function knob(id: BoardAction & { t: "knob" }): void {
   const v = id.v;
-  const s = useApp.getState().settings;
   if (id.id === "volume") {
-    if (!near(s.volume, v)) updateSettings({ volume: v });
-  } else if (id.id === "accomp") {
-    if (!near(s.accompVolume, v)) updateSettings({ accompVolume: v });
-  } else if (id.id === "reverb") {
-    const r = v * 0.6;
-    if (!near(s.reverb, r)) updateSettings({ reverb: r });
-  } else if (id.id === "click") {
-    if (!near(s.clickVolume, v)) updateSettings({ clickVolume: v });
-  } else if (id.id === "effects") {
-    const level = 0.1 + v * 0.9;
-    if (!near(s.effectLevel, level)) updateSettings({ effectLevel: level, effects: v > 0.04 });
-  } else if (id.id === "fall") {
-    const fall = 1 + v * 7;
-    if (!near(s.fallSeconds, fall)) updateSettings({ fallSeconds: fall });
-  } else if (id.id === "speed") {
-    const speed = Math.round((0.25 + v * 1.25) * 20) / 20;
-    if (!near(useApp.getState().session.speed, speed)) updateSession({ speed });
-  } else if (id.id === "transpose") {
-    const n = Math.max(-12, Math.min(12, Math.round((v - 0.5) * 24)));
-    if (n !== s.midiTranspose) updateSettings({ midiTranspose: n });
+    if (!near(useApp.getState().settings.volume, v)) updateSettings({ volume: v });
+  } else if (id.id === "cutoff") {
+    setCutoff(v);
+  } else if (id.id === "resonance") {
+    setResonance(v);
+  } else if (id.id === "env") {
+    setEnvelope(v);
+  } else if (id.id === "glide") {
+    setGlide(v * v * 0.45);
+  } else if (id.id === "lfoDelay") {
+    setVibratoDelay(v * 0.7);
+  } else if (id.id === "lfoRate") {
+    setVibratoRate(0.4 + v * 7.6);
+  } else if (id.id === "lfoDepth") {
+    setVibratoDepth(v * 40);
   } else {
-    if (!near(s.recordVoiceGain, v)) updateSettings({ recordVoiceGain: v });
-    setVoiceGain(v);
-    setVoiceMonitor(v);
+    setStereoPan(v);
   }
+  hint(id.id, LABEL[id.id], v);
 }
 
 function bar(): number {

@@ -19,6 +19,9 @@ export interface MasterBus {
   dryInput: GainNode;
   master: GainNode;
   reverbSend: GainNode;
+  tone: BiquadFilterNode;
+  color: BiquadFilterNode;
+  place: StereoPannerNode;
 }
 
 let bus: MasterBus | null = null;
@@ -83,6 +86,19 @@ export function getBus(): MasterBus {
   const master = ctx.createGain();
   master.gain.value = 0.9;
 
+  // Sits wide open until a controller moves it, so the piano is unchanged on its own.
+  const tone = ctx.createBiquadFilter();
+  tone.type = "lowpass";
+  tone.frequency.value = 20000;
+  tone.Q.value = 0.7;
+  const color = ctx.createBiquadFilter();
+  color.type = "peaking";
+  color.frequency.value = 1800;
+  color.Q.value = 1.1;
+  color.gain.value = 0;
+  const place = ctx.createStereoPanner();
+  place.pan.value = 0;
+
   // Rumble below hearing only eats headroom and makes small speakers rattle.
   const rumble = ctx.createBiquadFilter();
   rumble.type = "highpass";
@@ -122,8 +138,11 @@ export function getBus(): MasterBus {
   const reverbReturn = ctx.createGain();
   reverbReturn.gain.value = 0.9;
 
-  input.connect(rumble);
-  input.connect(reverbSend);
+  input.connect(tone);
+  tone.connect(color);
+  color.connect(place);
+  place.connect(rumble);
+  place.connect(reverbSend);
   reverbSend.connect(reverb);
   reverb.connect(reverbReturn);
   reverbReturn.connect(rumble);
@@ -134,7 +153,7 @@ export function getBus(): MasterBus {
   limiter.connect(ceiling.input);
   ceiling.output.connect(ctx.destination);
 
-  bus = { ctx, input, dryInput, master, reverbSend };
+  bus = { ctx, input, dryInput, master, reverbSend, tone, color, place };
   return bus;
 }
 
@@ -174,4 +193,28 @@ export function setMasterVolume(v: number): void {
 export function setReverbAmount(v: number): void {
   const { reverbSend, ctx } = getBus();
   reverbSend.gain.setTargetAtTime(Math.max(0, Math.min(0.6, v)), ctx.currentTime, 0.05);
+}
+
+/** 0 muffled … 1 fully open. */
+export function setCutoff(amount: number): void {
+  const { tone, ctx } = getBus();
+  const a = Math.max(0, Math.min(1, amount));
+  const hz = 160 * Math.pow(20000 / 160, a);
+  tone.frequency.setTargetAtTime(hz, ctx.currentTime, 0.02);
+}
+
+/** 0 plain … 1 a strong peak at the cutoff. */
+export function setResonance(amount: number): void {
+  const { tone, color, ctx } = getBus();
+  const a = Math.max(0, Math.min(1, amount));
+  const t = ctx.currentTime;
+  tone.Q.setTargetAtTime(0.5 + a * 9, t, 0.03);
+  color.frequency.setTargetAtTime(500 + a * 2500, t, 0.03);
+  color.gain.setTargetAtTime(a * 10, t, 0.03);
+}
+
+/** 0 hard left … 1 hard right. 0.5 stays in the middle. */
+export function setStereoPan(amount: number): void {
+  const { place, ctx } = getBus();
+  place.pan.setTargetAtTime(Math.max(-1, Math.min(1, (amount - 0.5) * 1.6)), ctx.currentTime, 0.03);
 }

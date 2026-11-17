@@ -12,7 +12,16 @@ export type BoardButton =
   | "left"
   | "both";
 
-export type BoardKnob = "volume" | "accomp" | "reverb" | "speed" | "fall" | "click" | "transpose" | "effects" | "voice";
+export type BoardKnob =
+  | "volume"
+  | "cutoff"
+  | "resonance"
+  | "env"
+  | "glide"
+  | "lfoDelay"
+  | "lfoRate"
+  | "lfoDepth"
+  | "pan";
 
 export type BoardAction = { t: "btn"; id: BoardButton } | { t: "knob"; id: BoardKnob; v: number };
 
@@ -23,31 +32,38 @@ export interface BoardHit {
 }
 
 /**
- * Factory preset 1 pots, left to right, plus the fader and the learn-friendly presets.
+ * Factory preset 1, left to right: brightness, harmonic content, portamento, vibrato, pan.
+ * The fader is volume. The modulation wheel (CC 1) is vibrato depth.
+ * 80–87 repeat the same row for the learn-friendly preset.
  * Transport buttons are global on the LX25+: 102 cycle … 107 record.
  */
 const KNOB: Record<number, BoardKnob> = {
   7: "volume",
   11: "volume",
   3: "volume",
-  80: "volume",
-  1: "accomp",
-  71: "accomp",
-  81: "accomp",
-  74: "reverb",
-  83: "reverb",
-  91: "reverb",
-  5: "speed",
-  82: "speed",
-  84: "fall",
-  78: "click",
-  85: "click",
-  76: "transpose",
-  86: "transpose",
-  77: "effects",
-  87: "effects",
-  10: "voice",
+  74: "cutoff",
+  80: "cutoff",
+  71: "resonance",
+  81: "resonance",
+  5: "env",
+  82: "env",
+  84: "glide",
+  83: "glide",
+  78: "lfoDelay",
+  85: "lfoDelay",
+  76: "lfoRate",
+  86: "lfoRate",
+  1: "lfoDepth",
+  77: "lfoDepth",
+  87: "lfoDepth",
+  10: "pan",
 };
+
+/** Pitch-bend wheel. Centre is 0 cents; a full throw is two semitones either way. */
+export function bendCents(lsb: number, msb: number): number {
+  const raw = (lsb & 0x7f) + ((msb & 0x7f) << 7);
+  return ((raw - 8192) / 8192) * 200;
+}
 
 const TRANSPORT: Record<number, BoardButton> = {
   102: "loop",

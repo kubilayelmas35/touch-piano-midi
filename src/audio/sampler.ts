@@ -379,7 +379,10 @@ class VoiceImpl implements Voice {
     if (this.done) return;
     const ctx = this.env.context as AudioContext;
     const t = Math.max(when ?? ctx.currentTime, this.startedAt + 0.005);
-    const rel = Math.max(this.def.minRelease, Math.min(this.def.maxRing, release ?? this.def.minRelease));
+    const rel = Math.max(
+      this.def.minRelease * 0.35,
+      Math.min(this.def.maxRing, (release ?? this.def.minRelease) * releaseScale),
+    );
     // A later stop may only shorten the fade (re-striking a ringing key), never stretch it.
     if (t + rel >= this.endsAt) return;
     this.endsAt = t + rel;
@@ -455,7 +458,14 @@ export function playNote(id: InstrumentId, midi: number, velocity: number, opts:
   const source = ctx.createBufferSource();
   source.buffer = buffer;
   const detune = (midi - sampleMidi) * 100;
-  source.detune.value = detune;
+  slideToPitch(source, detune, midi, when);
+  const { bend, depth } = modulation(ctx);
+  bend.connect(source.detune);
+  const gate = ctx.createGain();
+  gate.gain.setValueAtTime(vibDelaySec < 0.02 ? 1 : 0, when);
+  if (vibDelaySec >= 0.02) gate.gain.linearRampToValueAtTime(1, when + vibDelaySec);
+  depth.connect(gate);
+  gate.connect(source.detune);
   if (sample.loopStart !== null) {
     source.loop = true;
     source.loopStart = sample.loopStart;
@@ -476,7 +486,7 @@ export function playNote(id: InstrumentId, midi: number, velocity: number, opts:
     env.gain.setTargetAtTime(0, when + def.attack, (20 / Math.LN10) / holdFadeDb);
   }
   const level = ctx.createGain();
-  const nodes: AudioNode[] = [source, env, level];
+  const nodes: AudioNode[] = [source, env, level, gate];
   let tail: AudioNode = level;
   source.connect(env);
   env.connect(level);
@@ -527,6 +537,83 @@ export function stopAllVoices(): void {
   for (const v of [...active]) v.kill();
 }
 
+/** Multiplies the release so a controller can make notes shorter or longer. 1 is the instrument's own. */
+let releaseScale = 1;
+
+/** Seconds a new note takes to arrive at its pitch. 0 plays the note at once. */
+let glideSec = 0;
+let lastPlayedMidi: number | null = null;
+
+let bendCents = 0;
+let bendNode: ConstantSourceNode | null = null;
+let lfo: OscillatorNode | null = null;
+let lfoDepth: GainNode | null = null;
+let vibCents = 0;
+let vibRate = 5.2;
+let vibDelaySec = 0;
+
+function modulation(ctx: AudioContext): { bend: ConstantSourceNode; depth: GainNode } {
+  if (!bendNode || !lfo || !lfoDepth) {
+    bendNode = ctx.createConstantSource();
+    bendNode.offset.value = bendCents;
+    bendNode.start();
+    lfo = ctx.createOscillator();
+    lfo.frequency.value = vibRate;
+    lfoDepth = ctx.createGain();
+    lfoDepth.gain.value = vibCents;
+    lfo.connect(lfoDepth);
+    lfo.start();
+  }
+  return { bend: bendNode, depth: lfoDepth };
+}
+
+/** Pitch wheel, in cents. The centre is 0; a full throw is two semitones. */
+export function setPitchBend(cents: number): void {
+  bendCents = Math.max(-200, Math.min(200, cents));
+  if (bendNode) bendNode.offset.setTargetAtTime(bendCents, bendNode.context.currentTime, 0.008);
+}
+
+/** Vibrato depth in cents. The rate and the wait before it starts stay as they were. */
+export function setVibratoDepth(cents: number): void {
+  vibCents = Math.max(0, Math.min(45, cents));
+  if (lfoDepth) lfoDepth.gain.setTargetAtTime(vibCents, lfoDepth.context.currentTime, 0.03);
+}
+
+export function setVibratoRate(hz: number): void {
+  vibRate = Math.max(0.3, Math.min(9, hz));
+  if (lfo) lfo.frequency.setTargetAtTime(vibRate, lfo.context.currentTime, 0.03);
+}
+
+/** How long a new note waits before the vibrato reaches it. */
+export function setVibratoDelay(seconds: number): void {
+  vibDelaySec = Math.max(0, Math.min(0.8, seconds));
+}
+
+export function setGlide(seconds: number): void {
+  glideSec = Math.max(0, Math.min(0.5, seconds));
+}
+
+/** Held-note fade plus the release after the key comes up. Stays in effect when another setting is saved. */
+let knobSustain: number | null = null;
+
+export function setEnvelope(amount: number): void {
+  const a = Math.max(0, Math.min(1, amount));
+  knobSustain = 0.08 + a * 0.92;
+  releaseScale = 0.35 + a * 2.5;
+  holdFadeDb = sustainFadeDb(knobSustain);
+}
+
+function slideToPitch(source: AudioBufferSourceNode, detune: number, midi: number, when: number): void {
+  const from = lastPlayedMidi;
+  lastPlayedMidi = midi;
+  if (from == null || glideSec < 0.02) {
+    source.detune.setValueAtTime(detune, when);
+    return;
+  }
+  source.detune.setValueAtTime(detune - (midi - from) * 100, when);
+  source.detune.linearRampToValueAtTime(detune, when + glideSec);
+}
+
 /** Fade of a held piano key in dB a second; set from the sustain setting. */
 let holdFadeDb = sustainFadeDb(0.7);
 
@@ -536,7 +623,7 @@ export function sustainFadeDb(sustain: number): number {
 }
 
 export function setPianoSustain(sustain: number): void {
-  holdFadeDb = sustainFadeDb(sustain);
+  if (knobSustain == null) holdFadeDb = sustainFadeDb(sustain);
 }
 
 export function activeVoiceCount(): number {
