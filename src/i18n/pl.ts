@@ -648,6 +648,9 @@ export const pl: Dict = {
   keyMap: "Przegląd klawiatury — przeciągnij, by przewinąć",
   compactKeys: "Tylko klawisze utworu",
   compactKeysShort: "Klawisze utworu",
+  normalKeys: "Normal keys",
+  midiKeysShort: "MIDI keys",
+  keyView: "Which keys",
   compactKeysHint:
     "Ukryj klawisze nieużywane w utworze, żeby pozostałe były większe. Nazwy nut widać na każdym klawiszu.",
   fullPiano: "Pełny fortepian (88 klawiszy)",

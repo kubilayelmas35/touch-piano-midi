@@ -62,9 +62,9 @@ export function engineConfig(): Partial<EngineConfig> {
     accompVolume: together && settings.duetSound !== "auto" ? 0 : settings.accompVolume,
     pianoPedal: settings.pianoPedal,
     pianoSustain: settings.pianoSustain,
-    compactKeys: !together && settings.midiKeys > 0 ? false : settings.compactKeys,
+    compactKeys: settings.pianoView === "song",
     pianoSpan:
-      !together && settings.instrument === "piano" && settings.midiKeys > 0 && settings.midiFold
+      !together && settings.instrument === "piano" && settings.pianoView === "midi" && settings.midiKeys > 0 && settings.midiFold
         ? playedSpan(midiMapOf(settings), songPitchBounds(song, session.playTracks, session.hand))
         : null,
     playTracks: session.playTracks,

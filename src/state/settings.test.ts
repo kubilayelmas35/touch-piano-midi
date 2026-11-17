@@ -41,12 +41,16 @@ describe("MIDI keyboard", () => {
     expect(s.lampOn).toBe(false);
     expect(s.keyCueOn).toBe(true);
     expect(s.keyCueColor).toBe("match");
+    expect(s.pianoView).toBe("midi");
     expect(s.keyNumbers).toBe(false);
     expect(s.blackKeyOrder.startsWith("ABC")).toBe(true);
     const bad = sanitizeSettings({ midiKeys: 30, midiOctave: 9, midiLow: 2 } as never);
     expect(bad.midiKeys).toBe(0);
     expect(bad.midiOctave).toBe(3);
     expect(bad.midiLow).toBe(21);
+    expect(bad.pianoView).toBe("full");
+    expect(sanitizeSettings({ compactKeys: true }).pianoView).toBe("song");
+    expect(sanitizeSettings({ pianoView: "full", midiKeys: 25 }).pianoView).toBe("full");
   });
 });
 

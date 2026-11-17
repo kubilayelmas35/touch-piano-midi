@@ -35,6 +35,8 @@ import {
 import { CUE_COLORS, CUE_STYLES, KEY_COLORS, KEY_STYLES, LAMP_COLORS, LAMP_STYLES, type CueColor, type CueStyle, type KeyColor, type KeyStyle, type LampColor, type LampStyle } from "../render/cue";
 import { normalizeBlackKeyOrder } from "../render/keyIndex";
 
+export type PianoView = "full" | "song" | "midi";
+
 export type Language =
   | "tr"
   | "en"
@@ -324,7 +326,9 @@ export interface Settings {
   edgeGapPx: number;
   /** Piano width as a multiple of the screen (1–3); wider keys, the rest scrolls off screen. */
   keyZoom: number;
-  /** Piano shows only the keys the song uses. */
+  /** Which piano the screen shows: the fitted keyboard, only the song's keys, or the MIDI keyboard. */
+  pianoView: PianoView;
+  /** Piano shows only the keys the song uses. Kept in step with `pianoView`. */
   compactKeys: boolean;
   /** Piano shows the 88-key keyboard (the chosen octaves) instead of fitting the song. */
   fullPiano: boolean;
@@ -552,6 +556,7 @@ export function defaultSettings(): Settings {
     edgeGap: isNativeApp,
     edgeGapPx: 20,
     keyZoom: 1,
+    pianoView: "full",
     compactKeys: false,
     fullPiano: false,
     pianoOctaves: [...PIANO_OCTAVES],
@@ -583,7 +588,10 @@ export function loadSettings(): Settings {
   const base = defaultSettings();
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return sanitize({ ...base, ...migrate(JSON.parse(raw)) });
+    if (raw) {
+      const saved = migrate(JSON.parse(raw));
+      return sanitize({ ...base, ...saved }, saved);
+    }
     const legacy = readLegacySettings();
     if (legacy) {
       if (legacy.locale === "tr" || legacy.locale === "en") base.language = legacy.locale;
@@ -602,7 +610,7 @@ export function loadSettings(): Settings {
 /** Settings from an untrusted source (e.g. the account copy), filled up with defaults. */
 export function sanitizeSettings(raw: unknown): Settings {
   const obj = raw && typeof raw === "object" ? migrate(raw as Partial<Settings>) : {};
-  return sanitize({ ...defaultSettings(), ...obj });
+  return sanitize({ ...defaultSettings(), ...obj }, obj);
 }
 
 const KEYMAP_REV = 3;
@@ -658,11 +666,19 @@ function pianoOctaves(v: unknown, d: number[]): number[] {
   return pick.length ? pick : d;
 }
 
-function sanitize(s: Settings): Settings {
+function pianoViewOf(raw: Partial<Settings>, midiKeys: number, compact: boolean): PianoView {
+  if (raw.pianoView === "full" || raw.pianoView === "song" || raw.pianoView === "midi") return raw.pianoView;
+  if (midiKeys > 0) return "midi";
+  if (compact) return "song";
+  return "full";
+}
+
+function sanitize(s: Settings, raw: Partial<Settings> = {}): Settings {
   const num = (v: unknown, lo: number, hi: number, d: number) =>
     typeof v === "number" && Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : d;
   const hex = (v: unknown, d: string) => (typeof v === "string" && HEX_RE.test(v) ? v.toLowerCase() : d);
   const d = defaultSettings();
+  const view = pianoViewOf(raw, isMidiKeyCount(s.midiKeys) ? s.midiKeys : 0, s.compactKeys === true);
   return {
     ...s,
     language: LANGUAGE_SET.has(s.language) ? s.language : d.language,
@@ -745,7 +761,8 @@ function sanitize(s: Settings): Settings {
     edgeGap: typeof s.edgeGap === "boolean" ? s.edgeGap : d.edgeGap,
     edgeGapPx: Math.round(num(s.edgeGapPx, ...EDGE_GAP_RANGE, d.edgeGapPx)),
     keyZoom: num(s.keyZoom, 1, KEY_ZOOM_MAX, d.keyZoom),
-    compactKeys: s.compactKeys === true,
+    pianoView: view,
+    compactKeys: view === "song",
     fullPiano: s.fullPiano === true,
     pianoOctaves: pianoOctaves(s.pianoOctaves, d.pianoOctaves),
     freePlayStage: s.freePlayStage === true,

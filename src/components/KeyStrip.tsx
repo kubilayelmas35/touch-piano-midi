@@ -10,10 +10,11 @@ export const KEY_STRIP_H = 30;
 const ZOOM_STEPS = [1, 1.25, 1.5, 2, 2.5, KEY_ZOOM_MAX];
 
 /** Overview of the whole piano: shows which part is on screen, drag to scroll, buttons to zoom. */
-export function KeyStrip({ piano, used }: { piano: PianoLayout; used: readonly number[] }) {
+export function KeyStrip({ piano, used, canSong, midiOk }: { piano: PianoLayout; used: readonly number[]; canSong: boolean; midiOk: boolean }) {
   const t = useT();
   const zoom = useApp((s) => s.settings.keyZoom);
-  const compact = useApp((s) => s.settings.compactKeys);
+  const view = useApp((s) => s.settings.pianoView);
+  const midiKeys = useApp((s) => s.settings.midiKeys);
   const ref = useRef<HTMLCanvasElement>(null);
   const dragging = useRef(false);
 
@@ -66,9 +67,16 @@ export function KeyStrip({ piano, used }: { piano: PianoLayout; used: readonly n
     updateSettings({ keyZoom: next });
   };
 
+  const pick = (next: "full" | "song" | "midi") => {
+    if (next === "song") updateSettings({ pianoView: "song", compactKeys: true });
+    else if (next === "midi") updateSettings({ pianoView: "midi", compactKeys: false, ...(midiKeys ? {} : { midiKeys: 25 }) });
+    else updateSettings({ pianoView: "full", compactKeys: false });
+  };
   const btn = "grid h-6 min-w-6 place-items-center rounded-md px-1 text-sm font-semibold text-white/80 hover:bg-white/10 disabled:opacity-30";
+  const mode = (on: boolean) =>
+    cx("h-6 px-2 text-[11px] font-semibold whitespace-nowrap disabled:opacity-30", on ? "bg-brand-500/30 text-brand-100" : "text-white/60 hover:bg-white/10");
   return (
-    <div className="flex h-full items-center gap-1 border-t border-white/5 bg-[#0c0d18] pr-[calc(var(--edge-right)+0.375rem)] pl-[calc(var(--edge-left)+0.375rem)]">
+    <div className="flex h-full items-center gap-1 overflow-x-auto border-t border-white/5 bg-[#0c0d18] pr-[calc(var(--edge-right)+0.375rem)] pl-[calc(var(--edge-left)+0.375rem)]">
       <button type="button" className={btn} onClick={() => step(-1)} disabled={zoom <= 1} title={t("keyZoomOut")} aria-label={t("keyZoomOut")}>
         −
       </button>
@@ -89,18 +97,17 @@ export function KeyStrip({ piano, used }: { piano: PianoLayout; used: readonly n
         +
       </button>
       <span className="w-8 text-center text-[11px] tabular-nums text-white/50">{zoom.toFixed(zoom % 1 ? 2 : 0).replace(/0$/, "")}×</span>
-      <button
-        type="button"
-        onClick={() => updateSettings({ compactKeys: !compact })}
-        aria-pressed={compact}
-        title={t("compactKeysHint")}
-        className={cx(
-          "h-6 rounded-md px-2 text-[11px] font-semibold whitespace-nowrap",
-          compact ? "bg-brand-500/30 text-brand-100" : "text-white/60 hover:bg-white/10"
-        )}
-      >
-        {t("compactKeysShort")}
-      </button>
+      <div role="group" aria-label={t("keyView")} className="flex shrink-0 overflow-hidden rounded-md bg-white/5">
+        <button type="button" className={mode(view === "full")} aria-pressed={view === "full"} onClick={() => pick("full")}>
+          {t("normalKeys")}
+        </button>
+        <button type="button" className={mode(view === "song")} aria-pressed={view === "song"} disabled={!canSong && view !== "song"} title={t("compactKeysHint")} onClick={() => pick("song")}>
+          {t("compactKeysShort")}
+        </button>
+        <button type="button" className={mode(view === "midi")} aria-pressed={view === "midi"} disabled={!midiOk} title={t("midiKeysHint")} onClick={() => pick("midi")}>
+          {t("midiKeysShort")}
+        </button>
+      </div>
     </div>
   );
 }

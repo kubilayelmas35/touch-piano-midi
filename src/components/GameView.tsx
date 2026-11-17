@@ -74,6 +74,7 @@ export function GameView() {
   const fullStage = useApp((s) => !!s.song && s.song.notes.length === 0 && !s.settings.freePlayStage);
   const keyZoom = useApp((s) => s.settings.keyZoom);
   const compactKeys = useApp((s) => s.settings.compactKeys);
+  const pianoView = useApp((s) => s.settings.pianoView);
   const fullPiano = useApp((s) => s.settings.fullPiano);
   const pianoOctaves = useApp((s) => s.settings.pianoOctaves);
   const midiKeys = useApp((s) => s.settings.midiKeys);
@@ -144,16 +145,16 @@ export function GameView() {
   );
   const fullKeys = useMemo(() => (fullPiano ? fullPianoKeys(pianoOctaves) : null), [fullPiano, pianoOctaves]);
   const midiSpan = useMemo(() => {
-    if (inDuet || instrument !== "piano" || !midiKeys) return null;
+    if (inDuet || instrument !== "piano" || pianoView !== "midi" || !midiKeys) return null;
     const map: MidiMap = { keys: midiKeys, low: midiLow, octave: midiOctave, transpose: midiTranspose, fit: midiFit };
     return playedSpan(map, songPitchBounds(song, playTracks, hand));
-  }, [inDuet, instrument, midiKeys, midiLow, midiOctave, midiTranspose, midiFit, song, playTracks, hand]);
+  }, [inDuet, instrument, pianoView, midiKeys, midiLow, midiOctave, midiTranspose, midiFit, song, playTracks, hand]);
   const range = useMemo<[number, number] | null>(
     () => (!size.w ? null : midiSpan ? midiSpan : fullKeys ? [fullKeys[0], fullKeys[fullKeys.length - 1]] : pianoRange(size.w)),
     [size.w, notesRev, fullKeys, midiSpan] // eslint-disable-line react-hooks/exhaustive-deps
   );
   const keep = !midiSpan && fullKeys && fullKeys.length < fullKeys[fullKeys.length - 1] - fullKeys[0] + 1 ? fullKeys : null;
-  const only = !midiSpan && compactKeys && used.length ? used : null;
+  const only = pianoView === "song" && !midiSpan && used.length ? used : null;
 
   const calm = useApp((s) => s.settings.onboarded && !s.welcomeOpen && !s.video && !s.panel);
   useEffect(() => {
@@ -207,7 +208,7 @@ export function GameView() {
     const minH = instrument === "piano" ? 96 : (instrument === "guitar" ? 6 : 4) * 22;
     return Math.round(Math.max(minH, Math.min(want, size.h * INSTRUMENT_HEIGHT_RANGE[1])));
   }, [size.h, instrumentHeight, instrument]);
-  const showStrip = !!layout?.piano && (keyZoom > 1 || compactKeys || size.w < 760);
+  const showStrip = !!layout?.piano;
   const stripH = showStrip ? KEY_STRIP_H : 0;
   const instH = fullStage ? Math.max(0, size.h - stripH) : panelH;
   const staffOn = useApp((s) => s.settings.staffView) && hasSong && used.length > 0;
@@ -606,7 +607,7 @@ export function GameView() {
       )}
       {showStrip && layout?.piano && (
         <div className="absolute inset-x-0" style={{ top: staffH + hwH, height: stripH }}>
-          <KeyStrip piano={layout.piano} used={used} />
+          <KeyStrip piano={layout.piano} used={used} canSong={used.length > 0} midiOk={!inDuet} />
         </div>
       )}
       <div className="absolute inset-x-0" style={{ height: instH, bottom: edgeGap }}>

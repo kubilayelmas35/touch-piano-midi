@@ -957,7 +957,12 @@ export function SettingsDialog() {
               onChange={(v) => updateSettings({ keyZoom: v })}
               format={(v) => `${v.toFixed(2).replace(/\.?0+$/, "")}×`}
             />
-            <Switch label={t("compactKeys")} hint={t("compactKeysHint")} checked={s.compactKeys} onChange={(v) => updateSettings({ compactKeys: v })} />
+            <Switch
+              label={t("compactKeys")}
+              hint={t("compactKeysHint")}
+              checked={s.pianoView === "song"}
+              onChange={(v) => updateSettings({ compactKeys: v, pianoView: v ? "song" : s.pianoView === "song" ? "full" : s.pianoView })}
+            />
             <Switch label={t("fullPiano")} hint={t("fullPianoHint")} checked={s.fullPiano} onChange={(v) => updateSettings({ fullPiano: v })} />
             {s.fullPiano && (
               <div className="py-2">

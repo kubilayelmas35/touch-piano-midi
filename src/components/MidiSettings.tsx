@@ -33,7 +33,12 @@ export function MidiKeyboardSettings() {
 
   const pickSize = (n: number) => {
     const low = n && s.midiLow && !midiStartChoices(n).includes(s.midiLow) ? 0 : s.midiLow;
-    updateSettings({ midiKeys: n, midiLow: low });
+    updateSettings({
+      midiKeys: n,
+      midiLow: low,
+      pianoView: n ? "midi" : s.pianoView === "midi" ? "full" : s.pianoView,
+      ...(n ? { compactKeys: false } : {}),
+    });
   };
 
   return (
