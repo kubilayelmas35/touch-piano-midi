@@ -149,6 +149,7 @@ export function MidiKeyboardSettings() {
         </select>
       </div>
       <Switch label={t("midiPedal")} hint={t("midiPedalHint")} checked={s.midiPedal} onChange={(v) => updateSettings({ midiPedal: v })} />
+      <p className="rounded-xl bg-white/[0.04] px-3 py-2 text-xs leading-relaxed text-mist-400">{t("midiBoardHint")}</p>
       {heard != null && <p className="pb-2 text-xs text-mist-400">{t("midiLast", { note: noteName(heard, s.noteNaming, true) })}</p>}
     </div>
   );

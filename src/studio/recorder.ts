@@ -21,6 +21,8 @@ export class Recorder {
   private pedaled: Open[] = [];
   private sustain = false;
   private done: RawNote[] = [];
+  /** Seconds from the recording start to the first note. The voice track uses the same start. */
+  lead = 0;
 
   constructor(private readonly t0: number) {}
 
@@ -75,6 +77,7 @@ export class Recorder {
     this.pedaled = [];
     const notes = this.done.sort((a, b) => a.time - b.time || a.midi - b.midi);
     const first = notes.length ? notes[0].time : 0;
+    this.lead = first;
     return notes.map((n) => ({ ...n, time: n.time - first }));
   }
 }

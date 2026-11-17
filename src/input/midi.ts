@@ -4,6 +4,8 @@ import { tNow } from "../i18n";
 import { noteName } from "../lib/notes";
 import { updateSettings } from "../state/actions";
 import { setPanel, toast, useApp } from "../state/store";
+import { applyBoard } from "./midiControls";
+import { boardHit } from "./midiBoard";
 import { mapMidiNote, playedSpan, songPitchBounds, shapeVelocity, type MidiMap } from "./midiKeyboard";
 
 let access: MIDIAccess | null = null;
@@ -53,6 +55,11 @@ function onMessage(this: MIDIInput, ev: MIDIMessageEvent): void {
       toast(tNow("midiPro"), "info", 5000);
       setPanel("pro");
     }
+    return;
+  }
+  const control = boardHit(status, d1, d2, this.name || "", performance.now());
+  if (control) {
+    if (control.action) applyBoard(control.action);
     return;
   }
   if (status === 0x90 && d2 > 0) {

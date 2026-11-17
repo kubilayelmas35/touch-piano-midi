@@ -22,6 +22,7 @@ export function RecordingBar() {
         <span className="text-xs font-extrabold tracking-[0.14em] text-rose-200">{t("recording")}</span>
         <span className="text-sm font-semibold tabular-nums">{formatTime((Date.now() - rec.startedAt) / 1000)}</span>
         <span className="text-xs text-mist-400 tabular-nums max-[360px]:hidden">{t("recordNotes", { n: rec.notes })}</span>
+        {rec.voice && <span className="text-xs font-semibold text-rose-200">{t("recordVoiceOn")}</span>}
         <Button size="sm" variant="danger" onClick={stopRecording} aria-label={t("recordStop")}>
           <IconStop size={14} />
           <span className="max-sm:hidden">{t("recordStop")}</span>
@@ -83,7 +84,10 @@ export function TakeDialog() {
             save(false);
           }}
         >
-          <p className="mb-3 text-sm text-mist-300">{t("takeInfo", { time: formatTime(take.seconds), n: take.notes.length })}</p>
+          <p className="mb-3 text-sm text-mist-300">
+            {t("takeInfo", { time: formatTime(take.seconds), n: take.notes.length })}
+            {take.voice ? ` ${t("takeVoice")}` : ""}
+          </p>
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-mist-300">{t("takeNameLabel")}</span>
             <input

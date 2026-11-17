@@ -7,9 +7,12 @@ import { soundProgram } from "../audio/instruments";
 import { midiFileName, splitHands, writeMidi, type MidiTrackSpec } from "./midiFile";
 import { Recorder } from "./recorder";
 import { shareMidi } from "./share";
+import { beginVoice, endVoice } from "./voiceTake";
+import { clearVoice } from "./voicePlay";
 
 let recorder: Recorder | null = null;
 let ticker = 0;
+let voiceT0 = 0;
 const now = () => performance.now() / 1000;
 
 /** Starts recording what the player plays (any input); with `freePlay` on an empty stage. Pro only. */
@@ -19,13 +22,18 @@ export function startRecording(freePlay: boolean): void {
     return;
   }
   if (recorder) return;
+  clearVoice();
   engine.releaseAll();
   if (freePlay) openFreePlay();
   else if (engine.status === "playing") engine.pause();
-  recorder = new Recorder(now());
+  const t0 = now();
+  voiceT0 = t0;
+  recorder = new Recorder(t0);
   const rec = recorder;
+  const { settings } = useApp.getState();
+  if (settings.recordVoice) beginVoice(settings.micDevice, settings.recordVoiceHear, settings.recordVoiceGain);
   engine.onInput = (e) => rec.input(e, now());
-  useApp.setState({ recording: { startedAt: Date.now(), notes: 0 }, panel: null, take: null });
+  useApp.setState({ recording: { startedAt: Date.now(), notes: 0, voice: settings.recordVoice }, panel: null, take: null });
   ticker = window.setInterval(() => {
     useApp.setState((s) => (s.recording ? { recording: { ...s.recording, notes: rec.noteCount } } : {}));
   }, 250);
@@ -39,7 +47,13 @@ export function stopRecording(): void {
   window.clearInterval(ticker);
   engine.onInput = null;
   const notes = rec.finish(now());
+  const lead = rec.lead;
   useApp.setState({ recording: null });
+  void finishTake(notes, lead, voiceT0);
+}
+
+async function finishTake(notes: ReturnType<Recorder["finish"]>, lead: number, t0: number): Promise<void> {
+  const voice = await endVoice();
   if (!notes.length) {
     toast(tNow("recordEmpty"), "info");
     return;
@@ -48,7 +62,9 @@ export function stopRecording(): void {
   const instrument = settings.instrument;
   const program = soundProgram(settings);
   const seconds = notes.reduce((m, n) => Math.max(m, n.time + n.duration), 0);
-  useApp.setState({ take: { notes, instrument, program, seconds } });
+  const sung = voice ? { blob: voice.blob, lead: lead - (voice.startedAt - t0) } : null;
+  if (settings.recordVoice && !sung) toast(tNow("recordVoiceDenied"), "info");
+  useApp.setState({ take: { notes, instrument, program, seconds, voice: sung?.blob, voiceLead: sung?.lead } });
 }
 
 export function discardTake(): void {
@@ -66,7 +82,7 @@ export async function saveTake(title: string, share: boolean): Promise<void> {
   if (!take) return;
   const data = writeMidi({ title, bpm: 120, timeSignature: [4, 4], tracks: takeTracks(take) });
   useApp.setState({ take: null });
-  await addUserMidi(title, data);
+  await addUserMidi(title, data, take.voice ? { blob: take.voice, lead: take.voiceLead ?? 0 } : undefined);
   toast(tNow("recordSaved", { title }), "success");
   if (share) {
     try {

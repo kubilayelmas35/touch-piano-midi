@@ -1,5 +1,6 @@
 import { setClickVolume } from "../audio/click";
 import { setMasterVolume, setReverbAmount } from "../audio/context";
+import { clearVoice, loadVoice, syncVoice } from "../studio/voicePlay";
 import { setPianoSustain } from "../audio/sampler";
 import { engine } from "../engine/engine";
 import { accuracyOf, starsFor, type EngineConfig } from "../engine/types";
@@ -112,6 +113,7 @@ export async function initApp(): Promise<void> {
   applyAudioSettings(settings);
   engine.configure(engineConfig());
   engine.subscribe(syncFromEngine);
+  engine.subscribe(syncVoice);
   engine.onComplete = handleComplete;
   // Leaving the path mid-song: the song plays to its end again.
   useApp.subscribe((s, prev) => {
@@ -258,7 +260,10 @@ export async function openSong(id: string, opts: { quiet?: boolean; coach?: bool
       if (!stored) throw new Error("missing");
       song = parseMidi(stored.data, stored.title);
       song.title = stored.title;
+      if (stored.voice) void loadVoice(stored.voice, stored.voiceLead ?? 0);
+      else clearVoice();
     }
+    if (isBuiltin(id)) clearVoice();
     const prefs = useApp.getState().prefs[id];
     const session = sessionFor(song, prefs);
     useApp.setState({ song, currentId: id, session, results: null });
@@ -325,7 +330,7 @@ export async function importFiles(files: File[]): Promise<boolean> {
 }
 
 /** Stores a MIDI file made in the studio (recording, audio or notes) as a library song and opens it. */
-export async function addUserMidi(title: string, data: ArrayBuffer): Promise<string> {
+export async function addUserMidi(title: string, data: ArrayBuffer, voice?: { blob: Blob; lead: number }): Promise<string> {
   const clean = title.trim().slice(0, 120) || "MIDI";
   const song = parseMidi(data.slice(0), clean);
   const id = newSongId();
@@ -337,6 +342,8 @@ export async function addUserMidi(title: string, data: ArrayBuffer): Promise<str
     addedAt: Date.now(),
     duration: song.duration,
     noteCount: song.notes.length,
+    voice: voice?.blob,
+    voiceLead: voice?.lead,
   });
   await refreshLibrary();
   void cloudAfterImport([id]);
@@ -359,6 +366,7 @@ export async function exportUserSong(id: string): Promise<void> {
 
 /** An empty stage with no falling notes, for playing (and recording) freely. */
 export function openFreePlay(): void {
+  clearVoice();
   const song = finalizeSong(tNow("freePlay"), [], [], [], 120, 4);
   useApp.setState({ song, currentId: null, session: { ...DEFAULT_SESSION, loop: { ...NO_LOOP } }, results: null, coach: null });
   engine.load(song, engineConfig() as EngineConfig);

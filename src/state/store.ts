@@ -100,6 +100,9 @@ export interface Take {
   instrument: import("../engine/types").InstrumentKind;
   program: number;
   seconds: number;
+  /** Sung part, lined up so buffer position `voiceLead` is song time 0. */
+  voice?: Blob;
+  voiceLead?: number;
 }
 
 export interface Account {
@@ -186,7 +189,7 @@ export interface AppState {
   keyPan: number;
   progress: Progress;
   /** Live recording of the player's notes (Pro). */
-  recording: { startedAt: number; notes: number } | null;
+  recording: { startedAt: number; notes: number; voice: boolean } | null;
   take: Take | null;
   coach: CoachRun | null;
   drill: Drill | null;

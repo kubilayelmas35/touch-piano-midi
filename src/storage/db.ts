@@ -9,9 +9,13 @@ export interface StoredSong {
   folder?: string;
   duration?: number;
   noteCount?: number;
+  /** Microphone recorded with the performance. Stays on this device. */
+  voice?: Blob;
+  /** Buffer position that lines up with the first note. */
+  voiceLead?: number;
 }
 
-export type SongMeta = Omit<StoredSong, "data">;
+export type SongMeta = Omit<StoredSong, "data" | "voice">;
 
 export interface BestScore {
   score: number;
@@ -54,7 +58,7 @@ function db(): Promise<IDBPDatabase<StaveFlowDB>> {
 
 export async function listSongs(): Promise<SongMeta[]> {
   const all = await (await db()).getAllFromIndex("songs", "addedAt");
-  return all.reverse().map(({ data: _data, ...meta }) => meta);
+  return all.reverse().map(({ data: _data, voice: _voice, ...meta }) => meta);
 }
 
 export async function getSong(id: string): Promise<StoredSong | undefined> {

@@ -308,6 +308,12 @@ export interface Settings {
   midiChannel: number;
   /** Honour the keyboard's sustain pedal. */
   midiPedal: boolean;
+  /** Record the microphone together with what is played. */
+  recordVoice: boolean;
+  /** Play the microphone back while recording (headphones). */
+  recordVoiceHear: boolean;
+  /** 0–1 loudness of the recorded voice, on the way in and when the song plays. */
+  recordVoiceGain: number;
   /** Microphone listening: 0 only loud notes … 1 picks up quiet playing. */
   micSensitivity: number;
   /** Microphone to listen with (a MediaDevices id); "" is the system default. */
@@ -550,6 +556,9 @@ export function defaultSettings(): Settings {
     midiVelocity: 0.5,
     midiChannel: 0,
     midiPedal: true,
+    recordVoice: true,
+    recordVoiceHear: false,
+    recordVoiceGain: 1,
     micSensitivity: 0.5,
     micDevice: "",
     duetSound: "auto",
@@ -759,6 +768,9 @@ function sanitize(s: Settings, raw: Partial<Settings> = {}): Settings {
     midiVelocity: num(s.midiVelocity, 0, 1, 0.5),
     midiChannel: Math.round(num(s.midiChannel, 0, 16, 0)),
     midiPedal: s.midiPedal !== false,
+    recordVoice: s.recordVoice !== false,
+    recordVoiceHear: s.recordVoiceHear === true,
+    recordVoiceGain: num(s.recordVoiceGain, 0, 1, 1),
     instrumentHeight: num(s.instrumentHeight, ...INSTRUMENT_HEIGHT_RANGE, d.instrumentHeight),
     lockHeight: s.lockHeight === true,
     edgeGap: typeof s.edgeGap === "boolean" ? s.edgeGap : d.edgeGap,

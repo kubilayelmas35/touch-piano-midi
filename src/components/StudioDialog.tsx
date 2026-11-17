@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { canImport } from "../auth/account";
 import { useT, type DictKey } from "../i18n";
 import { formatTime } from "../lib/notes";
-import { addUserMidi } from "../state/actions";
+import { addUserMidi, updateSettings } from "../state/actions";
 import { setPanel, toast, useApp } from "../state/store";
 import { soundProgram } from "../audio/instruments";
 import { midiFileName, writeMidi } from "../studio/midiFile";
@@ -52,11 +52,17 @@ function ProNote() {
 function RecordTab() {
   const t = useT();
   const hasSong = useApp((s) => !!s.song?.notes.length);
+  const voice = useApp((s) => s.settings.recordVoice);
+  const hear = useApp((s) => s.settings.recordVoiceHear);
   const [freePlay, setFreePlay] = useState(true);
   return (
     <div className="space-y-3">
       <p className="text-sm leading-relaxed text-mist-300">{t("recordIntro")}</p>
       {hasSong && <Switch checked={freePlay} onChange={setFreePlay} label={t("recordFreePlay")} hint={t("recordFreePlayHint")} />}
+      <Switch checked={voice} onChange={(v) => updateSettings({ recordVoice: v })} label={t("recordVoice")} hint={t("recordVoiceHint")} />
+      {voice && (
+        <Switch checked={hear} onChange={(v) => updateSettings({ recordVoiceHear: v })} label={t("recordVoiceHear")} hint={t("recordVoiceHearHint")} />
+      )}
       <p className="flex gap-2 rounded-xl bg-white/[0.04] px-3 py-2 text-xs leading-relaxed text-mist-400">
         <IconInfo size={14} className="mt-0.5 shrink-0" />
         {t("recordInputsHint")}
