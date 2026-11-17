@@ -114,16 +114,26 @@ export function nektarDevice(name: string): boolean {
   return /impact|nektar|\blx\s?\d/i.test(name);
 }
 
-/** `status` is the high nibble (0x90 note on, 0xb0 control). `now` is milliseconds. */
-export function boardHit(status: number, d1: number, d2: number, device: string, now: number): BoardHit | null {
+/** Mixer presets send CC 7 on a different channel for each pot. Slot 0 stays the volume. */
+const MIXER: BoardKnob[] = ["volume", "cutoff", "resonance", "glideTime", "glideDepth", "lfoDelay", "lfoRate", "lfoDepth"];
+
+function knobValue(d2: number): number {
+  return Math.max(0, Math.min(1, d2 / 127));
+}
+
+/** `status` is the high nibble (0x90 note on, 0xb0 control). `channel` is 0–15. `now` is milliseconds. */
+export function boardHit(status: number, d1: number, d2: number, device: string, now: number, channel = 0): BoardHit | null {
   if (status === 0xb0) {
     const button = TRANSPORT[d1];
     if (button) {
       if (!rising(d1, d2 >= 64)) return { eat: true, action: null };
       return { eat: true, action: { t: "btn", id: button } };
     }
+    if (d1 === 7 && (channel & 7) !== 0) {
+      return { eat: true, action: { t: "knob", id: MIXER[channel & 7], v: knobValue(d2) } };
+    }
     const knob = KNOB[d1];
-    if (knob) return { eat: true, action: { t: "knob", id: knob, v: Math.max(0, Math.min(1, d2 / 127)) } };
+    if (knob) return { eat: true, action: { t: "knob", id: knob, v: knobValue(d2) } };
     return null;
   }
   if (status === 0x90 || status === 0x80) {

@@ -7,7 +7,7 @@ import { updateSettings } from "../state/actions";
 import { setPanel, toast, useApp } from "../state/store";
 import { applyBoard } from "./midiControls";
 import { bendCents, boardHit } from "./midiBoard";
-import { mapMidiNote, playedSpan, songPitchBounds, shapeVelocity, type MidiMap } from "./midiKeyboard";
+import { hardwareLow, mapMidiNote, playedSpan, songPitchBounds, shapeVelocity, type MidiMap } from "./midiKeyboard";
 
 let access: MIDIAccess | null = null;
 let started = false;
@@ -34,7 +34,12 @@ function playedMidi(raw: number): number {
   const s = useApp.getState().settings;
   const map = midiMap();
   const span = liveSpan(map);
-  return mapMidiNote(raw, map, span, s.midiFold && !!span);
+  const folded = mapMidiNote(raw, map, span, s.midiFold && !!span);
+  if (!span || !map.keys) return folded;
+  // Octave and transpose buttons move the note by 12 or more. Folding would put it back on the same key.
+  const straight = Math.max(0, Math.min(127, span[0] + (raw - hardwareLow(map))));
+  if (Math.abs(straight - folded) >= 12) return straight;
+  return folded;
 }
 
 function onMessage(this: MIDIInput, ev: MIDIMessageEvent): void {
@@ -62,7 +67,7 @@ function onMessage(this: MIDIInput, ev: MIDIMessageEvent): void {
     setPitchBend(bendCents(d1, d2));
     return;
   }
-  const control = boardHit(status, d1, d2, this.name || "", performance.now());
+  const control = boardHit(status, d1, d2, this.name || "", performance.now(), channel);
   if (control) {
     if (control.action) applyBoard(control.action);
     return;

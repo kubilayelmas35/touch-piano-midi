@@ -20,8 +20,8 @@ export interface MasterBus {
   master: GainNode;
   reverbSend: GainNode;
   tone: BiquadFilterNode;
-  color: BiquadFilterNode;
   place: StereoPannerNode;
+  trem: GainNode;
 }
 
 let bus: MasterBus | null = null;
@@ -86,18 +86,15 @@ export function getBus(): MasterBus {
   const master = ctx.createGain();
   master.gain.value = 0.9;
 
-  // Sits wide open until a controller moves it, so the piano is unchanged on its own.
+  // Kept out of the signal until a knob asks for it, so a resonant filter cannot hum on its own.
   const tone = ctx.createBiquadFilter();
   tone.type = "lowpass";
-  tone.frequency.value = 20000;
-  tone.Q.value = 0.7;
-  const color = ctx.createBiquadFilter();
-  color.type = "peaking";
-  color.frequency.value = 1800;
-  color.Q.value = 1.1;
-  color.gain.value = 0;
+  tone.frequency.value = 16000;
+  tone.Q.value = 0.5;
   const place = ctx.createStereoPanner();
   place.pan.value = 0;
+  const trem = ctx.createGain();
+  trem.gain.value = 1;
 
   // Rumble below hearing only eats headroom and makes small speakers rattle.
   const rumble = ctx.createBiquadFilter();
@@ -138,11 +135,9 @@ export function getBus(): MasterBus {
   const reverbReturn = ctx.createGain();
   reverbReturn.gain.value = 0.9;
 
-  input.connect(tone);
-  tone.connect(color);
-  color.connect(place);
-  place.connect(rumble);
-  place.connect(reverbSend);
+  input.connect(trem);
+  trem.connect(rumble);
+  trem.connect(reverbSend);
   reverbSend.connect(reverb);
   reverb.connect(reverbReturn);
   reverbReturn.connect(rumble);
@@ -153,7 +148,7 @@ export function getBus(): MasterBus {
   limiter.connect(ceiling.input);
   ceiling.output.connect(ctx.destination);
 
-  bus = { ctx, input, dryInput, master, reverbSend, tone, color, place };
+  bus = { ctx, input, dryInput, master, reverbSend, tone, place, trem };
   return bus;
 }
 
@@ -195,26 +190,64 @@ export function setReverbAmount(v: number): void {
   reverbSend.gain.setTargetAtTime(Math.max(0, Math.min(0.6, v)), ctx.currentTime, 0.05);
 }
 
-/** 0 muffled … 1 fully open. */
+let toneLive = false;
+let tremLfo: OscillatorNode | null = null;
+let tremDepth: GainNode | null = null;
+
+/** The filter stays out of the chain until a knob moves, so it cannot drone in the background. */
+function engageTone(): void {
+  if (toneLive) return;
+  toneLive = true;
+  const { input, tone, place, trem } = getBus();
+  input.disconnect();
+  input.connect(tone);
+  tone.connect(place);
+  place.connect(trem);
+}
+
+/** 0 muffled … 1 fully open. Loudness stays put, so this is a tone change. */
 export function setCutoff(amount: number): void {
+  engageTone();
   const { tone, ctx } = getBus();
   const a = Math.max(0, Math.min(1, amount));
-  const hz = 160 * Math.pow(20000 / 160, a);
+  const hz = 280 * Math.pow(14000 / 280, a);
   tone.frequency.setTargetAtTime(hz, ctx.currentTime, 0.02);
 }
 
-/** 0 plain … 1 a strong peak at the cutoff. */
+/** 0 plain … 1 a mild peak. Kept low so the filter cannot sing on its own. */
 export function setResonance(amount: number): void {
-  const { tone, color, ctx } = getBus();
+  engageTone();
+  const { tone, ctx } = getBus();
+  const a = Math.max(0, Math.min(1, amount));
+  tone.Q.setTargetAtTime(0.4 + a * 2.2, ctx.currentTime, 0.03);
+}
+
+/** 0 still … 1 a deep volume pulse, added on top of the vibrato. */
+export function setTremolo(amount: number): void {
+  const { trem, ctx } = getBus();
   const a = Math.max(0, Math.min(1, amount));
   const t = ctx.currentTime;
-  tone.Q.setTargetAtTime(0.5 + a * 9, t, 0.03);
-  color.frequency.setTargetAtTime(500 + a * 2500, t, 0.03);
-  color.gain.setTargetAtTime(a * 10, t, 0.03);
+  if (a < 0.03) {
+    if (tremDepth) tremDepth.gain.setTargetAtTime(0, t, 0.03);
+    trem.gain.setTargetAtTime(1, t, 0.03);
+    return;
+  }
+  if (!tremLfo || !tremDepth) {
+    tremLfo = ctx.createOscillator();
+    tremLfo.frequency.value = 5.5;
+    tremDepth = ctx.createGain();
+    tremDepth.gain.value = 0;
+    tremLfo.connect(tremDepth);
+    tremDepth.connect(trem.gain);
+    tremLfo.start();
+  }
+  trem.gain.setTargetAtTime(1, t, 0.03);
+  tremDepth.gain.setTargetAtTime(a * 0.45, t, 0.03);
 }
 
 /** 0 hard left … 1 hard right. 0.5 stays in the middle. */
 export function setStereoPan(amount: number): void {
+  engageTone();
   const { place, ctx } = getBus();
   place.pan.setTargetAtTime(Math.max(-1, Math.min(1, (amount - 0.5) * 1.6)), ctx.currentTime, 0.03);
 }

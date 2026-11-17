@@ -577,7 +577,7 @@ export function setPitchBend(cents: number): void {
 
 /** Vibrato depth in cents. The rate and the wait before it starts stay as they were. */
 export function setVibratoDepth(cents: number): void {
-  vibCents = Math.max(0, Math.min(45, cents));
+  vibCents = Math.max(0, Math.min(140, cents));
   if (lfoDepth) lfoDepth.gain.setTargetAtTime(vibCents, lfoDepth.context.currentTime, 0.03);
 }
 

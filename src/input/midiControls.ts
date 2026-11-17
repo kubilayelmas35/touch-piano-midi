@@ -1,4 +1,4 @@
-import { setCutoff, setResonance, setStereoPan } from "../audio/context";
+import { setCutoff, setResonance, setStereoPan, setTremolo } from "../audio/context";
 import { setGlideDepth, setGlideTime, setVibratoDelay, setVibratoDepth, setVibratoRate } from "../audio/sampler";
 import { engine } from "../engine/engine";
 import { tNow } from "../i18n";
@@ -50,7 +50,8 @@ function knob(id: BoardAction & { t: "knob" }): void {
   } else if (id.id === "lfoRate") {
     setVibratoRate(0.4 + v * 7.6);
   } else if (id.id === "lfoDepth") {
-    setVibratoDepth(v * 40);
+    setVibratoDepth(v * 140);
+    setTremolo(v);
   } else {
     setStereoPan(v);
   }

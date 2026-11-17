@@ -13,6 +13,8 @@ describe("LX25+ controls", () => {
 
   it("maps the eight pots, the fader and the two wheels", () => {
     expect(boardHit(0xb0, 7, 127, "Impact LX25+", 0)?.action).toEqual({ t: "knob", id: "volume", v: 1 });
+    expect(boardHit(0xb0, 7, 64, "Impact LX25+", 0, 1)?.action).toMatchObject({ t: "knob", id: "cutoff" });
+    expect(boardHit(0xb0, 7, 32, "Impact LX25+", 0, 2)?.action).toMatchObject({ t: "knob", id: "resonance" });
     expect(boardHit(0xb0, 74, 0, "x", 0)?.action).toEqual({ t: "knob", id: "cutoff", v: 0 });
     expect(boardHit(0xb0, 71, 127, "x", 0)?.action).toEqual({ t: "knob", id: "resonance", v: 1 });
     expect(boardHit(0xb0, 5, 64, "x", 0)?.action).toMatchObject({ t: "knob", id: "glideTime" });
