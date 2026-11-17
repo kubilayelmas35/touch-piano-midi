@@ -205,6 +205,20 @@ function engageTone(): void {
   place.connect(trem);
 }
 
+/** Take the filter and the panner back out, which is how the piano starts. */
+export function clearTone(): void {
+  const { input, tone, place, trem, ctx } = getBus();
+  place.pan.setTargetAtTime(0, ctx.currentTime, 0.02);
+  tone.frequency.setTargetAtTime(16000, ctx.currentTime, 0.02);
+  tone.Q.setTargetAtTime(0.5, ctx.currentTime, 0.02);
+  if (!toneLive) return;
+  toneLive = false;
+  input.disconnect();
+  tone.disconnect();
+  place.disconnect();
+  input.connect(trem);
+}
+
 /** 0 muffled … 1 fully open. Loudness stays put, so this is a tone change. */
 export function setCutoff(amount: number): void {
   engageTone();

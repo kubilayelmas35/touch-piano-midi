@@ -10,7 +10,8 @@ export type BoardButton =
   | "loop"
   | "right"
   | "left"
-  | "both";
+  | "both"
+  | "reset";
 
 export type BoardKnob =
   | "volume"
@@ -114,6 +115,14 @@ export function nektarDevice(name: string): boolean {
   return /impact|nektar|\blx\s?\d/i.test(name);
 }
 
+/** The second USB port. Mixer, Inst and Preset report here, not on the keybed port. */
+export function dawPort(name: string): boolean {
+  return /MIDIIN2|MIDIN2|MIDI2|MIDI\s*2|port\s*2|\(2\)|\s2$/i.test(name);
+}
+
+/** Mixer button on the DAW port: note 45, press 127, release 0. */
+const MIXER_NOTE = 45;
+
 /** Mixer presets send CC 7 on a different channel for each pot. Slot 0 stays the volume. */
 const MIXER: BoardKnob[] = ["volume", "cutoff", "resonance", "glideTime", "glideDepth", "lfoDelay", "lfoRate", "lfoDepth"];
 
@@ -129,6 +138,10 @@ export function boardHit(status: number, d1: number, d2: number, device: string,
       if (!rising(d1, d2 >= 64)) return { eat: true, action: null };
       return { eat: true, action: { t: "btn", id: button } };
     }
+    if (dawPort(device) && d1 === MIXER_NOTE) {
+      if (!rising(1000 + d1, d2 >= 64)) return { eat: true, action: null };
+      return { eat: true, action: { t: "btn", id: "reset" } };
+    }
     if (d1 === 7 && (channel & 7) !== 0) {
       return { eat: true, action: { t: "knob", id: MIXER[channel & 7], v: knobValue(d2) } };
     }
@@ -137,6 +150,11 @@ export function boardHit(status: number, d1: number, d2: number, device: string,
     return null;
   }
   if (status === 0x90 || status === 0x80) {
+    if (dawPort(device) && d1 === MIXER_NOTE) {
+      const on = status === 0x90 && d2 > 0;
+      if (!rising(1000 + d1, on)) return { eat: true, action: null };
+      return { eat: true, action: { t: "btn", id: "reset" } };
+    }
     if (!PAD[d1] || !nektarDevice(device)) return null;
     if (status === 0x80 || d2 === 0) return { eat: true, action: null };
     if (now - lastPad < 220) return { eat: true, action: null };

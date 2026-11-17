@@ -602,6 +602,16 @@ export function setGlideDepth(amount: number): void {
   glideDepth = Math.max(0, Math.min(1, amount));
 }
 
+/** Pitch, vibrato and glide back to the plain piano. */
+export function resetPerformance(): void {
+  setPitchBend(0);
+  setVibratoDepth(0);
+  setVibratoRate(5.2);
+  setVibratoDelay(0);
+  setGlideTime(0);
+  setGlideDepth(1);
+}
+
 function slideToPitch(source: AudioBufferSourceNode, detune: number, midi: number, when: number): void {
   const from = lastPlayedMidi;
   lastPlayedMidi = midi;

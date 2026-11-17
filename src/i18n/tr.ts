@@ -597,7 +597,7 @@ export const tr: Dict = {
   midiPedal: "Sustain pedalı",
   midiPedalHint: "Klavyenin pedalı piyano notalarını uzatır. Elinde olmayan bir pedal sürekli mesaj gönderiyorsa kapat.",
   midiBoardHint:
-    "Impact LX25+’ta Preset tuşuna bas; fabrika ayarı 1 bu. Inst ve Mixer yalnızca Nektar’ın DAW eklentisine gider. Sürgü sestir. Bırakınca yerine dönen teker sesi inceltir ve kalınlaştırır; yerinde kalan teker titreşim ekler. Soldan sağa sekiz düğme: parlaklık, harmonik, kaydırma süresi, kaydırma derinliği, titreşim gecikmesi, titreşim hızı, titreşim derinliği, sağ-sol. Taşıma tuşları: döngü, bir ölçü geri, bir ölçü ileri, başa sar, çal ya da duraklat, kayıt. Pad’ler: çal, başa sar, kayıt, metronom, sağ el, sol el, iki el, döngü.",
+    "Impact LX25+’ta Preset tuşuna bas; fabrika ayarı 1 bu. Mixer tuşu sesi düz piyanoya döndürür. Inst yalnızca Nektar’ın DAW eklentisine gider. Sürgü sestir. Bırakınca yerine dönen teker sesi inceltir ve kalınlaştırır; yerinde kalan teker titreşim ekler. Soldan sağa sekiz düğme: parlaklık, harmonik, kaydırma süresi, kaydırma derinliği, titreşim gecikmesi, titreşim hızı, titreşim derinliği, sağ-sol. Taşıma tuşları: döngü, bir ölçü geri, bir ölçü ileri, başa sar, çal ya da duraklat, kayıt. Pad’ler: çal, başa sar, kayıt, metronom, sağ el, sol el, iki el, döngü.",
   ctlPlay: "Çalıyor",
   ctlPause: "Duraklatıldı",
   ctlStop: "Başa sarıldı",
@@ -609,6 +609,7 @@ export const tr: Dict = {
   ctlLeft: "Sol el",
   ctlBoth: "İki el",
   ctlVol: "Ses %{n}",
+  ctlReset: "Ses varsayılana döndü",
   ctlCutoff: "Kesim %{n}",
   ctlReso: "Rezonans %{n}",
   ctlEnv: "Kaydırma süresi %{n}",

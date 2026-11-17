@@ -38,4 +38,12 @@ describe("LX25+ controls", () => {
     expect(boardHit(0x90, 40, 90, "Keystation", 400)).toBeNull();
     expect(boardHit(0x90, 60, 90, "Impact LX25+", 500)).toBeNull();
   });
+
+  it("puts the sound back when the Mixer button arrives on the second port", () => {
+    resetBoard();
+    expect(boardHit(0x90, 45, 127, "MIDIIN2 (Impact LX25+)", 0)?.action).toEqual({ t: "btn", id: "reset" });
+    expect(boardHit(0x90, 45, 0, "MIDIIN2 (Impact LX25+)", 20)?.action).toBeNull();
+    expect(boardHit(0x90, 45, 127, "MIDIIN2 (Impact LX25+)", 40)?.action).toEqual({ t: "btn", id: "reset" });
+    expect(boardHit(0x90, 45, 127, "Impact LX25+", 60)).toBeNull();
+  });
 });

@@ -1,9 +1,10 @@
-import { setCutoff, setResonance, setStereoPan, setTremolo } from "../audio/context";
-import { setGlideDepth, setGlideTime, setVibratoDelay, setVibratoDepth, setVibratoRate } from "../audio/sampler";
+import { clearTone, setCutoff, setResonance, setStereoPan, setTremolo } from "../audio/context";
+import { resetPerformance, setGlideDepth, setGlideTime, setVibratoDelay, setVibratoDepth, setVibratoRate } from "../audio/sampler";
 import { engine } from "../engine/engine";
 import { tNow } from "../i18n";
 import type { DictKey } from "../i18n/en";
 import { cycleLoop, setHand, updateSettings } from "../state/actions";
+import { defaultSettings } from "../state/settings";
 import { toast, useApp } from "../state/store";
 import { startRecording, stopRecording } from "../studio/recording";
 import type { BoardAction, BoardKnob } from "./midiBoard";
@@ -94,6 +95,13 @@ function button(id: Exclude<BoardAction, { t: "knob" }>["id"]): void {
     toast(tNow(on ? "ctlMetroOn" : "ctlMetroOff"));
   } else if (id === "loop") {
     cycleLoop();
+  } else if (id === "reset") {
+    resetPerformance();
+    setTremolo(0);
+    clearTone();
+    const volume = defaultSettings().volume;
+    if (!near(useApp.getState().settings.volume, volume)) updateSettings({ volume });
+    toast(tNow("ctlReset"));
   } else if (id === "right" || id === "left" || id === "both") {
     const hand = id === "right" ? "right" : id === "left" ? "left" : "both";
     setHand(hand);

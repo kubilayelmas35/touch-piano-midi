@@ -602,7 +602,7 @@ export const en = {
   midiPedal: "Sustain pedal",
   midiPedalHint: "The keyboard's pedal holds the piano notes. Turn it off if a pedal you don't have keeps sending messages.",
   midiBoardHint:
-    "Press Preset on the Impact LX25+ so factory preset 1 is active. Inst and Mixer only talk to Nektar's DAW plugin. The fader is the volume. The wheel that springs back bends the pitch; the wheel that stays adds vibrato. The eight knobs, from the left: brightness, harmonics, glide time, glide depth, vibrato delay, vibrato speed, vibrato depth, left to right. Transport: loop, one bar back, one bar forward, back to the start, play or pause, record. Pads: play, back to the start, record, metronome, right hand, left hand, both hands, loop.",
+    "Press Preset on the Impact LX25+ so factory preset 1 is active. Press Mixer to put the sound back to the plain piano. Inst only talks to Nektar's DAW plugin. The fader is the volume. The wheel that springs back bends the pitch; the wheel that stays adds vibrato. The eight knobs, from the left: brightness, harmonics, glide time, glide depth, vibrato delay, vibrato speed, vibrato depth, left to right. Transport: loop, one bar back, one bar forward, back to the start, play or pause, record. Pads: play, back to the start, record, metronome, right hand, left hand, both hands, loop.",
   ctlPlay: "Playing",
   ctlPause: "Paused",
   ctlStop: "Back to the start",
@@ -614,6 +614,7 @@ export const en = {
   ctlLeft: "Left hand",
   ctlBoth: "Both hands",
   ctlVol: "Volume {n}%",
+  ctlReset: "Sound back to default",
   ctlCutoff: "Cutoff {n}%",
   ctlReso: "Resonance {n}%",
   ctlEnv: "Glide time {n}%",
