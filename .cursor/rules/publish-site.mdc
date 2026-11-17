@@ -1,0 +1,12 @@
+---
+description: Publish finished web changes to sonatrio.com without asking
+alwaysApply: true
+---
+
+# Publish to the site
+
+When a web change is finished and working, publish it to sonatrio.com in the same turn. Do not ask whether to push, and do not wait for a second confirmation.
+
+- Commit the source, run `npm run build` (output is `docs/`), drop license files that only changed line endings, then commit the site build.
+- Fast-forward `main` and push `origin main`. GitHub Pages serves the committed `docs/` folder.
+- Tell the user it is live and to hard-refresh (Ctrl+F5).
